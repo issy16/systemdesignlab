@@ -38,11 +38,6 @@
   },
   {
    "kind": "html",
-   "en": "<!-- Plan. Stuck point: \"optimistic vs pessimistic\" sounds like personality types; deadlocks sound exotic.\n     Lab 1: two admins edit one concert (lost edit). None / optimistic (version) / pessimistic (lock).\n     Lab 2: two transfers lock two rows in opposite order -> deadlock; fix with a consistent lock order. -->",
-   "zh": "="
-  },
-  {
-   "kind": "html",
    "en": "system<b>.design.lab</b>",
    "zh": "="
   },

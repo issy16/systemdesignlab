@@ -114,6 +114,7 @@ def extract_segments(html):
                 text = code[a + 1:b - 1]
                 if wanted_js(text, vocab): add('js', code[a:b])
             continue
+        part = re.sub(r'<!--.*?-->', '', part, flags=re.S)  # comments are never shown
         for m in ATTR.finditer(part):
             add('attr', m.group(2))
         for chunk in BREAK.split(part):
