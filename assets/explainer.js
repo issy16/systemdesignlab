@@ -258,7 +258,7 @@
     [13, 4, 'locking-deadlocks', 'Locking and deadlocks', [36, 37, 40], 'built'],
     [14, 4, 'replication-failover', 'Replication and failover', [29, 32, 35, 85], 'built'],
     [15, 4, 'sharding', 'Sharding and partitioning', [30, 31], 'built'],
-    [16, 4, 'cap-theorem', 'CAP theorem', [34, 95], 'planned'],
+    [16, 4, 'cap-theorem', 'CAP theorem', [34, 95], 'built'],
     [17, 5, 'ci-cd', 'CI/CD and safe deployments', [6, 51, 52, 53, 54, 55], 'partial'],
     [18, 5, 'observability', 'Observability', [58, 59, 60, 61, 62, 66], 'planned'],
     [19, 5, 'tls-secrets', 'TLS and secrets', [67, 71, 73], 'planned'],

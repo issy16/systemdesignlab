@@ -115,6 +115,12 @@ const FLOWS = {
     ['click', seg('keySeg', 3), 300],
     ['click', seg('qSeg', 2), 200],
   ],
+  'cap-theorem': [
+    ['click', '#player .btn.primary', 3500],
+    ['click', seg('modeSeg', 2), 100], ['click', '#cut', 4000],
+    ['click', '#heal', 500],
+    ['click', '#player button:nth-child(3)', 100], ['click', seg('modeSeg', 1), 100], ['click', '#cut', 4500],
+  ],
 };
 
 (async () => {

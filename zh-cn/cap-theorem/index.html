@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-Hans-CN" data-lang="zh-cn" data-slug="cap-theorem">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="切断两个数据中心之间的网络，然后做出选择：拒绝购买以保持正确，或继续贩售而超卖。">
+<title>CAP 定理 · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/explainer.css">
+</head>
+<body>
+<!-- Plan. Stuck point: "pick 2 of 3" sounds like a menu; really, partitions happen, and during one you choose consistency or availability.
+     Lab: US and EU both sell the same 30 seats. Cut the link. CP: EU refuses; AP: both sell, then oversell on heal.
+     One difference: during a partition, refuse (C) or answer with possibly-wrong data (A). -->
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="章节"><a href="#lab">实验室</a><a href="#real">设置</a><a href="#recap">重点整理</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>第 16 页 · 阶段 4 · 保持数据正确</span><span class="hot">34 · 95</span></div>
+  <div class="eyebrow">CAP 定理、网络分割</div>
+  <h1>两个数据中心之间的线路断了。<em>你还要继续卖吗？</em></h1>
+  <div class="scenario"><b>Encore</b>Encore 在美国和欧洲各有一个数据中心，让世界各地的歌迷都能快速加载页面。两边都在卖同一场演唱会的座位，并互相同步。某天晚上，两边之间的连接断了。没有一边能确定另一边是不是刚卖掉了最后一个座位。</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">打开实验室 ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>实验室 · 在压力下做选择</span><span class="hot" id="tag">一致性优先</span></div>
+  <h2>20 个座位，两个数据中心</h2>
+  <p>每个数据中心大约每秒有两位歌迷买座位。连接正常时，每笔销售都会由两边共同确认。官方的座位数由美国数据中心持有。数字是模拟的。</p>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">发生分割时，选择</span><div id="modeSeg"></div></div>
+      <div class="ctl"><span class="lab-k">美国与欧洲之间的连接</span>
+        <div class="presets"><button class="btn sm bad" id="cut" type="button">✂ 切断网络</button><button class="btn sm" id="heal" type="button">🔌 重新连接</button></div></div>
+      <div class="ctl"><span class="lab-k">模拟</span><div id="player"></div></div>
+    </div>
+    <div class="servers" id="dcs" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))" aria-label="数据中心"></div>
+    <div class="status" id="link" role="status"></div>
+    <div class="meters" style="margin:0">
+      <div class="meter"><div class="k">已售出的票</div><div class="v" id="mSold">0</div><div class="d">真正的座位共 20 个</div></div>
+      <div class="meter"><div class="k">被挡下的歌迷</div><div class="v" id="mRef">0</div><div class="d">「请稍后再试」</div></div>
+      <div class="meter"><div class="k">超卖</div><div class="v" id="mOver">0</div><div class="d">不存在的座位所卖出的票</div></div>
+    </div>
+    <div class="status" id="status" role="status">按「播放」开始贩售。</div>
+  </div>
+  <h3>试试看</h3>
+  <ol class="missions" id="missions"></ol>
+  <div class="compare">
+    <div><h3>一致性优先（CP）</h3><p style="margin:0">如果某一边无法向官方座位数确认，它就<b>拒绝</b>。每个回答都是正确的，但在网络恢复之前，有些歌迷会看到错误。</p></div>
+    <div><h3>可用性优先（AP）</h3><p style="margin:0">每一边都<b>继续响应</b>自己所知道的。没有人会看到错误，但两边可能意见不同，事后你得收拾这些冲突。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">关键差别</div><p>CAP 定理说的是：当网络发生<b>分割（partition）</b>（被切开、彼此无法沟通）时，系统必须选择：拒绝部分请求以保持<b>一致（consistent）</b>，或是用可能错误的数据响应以保持<b>可用（available）</b>。网络分割不是可选的，所以真正的问题是你为每一种数据选择哪一边。</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>第 2 幕 · 真实世界</span><span class="hot">一致性层级</span></div>
+  <h2>同样的选择，变成一个设置</h2>
+  <p>分布式数据库让你可以针对每个查找做选择。下面是 Cassandra 风格的一致性层级。DynamoDB、Cosmos DB 等也有类似的选项。<b>把鼠标移到某一行上，或点一下。</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="一致性层级设置范例"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 选一行</div><p id="exP">每一行反白后，都会对应到实验室里的一种模式。</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>重点整理 · 带走这些</span><span class="hot">♥</span></div>
+  <h2>整页浓缩在一个画面</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">一定会发生</div><div class="t">网络分割</div><p>线路会断、路由器会出错、数据中心会停电。你系统的各个部分还在运作，却无法互相沟通。</p></div>
+    <div class="card"><div class="sub">选择</div><div class="t">CAP</div><p>分割期间：拒绝以保持正确（CP），或响应以保持运作（AP）。两者无法同时拥有。</p></div>
+    <div class="card"><div class="sub">依数据而定</div><div class="t">刻意做选择</div><p>座位和付款：一致性。按赞、浏览次数、推荐：可用性。同一个 App 可以对每种数据做不同的选择。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">取舍</div><p>CP 在分割期间牺牲可用性；AP 牺牲正确性，事后还需要解决冲突。即使没有分割，也有一个较小版本的同样取舍：等另一边确认（一致）比在本地直接响应（快）要慢。</p></div>
+  <h3 style="margin-top:26px">考考自己 <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="页面"></nav>
+</main>
+
+<script src="../../assets/explainer.js"></script>
+<script src="../../assets/i18n.zh-cn.js"></script>
+<script>
+(() => {
+const { $, el } = X;
+const DT = 100, SEATS = 20, EVERY = 500;
+
+/* ---------- simulation: deterministic, pure state + tick ---------- */
+function init(o = {}) {
+  return Object.assign({ t: 0, ap: false, cut: false, official: SEATS, us: { sold: 0, local: SEATS, refused: 0 }, eu: { sold: 0, local: SEATS, refused: 0 }, euPending: 0, oversold: 0, healed: 0, ticks: 0, cutAt: -1 }, o);
+}
+function buy(s, side) {
+  const dc = s[side], other = side === 'us' ? s.eu : s.us;
+  if (!s.cut) {
+    if (s.official <= 0) { dc.refused++; return; }
+    s.official--; dc.sold++; dc.local = other.local = s.official; return;
+  }
+  // partition
+  if (!s.ap) {
+    if (side === 'eu') { dc.refused++; return; }              // EU can't reach the official count
+    if (s.official <= 0) { dc.refused++; return; }
+    s.official--; dc.sold++; dc.local = s.official; return;
+  }
+  if (dc.local <= 0) { dc.refused++; return; }                // AP: answer with what you know
+  dc.local--; dc.sold++;
+  if (side === 'us') s.official--; else s.euPending++;
+}
+function heal(s) {
+  if (!s.cut) return;
+  s.cut = false;
+  if (s.ap) {
+    const real = s.official - s.euPending;
+    if (real < 0) s.oversold += -real;
+    s.official = Math.max(0, real); s.euPending = 0;
+  }
+  s.us.local = s.eu.local = s.official; s.healed++;
+}
+function tick(s) {
+  const t1 = s.t + DT;
+  if (s.t % EVERY === 0) buy(s, 'us');
+  if (s.t % EVERY === 200) buy(s, 'eu'); // offset so the two sides alternate
+  s.t = t1; s.ticks++;
+  return s;
+}
+
+/* ---------- UI ---------- */
+let S = init();
+const mis = X.missions($('#missions'), [
+  { text: '在连接正常的情况下按<b>播放</b>。', hint: '每笔销售都由两个数据中心确认。两边显示的座位数永远一样。', check: s => s.ticks >= 30 && !s.cut },
+  { text: '选择<b>可用性优先</b>，然后<b>切断网络</b>。', hint: '两边都依自己手上的座位数继续贩售。没有歌迷看到错误。', check: s => s.ap && s.cut && s.us.sold + s.eu.sold > 0 && s.t - s.cutAt > 3000 },
+  { text: '等几秒钟，然后<b>重新连接</b>。', hint: '现在两边互相核对，发现同样的座位被卖了两次。（如果先卖完了，就按重置，早一点切断网络。）', check: s => s.ap && s.healed > 0 && s.oversold > 0 },
+  { text: '按<b>↺ 重置</b>，选择<b>一致性优先</b>，再切断一次网络。', hint: '欧洲那边无法向官方座位数确认，所以把歌迷挡下来。没有任何一个座位被卖两次。', check: s => !s.ap && s.cut && s.eu.refused > 2 && s.oversold === 0 },
+]);
+function render() {
+  const total = S.us.sold + S.eu.sold;
+  $('#tag').textContent = S.ap ? '可用性优先' : '一致性优先';
+  const box = $('#dcs'); box.innerHTML = '';
+  [['us', '美国 · 弗吉尼亚'], ['eu', '欧洲 · 法兰克福']].forEach(([k, name]) => {
+    const dc = S[k];
+    const refusing = S.cut && !S.ap && k === 'eu';
+    const d = el('div', 'server');
+    d.innerHTML = `<div class="nm"><span>${name}</span>${refusing ? '<span class="pill bad">拒绝中</span>' : '<span class="pill ok">贩售中</span>'}</div>
+      <div class="mono">以为剩下的座位：<b>${refusing ? '?' : dc.local}</b></div>
+      <div class="mono">这里卖出：${dc.sold} · 挡下：${dc.refused}</div>`;
+    box.append(d);
+  });
+  const ln = $('#link');
+  ln.className = 'status ' + (S.cut ? 'bad' : 'ok');
+  ln.textContent = S.cut ? '✂ 分割：美国和欧洲无法连到彼此。两边都还在运作，也都还有歌迷上门。' : '🔌 已连接：每笔销售都由两边共同确认。';
+  $('#mSold').textContent = total;
+  $('#mSold').parentElement.className = 'meter' + (total > SEATS ? ' bad' : '');
+  $('#mRef').textContent = S.us.refused + S.eu.refused;
+  $('#mOver').textContent = S.oversold;
+  $('#mOver').parentElement.className = 'meter' + (S.oversold ? ' bad' : '');
+  $('#cut').disabled = S.cut; $('#heal').disabled = !S.cut;
+  const st = $('#status');
+  if (!S.t) { st.className = 'status'; st.textContent = '按「播放」开始贩售。'; }
+  else if (S.oversold) { st.className = 'status bad'; st.textContent = `✕ 重新连接后：有 ${S.oversold} 位歌迷拿着不存在的座位的票。两边都依自己那份「剩余座位」在卖。现在得有人去寄信、退款、道歉。`; }
+  else if (S.cut && S.ap) { st.className = 'status wait'; st.textContent = '⚠ 两边都在卖，每位歌迷都得到响应，但两边的座位数正在渐行渐远。目前还没有人知道。'; }
+  else if (S.cut) { st.className = 'status wait'; st.textContent = `⚠ 欧洲那边正在拒绝购买（目前挡下 ${S.eu.refused} 位歌迷）：它无法向官方座位数确认。所有卖出去的都是真的。`; }
+  else if (total >= SEATS) { st.className = 'status ok'; st.textContent = '✓ 售罄，20 个座位刚好卖出 20 张票。'; }
+  else { st.className = 'status ok'; st.textContent = `✓ 一致：两个数据中心都同意还剩 ${S.official} 个座位。`; }
+  player.clock(`t = ${(S.t / 1000).toFixed(1)} s`);
+  mis.update(S);
+}
+const player = X.player($('#player'), {
+  step: () => { tick(S); render(); }, stepTicks: 5,
+  reset: () => { S = init({ ap: S.ap }); render(); },
+});
+X.seg($('#modeSeg'), ['一致性优先（CP）', '可用性优先（AP）'], i => { S.ap = i === 1; render(); }, 0);
+$('#cut').addEventListener('click', () => { S.cut = true; S.cutAt = S.t; if (!player.running) player.play(); render(); });
+$('#heal').addEventListener('click', () => { heal(S); render(); });
+render();
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="c">-- 可用性优先：任何一个副本都可以响应</span>', null],
+  ['<span class="key">CONSISTENCY ONE</span>;', 'one'],
+  ['<span class="key">SELECT</span> seats_left <span class="key">FROM</span> concerts <span class="key">WHERE</span> id = <span class="s">\'reunion-1\'</span>;', 'oneread'],
+  ['', null],
+  ['<span class="c">-- 一致性优先：必须有过半数的副本同意</span>', null],
+  ['<span class="key">CONSISTENCY QUORUM</span>;', 'quorum'],
+  ['<span class="key">UPDATE</span> concerts <span class="key">SET</span> seats_left = 11 <span class="key">WHERE</span> id = <span class="s">\'reunion-1\'</span>', 'lwt'],
+  ['  <span class="key">IF</span> seats_left = 12;  <span class="c">-- only if nobody else changed it</span>', 'lwt'],
+  ['', null],
+  ['<span class="c">-- 分割期间，少数那一边会收到：</span>', null],
+  ['<span class="c">-- Unavailable: Cannot achieve consistency level QUORUM</span>', 'error'],
+], {
+  one: ['ONE', '只要任何一个副本响应就回答。即使其他副本连不上也能运作，所以永远可用，但可能返回旧的值。这就是实验室的「可用性优先」。'],
+  oneread: ['快，但可能过期', '适合会自动更新的座位图或按赞计数器。不适合拿来决定一个座位能不能卖。'],
+  quorum: ['QUORUM', '必须有过半数的副本响应。如果分割让你落在较小的那一边，就没有过半数，请求会失败而不是用猜的。这就是实验室的「一致性优先」。'],
+  lwt: ['有条件的写入', '只有在座位数仍然是你看到的那个值时才卖。搭配过半数（quorum），两边就不可能卖出同一个座位。'],
+  error: ['一致性的代价', '这个错误就是实验室里那个「拒绝中」的欧洲数据中心。它是一个正确的回答：「我现在无法确定。」'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: 'Encore 的哪个功能应该保持正确（CP），即使代价是分割期间会出现错误？', opts: [
+    ['「正在看这场演唱会的人数」计数器', false, '就算几分钟内有点不准，也不会有人受害。可用性是比较好的选择。'],
+    ['卖出演唱会的最后几个座位', true, '两位歌迷为同一个座位付钱，比一位歌迷看到「请一分钟后再试」糟糕得多。'],
+    ['演唱会推荐', false, '过时的推荐没有伤害。让它保持可用。'],
+  ] },
+  { q: '「我们就选 CA 吧：一致又可用，跳过分割容忍。」这有什么问题？', opts: [
+    ['没问题，这是很常见的选择', false, '只适用于跑在单一机器上、根本没有网络可以被分割的系统。'],
+    ['不管你有没有规划，分割都会发生；唯一的选择是发生时要怎么表现', true, '对任何分散在多台机器上的系统，「P」都不是可选的。真正的选择是分割期间要 C 还是 A。'],
+    ['CA 系统比较慢', false, '问题不在速度。分布式系统无法选择不面对网络故障。'],
+  ] },
+  { q: '分割恢复后，一个可用性优先的系统发现两边都改了同一笔数据。接下来必须怎么做？', opts: [
+    ['什么都不用：数据库会完美地合并', false, '有时候可以（计数器、集合），但像同一个座位卖了两次这种互相冲突的决定，就需要规则或由人处理。'],
+    ['冲突解决：选出赢家（例如最后写入者胜）、合并，或手动修正，例如退款给某位歌迷', true, 'AP 系统把问题从「现在出错」转成「之后收拾」。在需要之前就先规划好收拾的方法。'],
+    ['从备份还原', false, '两边的变更都是真的。备份会把合法的销售一起丢掉。'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'cap-theorem');
+})();
+</script>
+</body>
+</html>

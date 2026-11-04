@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Cut the network between two data centers and choose: refuse purchases to stay correct, or keep selling and oversell.">
+<title>CAP Theorem · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/explainer.css">
+</head>
+<body>
+<!-- Plan. Stuck point: "pick 2 of 3" sounds like a menu; really, partitions happen, and during one you choose consistency or availability.
+     Lab: US and EU both sell the same 30 seats. Cut the link. CP: EU refuses; AP: both sell, then oversell on heal.
+     One difference: during a partition, refuse (C) or answer with possibly-wrong data (A). -->
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="Sections"><a href="#lab">Lab</a><a href="#real">The config</a><a href="#recap">Recap</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>page 16 · stage 4 · keep data correct</span><span class="hot">34 · 95</span></div>
+  <div class="eyebrow">CAP theorem, network partitions</div>
+  <h1>The cable between two data centers breaks. <em>Do you keep selling?</em></h1>
+  <div class="scenario"><b>Encore</b>Encore runs in a US and an EU data center, so fans everywhere get fast pages. Both sell seats for the same concert and keep each other up to date. One evening the link between them goes down. Neither side can tell whether the other just sold the last seat.</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">Open the lab ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>lab · choose under pressure</span><span class="hot" id="tag">consistency first</span></div>
+  <h2>20 seats, two data centers</h2>
+  <p>Fans buy a seat in each data center about twice a second. While the link works, every sale is confirmed by both sides. The US data center holds the official count. Simulated numbers.</p>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">During a partition, choose</span><div id="modeSeg"></div></div>
+      <div class="ctl"><span class="lab-k">The link between US and EU</span>
+        <div class="presets"><button class="btn sm bad" id="cut" type="button">✂ Cut the network</button><button class="btn sm" id="heal" type="button">🔌 Reconnect</button></div></div>
+      <div class="ctl"><span class="lab-k">Simulation</span><div id="player"></div></div>
+    </div>
+    <div class="servers" id="dcs" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))" aria-label="Data centers"></div>
+    <div class="status" id="link" role="status"></div>
+    <div class="meters" style="margin:0">
+      <div class="meter"><div class="k">Tickets sold</div><div class="v" id="mSold">0</div><div class="d">of 20 real seats</div></div>
+      <div class="meter"><div class="k">Fans turned away</div><div class="v" id="mRef">0</div><div class="d">“try again later”</div></div>
+      <div class="meter"><div class="k">Oversold</div><div class="v" id="mOver">0</div><div class="d">tickets for seats that don't exist</div></div>
+    </div>
+    <div class="status" id="status" role="status">Press Play to start selling.</div>
+  </div>
+  <h3>Try this</h3>
+  <ol class="missions" id="missions"></ol>
+  <div class="compare">
+    <div><h3>Consistency first (CP)</h3><p style="margin:0">If a side can't confirm with the official count, it <b>refuses</b>. Every answer is correct, but some fans get an error until the network heals.</p></div>
+    <div><h3>Availability first (AP)</h3><p style="margin:0">Every side <b>keeps answering</b> with what it knows. Nobody gets an error, but the two sides can disagree, and you have to clean up the conflicts afterwards.</p></div>
+  </div>
+  <div class="takeaway"><div class="t">The one difference</div><p>The CAP theorem says that when the network is <b>partitioned</b> (split so parts can't talk), a system must choose: stay <b>consistent</b> by refusing some requests, or stay <b>available</b> by answering with data that might be wrong. Partitions aren't optional, so the real question is which one you pick, for each kind of data.</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>act 2 · the real thing</span><span class="hot">consistency levels</span></div>
+  <h2>The same choice, as a setting</h2>
+  <p>Distributed databases let you pick per query. These are Cassandra-style consistency levels. DynamoDB, Cosmos DB and others have similar options. <b>Hover or tap a line.</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="Example consistency level settings"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 pick a line</div><p id="exP">Each highlighted line maps to a mode in the lab.</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>recap · keep this</span><span class="hot">♥</span></div>
+  <h2>The whole page on one screen</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">It will happen</div><div class="t">Network partition</div><p>Links fail, routers misbehave, a data center goes dark. Parts of your system can't talk while still running.</p></div>
+    <div class="card"><div class="sub">The choice</div><div class="t">CAP</div><p>During a partition: refuse to stay correct (CP), or answer to stay up (AP). You can't have both at once.</p></div>
+    <div class="card"><div class="sub">Per data</div><div class="t">Choose deliberately</div><p>Seats and payments: consistency. Likes, view counts, recommendations: availability. One app can make different choices for each.</p></div>
+  </div>
+  <div class="takeaway"><div class="t">The tradeoff</div><p>CP costs availability during partitions; AP costs correctness and needs conflict resolution afterwards. Even without a partition there's a smaller version of the same trade: waiting for the other side to confirm (consistent) is slower than answering locally (fast).</p></div>
+  <h3 style="margin-top:26px">Check it <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="Pages"></nav>
+</main>
+
+<script src="../assets/explainer.js"></script>
+<script>
+(() => {
+const { $, el } = X;
+const DT = 100, SEATS = 20, EVERY = 500;
+
+/* ---------- simulation: deterministic, pure state + tick ---------- */
+function init(o = {}) {
+  return Object.assign({ t: 0, ap: false, cut: false, official: SEATS, us: { sold: 0, local: SEATS, refused: 0 }, eu: { sold: 0, local: SEATS, refused: 0 }, euPending: 0, oversold: 0, healed: 0, ticks: 0, cutAt: -1 }, o);
+}
+function buy(s, side) {
+  const dc = s[side], other = side === 'us' ? s.eu : s.us;
+  if (!s.cut) {
+    if (s.official <= 0) { dc.refused++; return; }
+    s.official--; dc.sold++; dc.local = other.local = s.official; return;
+  }
+  // partition
+  if (!s.ap) {
+    if (side === 'eu') { dc.refused++; return; }              // EU can't reach the official count
+    if (s.official <= 0) { dc.refused++; return; }
+    s.official--; dc.sold++; dc.local = s.official; return;
+  }
+  if (dc.local <= 0) { dc.refused++; return; }                // AP: answer with what you know
+  dc.local--; dc.sold++;
+  if (side === 'us') s.official--; else s.euPending++;
+}
+function heal(s) {
+  if (!s.cut) return;
+  s.cut = false;
+  if (s.ap) {
+    const real = s.official - s.euPending;
+    if (real < 0) s.oversold += -real;
+    s.official = Math.max(0, real); s.euPending = 0;
+  }
+  s.us.local = s.eu.local = s.official; s.healed++;
+}
+function tick(s) {
+  const t1 = s.t + DT;
+  if (s.t % EVERY === 0) buy(s, 'us');
+  if (s.t % EVERY === 200) buy(s, 'eu'); // offset so the two sides alternate
+  s.t = t1; s.ticks++;
+  return s;
+}
+
+/* ---------- UI ---------- */
+let S = init();
+const mis = X.missions($('#missions'), [
+  { text: 'Press <b>Play</b> with the link connected.', hint: 'Every sale is confirmed by both data centers. Both always show the same count.', check: s => s.ticks >= 30 && !s.cut },
+  { text: 'Choose <b>Availability first</b> and <b>cut the network</b>.', hint: 'Both sides keep selling from their own copy of the count. No fan sees an error.', check: s => s.ap && s.cut && s.us.sold + s.eu.sold > 0 && s.t - s.cutAt > 3000 },
+  { text: 'Wait a few seconds, then <b>reconnect</b>.', hint: 'Now the two sides compare notes and find they sold the same seats twice. (If it sold out first, Reset and cut sooner.)', check: s => s.ap && s.healed > 0 && s.oversold > 0 },
+  { text: 'Press <b>↺ Reset</b>, choose <b>Consistency first</b>, and cut the network again.', hint: 'The EU side can\'t confirm with the official count, so it turns fans away. No seat is ever sold twice.', check: s => !s.ap && s.cut && s.eu.refused > 2 && s.oversold === 0 },
+]);
+function render() {
+  const total = S.us.sold + S.eu.sold;
+  $('#tag').textContent = S.ap ? 'availability first' : 'consistency first';
+  const box = $('#dcs'); box.innerHTML = '';
+  [['us', 'US · Virginia'], ['eu', 'EU · Frankfurt']].forEach(([k, name]) => {
+    const dc = S[k];
+    const refusing = S.cut && !S.ap && k === 'eu';
+    const d = el('div', 'server');
+    d.innerHTML = `<div class="nm"><span>${name}</span>${refusing ? '<span class="pill bad">refusing</span>' : '<span class="pill ok">selling</span>'}</div>
+      <div class="mono">thinks seats left: <b>${refusing ? '?' : dc.local}</b></div>
+      <div class="mono">sold here: ${dc.sold} · turned away: ${dc.refused}</div>`;
+    box.append(d);
+  });
+  const ln = $('#link');
+  ln.className = 'status ' + (S.cut ? 'bad' : 'ok');
+  ln.textContent = S.cut ? '✂ Partition: US and EU can\'t reach each other. Both are still running and still getting fans.' : '🔌 Connected: every sale is confirmed by both sides.';
+  $('#mSold').textContent = total;
+  $('#mSold').parentElement.className = 'meter' + (total > SEATS ? ' bad' : '');
+  $('#mRef').textContent = S.us.refused + S.eu.refused;
+  $('#mOver').textContent = S.oversold;
+  $('#mOver').parentElement.className = 'meter' + (S.oversold ? ' bad' : '');
+  $('#cut').disabled = S.cut; $('#heal').disabled = !S.cut;
+  const st = $('#status');
+  if (!S.t) { st.className = 'status'; st.textContent = 'Press Play to start selling.'; }
+  else if (S.oversold) { st.className = 'status bad'; st.textContent = `✕ After reconnecting: ${S.oversold} fans hold tickets for seats that don't exist. Both sides sold from their own copy of “seats left”. Someone now has to email, refund and apologize.`; }
+  else if (S.cut && S.ap) { st.className = 'status wait'; st.textContent = '⚠ Both sides are selling and every fan gets an answer, but the two counts are drifting apart. Nobody knows yet.'; }
+  else if (S.cut) { st.className = 'status wait'; st.textContent = `⚠ The EU side is refusing purchases (${S.eu.refused} fans so far): it can't confirm with the official count. Everything that was sold is real.`; }
+  else if (total >= SEATS) { st.className = 'status ok'; st.textContent = '✓ Sold out, with exactly 20 tickets for 20 seats.'; }
+  else { st.className = 'status ok'; st.textContent = `✓ Consistent: both data centers agree that ${S.official} seats are left.`; }
+  player.clock(`t = ${(S.t / 1000).toFixed(1)} s`);
+  mis.update(S);
+}
+const player = X.player($('#player'), {
+  step: () => { tick(S); render(); }, stepTicks: 5,
+  reset: () => { S = init({ ap: S.ap }); render(); },
+});
+X.seg($('#modeSeg'), ['Consistency first (CP)', 'Availability first (AP)'], i => { S.ap = i === 1; render(); }, 0);
+$('#cut').addEventListener('click', () => { S.cut = true; S.cutAt = S.t; if (!player.running) player.play(); render(); });
+$('#heal').addEventListener('click', () => { heal(S); render(); });
+render();
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="c">-- availability first: any one replica may answer</span>', null],
+  ['<span class="key">CONSISTENCY ONE</span>;', 'one'],
+  ['<span class="key">SELECT</span> seats_left <span class="key">FROM</span> concerts <span class="key">WHERE</span> id = <span class="s">\'reunion-1\'</span>;', 'oneread'],
+  ['', null],
+  ['<span class="c">-- consistency first: a majority of replicas must agree</span>', null],
+  ['<span class="key">CONSISTENCY QUORUM</span>;', 'quorum'],
+  ['<span class="key">UPDATE</span> concerts <span class="key">SET</span> seats_left = 11 <span class="key">WHERE</span> id = <span class="s">\'reunion-1\'</span>', 'lwt'],
+  ['  <span class="key">IF</span> seats_left = 12;  <span class="c">-- only if nobody else changed it</span>', 'lwt'],
+  ['', null],
+  ['<span class="c">-- during a partition, the minority side gets:</span>', null],
+  ['<span class="c">-- Unavailable: Cannot achieve consistency level QUORUM</span>', 'error'],
+], {
+  one: ['ONE', 'Answer as soon as any single replica responds. Works even if the others are unreachable, so it\'s always available, but it might return an old value. The lab\'s “Availability first”.'],
+  oneread: ['Fast, maybe stale', 'Fine for a seat map that refreshes, or a like counter. Not for deciding whether a seat can be sold.'],
+  quorum: ['QUORUM', 'A majority of replicas must respond. If a partition leaves you on the smaller side, there\'s no majority, and the request fails instead of guessing. The lab\'s “Consistency first”.'],
+  lwt: ['Conditional write', 'Only sell if the count is still what you saw. Combined with a quorum, two sides can\'t both sell the same seat.'],
+  error: ['The price of consistency', 'This error is the “refusing” EU data center from the lab. It\'s a correct answer: “I can\'t know right now.”'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: 'Which Encore feature should stay correct (CP) even if that means errors during a partition?', opts: [
+    ['The “people viewing this concert” counter', false, 'If it\'s a little off for a few minutes, nobody is harmed. Availability is the better choice.'],
+    ['Selling the last seats of a concert', true, 'Two fans paying for the same seat is worse than one fan seeing “try again in a minute”.'],
+    ['The concert recommendations', false, 'Stale recommendations are harmless. Keep them available.'],
+  ] },
+  { q: '“We\'ll just choose CA: consistent and available, and skip partition tolerance.” What\'s wrong with that?', opts: [
+    ['Nothing, it\'s a common choice', false, 'Only for a system that runs on a single machine, where there\'s no network to partition.'],
+    ['Partitions happen whether you plan for them or not; the only choice is how to behave when they do', true, 'For any system spread across machines, “P” isn\'t optional. The real choice is C or A during a partition.'],
+    ['CA systems are slower', false, 'Speed isn\'t the issue. A distributed system can\'t opt out of network failures.'],
+  ] },
+  { q: 'After a partition heals, an availability-first system finds that both sides changed the same record. What has to happen?', opts: [
+    ['Nothing: the database merges it perfectly', false, 'Sometimes it can (counters, sets), but conflicting decisions like two sales of one seat need a rule or a person.'],
+    ['Conflict resolution: pick a winner (for example, last write wins), merge, or fix it by hand, such as refunding a fan', true, 'AP systems move the problem from “error now” to “clean up later”. Plan the cleanup before you need it.'],
+    ['Restore from backup', false, 'Both sides\' changes are real. A backup would throw away valid sales.'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'cap-theorem');
+})();
+</script>
+</body>
+</html>
