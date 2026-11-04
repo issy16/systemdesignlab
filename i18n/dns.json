@@ -1,0 +1,735 @@
+{
+ "page": "dns",
+ "segments": [
+  {
+   "kind": "attr",
+   "en": "width=device-width, initial-scale=1, viewport-fit=cover",
+   "zh": "="
+  },
+  {
+   "kind": "attr",
+   "en": "Follow a DNS lookup from the browser to the authoritative server, then move Encore to a new server and see what TTL does.",
+   "zh": "跟著一次 DNS 查詢從瀏覽器一路走到權威伺服器，再把 Encore 搬到新伺服器，看看 TTL 有什麼影響。"
+  },
+  {
+   "kind": "attr",
+   "en": "Sections",
+   "zh": "章節"
+  },
+  {
+   "kind": "attr",
+   "en": "Lookup log",
+   "zh": "查詢紀錄"
+  },
+  {
+   "kind": "attr",
+   "en": "Share of fans reaching the new server over time",
+   "zh": "隨時間連到新伺服器的歌迷比例"
+  },
+  {
+   "kind": "attr",
+   "en": "Example dig output and DNS zone records",
+   "zh": "dig 輸出與 DNS 區域記錄範例"
+  },
+  {
+   "kind": "attr",
+   "en": "Pages",
+   "zh": "頁面"
+  },
+  {
+   "kind": "html",
+   "en": "DNS · System Design Lab",
+   "zh": "DNS · System Design Lab"
+  },
+  {
+   "kind": "html",
+   "en": "system<b>.design.lab</b>",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "Lookup",
+   "zh": "查詢"
+  },
+  {
+   "kind": "html",
+   "en": "Moving",
+   "zh": "搬家"
+  },
+  {
+   "kind": "html",
+   "en": "dig",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "Recap",
+   "zh": "重點整理"
+  },
+  {
+   "kind": "html",
+   "en": "page 21 · stage 6 · talk to the world",
+   "zh": "第 21 頁 · 階段 6 · 與外界溝通"
+  },
+  {
+   "kind": "html",
+   "en": "DNS",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "Encore moved to a new server. <em>Half the fans are still knocking on the old door.</em>",
+   "zh": "Encore 搬到新伺服器了。<em>一半的歌迷還在敲舊的門。</em>"
+  },
+  {
+   "kind": "html",
+   "en": "<b>Encore</b>Before a browser can talk to encore.example, it has to turn the name into an IP address. That lookup goes through several servers and gets cached at every step. Dee is about to move Encore to a new server, and the caches are about to matter a lot.",
+   "zh": "<b>Encore</b>瀏覽器在和 encore.example 通訊之前，必須先把名稱轉成 IP 位址。這次查詢會經過好幾台伺服器，而且每一步都會被快取。Dee 正準備把 Encore 搬到新的伺服器，這些快取即將變得非常重要。"
+  },
+  {
+   "kind": "html",
+   "en": "Open the lab ↓",
+   "zh": "打開實驗室 ↓"
+  },
+  {
+   "kind": "html",
+   "en": "lab 1 · one lookup",
+   "zh": "實驗室 1 · 一次查詢"
+  },
+  {
+   "kind": "html",
+   "en": "cold",
+   "zh": "冷查詢"
+  },
+  {
+   "kind": "html",
+   "en": "Who knows where encore.example lives?",
+   "zh": "誰知道 encore.example 住在哪裡？"
+  },
+  {
+   "kind": "html",
+   "en": "Each server either answers from its cache or points to the next one that knows more. Times are typical, simulated values.",
+   "zh": "每台伺服器要不是從快取回答，就是指向下一台知道更多的伺服器。時間是典型的模擬值。"
+  },
+  {
+   "kind": "html",
+   "en": "Look up encore.example",
+   "zh": "查詢 encore.example"
+  },
+  {
+   "kind": "html",
+   "en": "🧹 Clear all caches",
+   "zh": "🧹 清除所有快取"
+  },
+  {
+   "kind": "html",
+   "en": "Press “Look up”.",
+   "zh": "按「查詢」。"
+  },
+  {
+   "kind": "html",
+   "en": "Lookup time",
+   "zh": "查詢時間"
+  },
+  {
+   "kind": "html",
+   "en": "Answered by",
+   "zh": "回答者"
+  },
+  {
+   "kind": "html",
+   "en": "lab 2 · moving servers",
+   "zh": "實驗室 2 · 搬伺服器"
+  },
+  {
+   "kind": "html",
+   "en": "ttl 1 day",
+   "zh": "TTL 1 天"
+  },
+  {
+   "kind": "html",
+   "en": "Change the address, then wait for the caches",
+   "zh": "更改位址，然後等待快取過期"
+  },
+  {
+   "kind": "html",
+   "en": "Dee points encore.example at a new server and shuts the old one down. Resolvers all over the world cached the old address at different moments, and each keeps it until its <b>TTL</b> (time to live) runs out.",
+   "zh": "Dee 把 encore.example 指向新伺服器，並關掉舊的那台。世界各地的解析器在不同時間點快取了舊位址，每一台都會保留它，直到 <b>TTL</b>（存活時間）用完為止。"
+  },
+  {
+   "kind": "html",
+   "en": "TTL on the record: <b id=\"ttlV\">1 day</b>",
+   "zh": "記錄的 TTL：<b id=\"ttlV\">1 天</b>"
+  },
+  {
+   "kind": "html",
+   "en": "&nbsp;",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "Switch to the new server",
+   "zh": "切換到新伺服器"
+  },
+  {
+   "kind": "html",
+   "en": "<i style=\"background:var(--ok)\"></i>fans reaching the new server",
+   "zh": "<i style=\"background:var(--ok)\"></i>連到新伺服器的歌迷"
+  },
+  {
+   "kind": "html",
+   "en": "Everyone switched after",
+   "zh": "所有人完成切換的時間"
+  },
+  {
+   "kind": "html",
+   "en": "Still hitting the old server after 1 hour",
+   "zh": "1 小時後仍連到舊伺服器的比例"
+  },
+  {
+   "kind": "html",
+   "en": "Pick a TTL, then switch servers.",
+   "zh": "選一個 TTL，然後切換伺服器。"
+  },
+  {
+   "kind": "html",
+   "en": "Try this",
+   "zh": "試試看"
+  },
+  {
+   "kind": "html",
+   "en": "The one difference",
+   "zh": "關鍵差別"
+  },
+  {
+   "kind": "html",
+   "en": "DNS changes don't “propagate”: every cache just keeps the old answer until its <b>TTL</b> expires. A long TTL means fewer lookups and faster pages, and slow changes. Lower the TTL <b>a day before</b> a planned move (so old long-TTL copies expire first), then switch, then raise it again.",
+   "zh": "DNS 變更並不會「傳播」：每個快取只是保留舊答案，直到它的 <b>TTL</b> 到期。TTL 長，查詢次數少、頁面更快，但變更很慢。在計畫好的搬遷<b>前一天</b>先調低 TTL（讓舊的長 TTL 副本先過期），然後切換，之後再調回來。"
+  },
+  {
+   "kind": "html",
+   "en": "DNS in one line",
+   "zh": "一句話說清楚 DNS"
+  },
+  {
+   "kind": "html",
+   "en": "DNS turns a name into an address by asking a chain of servers (root → top-level domain → the domain's own server), and every answer is cached along the way for as long as its TTL says.",
+   "zh": "DNS 透過詢問一連串的伺服器（根伺服器 → 頂級網域 → 該網域自己的伺服器）把名稱轉成位址，而每個答案在沿途都會依 TTL 的長度被快取。"
+  },
+  {
+   "kind": "html",
+   "en": "act 3 · the real thing",
+   "zh": "第 3 幕 · 真實世界"
+  },
+  {
+   "kind": "html",
+   "en": "dig + zone file",
+   "zh": "dig＋區域檔"
+  },
+  {
+   "kind": "html",
+   "en": "Ask DNS yourself",
+   "zh": "自己問問 DNS"
+  },
+  {
+   "kind": "html",
+   "en": "<code>dig</code> is the standard tool for querying DNS (on Windows, <code>nslookup</code>). Below it, the records Encore publishes. <b>Hover or tap a line.</b>",
+   "zh": "<code>dig</code> 是查詢 DNS 的標準工具（Windows 上用 <code>nslookup</code>）。下面是 Encore 公開的記錄。<b>把滑鼠移到某一行上，或點一下。</b>"
+  },
+  {
+   "kind": "html",
+   "en": "👆 pick a line",
+   "zh": "👆 選一行"
+  },
+  {
+   "kind": "html",
+   "en": "Each highlighted line maps to the labs.",
+   "zh": "每一行反白後，都會對應到實驗室。"
+  },
+  {
+   "kind": "html",
+   "en": "recap · keep this",
+   "zh": "重點整理 · 帶走這些"
+  },
+  {
+   "kind": "html",
+   "en": "The whole page on one screen",
+   "zh": "整頁濃縮在一個畫面"
+  },
+  {
+   "kind": "html",
+   "en": "Chain",
+   "zh": "一條鏈"
+  },
+  {
+   "kind": "html",
+   "en": "Resolution",
+   "zh": "解析"
+  },
+  {
+   "kind": "html",
+   "en": "Browser → OS → recursive resolver → root → TLD → authoritative server. Only a cold lookup walks the whole chain.",
+   "zh": "瀏覽器 → 作業系統 → 遞迴解析器 → 根伺服器 → 頂級網域 → 權威伺服器。只有冷查詢才會走完整條鏈。"
+  },
+  {
+   "kind": "html",
+   "en": "Cache",
+   "zh": "快取"
+  },
+  {
+   "kind": "html",
+   "en": "TTL",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "Every answer carries a TTL. Every layer caches it that long, which is why most lookups take 0 ms, and why changes are slow.",
+   "zh": "每個答案都帶著 TTL。每一層都會快取那麼久，這就是為什麼大多數查詢只要 0 毫秒，也是為什麼變更很慢。"
+  },
+  {
+   "kind": "html",
+   "en": "Records",
+   "zh": "記錄"
+  },
+  {
+   "kind": "html",
+   "en": "A, CNAME, MX…",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "A: name → IPv4 address. AAAA: IPv6. CNAME: an alias for another name. MX: where email goes. TXT: verification and policies.",
+   "zh": "A：名稱 → IPv4 位址。AAAA：IPv6。CNAME：另一個名稱的別名。MX：email 要送去哪裡。TXT：驗證與政策。"
+  },
+  {
+   "kind": "html",
+   "en": "The tradeoff",
+   "zh": "取捨"
+  },
+  {
+   "kind": "html",
+   "en": "Long TTLs cut lookup traffic and latency but make changes and failovers slow; short TTLs make changes fast but put more load on your DNS servers. Use hours for records that rarely change, and minutes for records you may need to move in an emergency.",
+   "zh": "TTL 長能減少查詢流量和延遲，但讓變更和故障轉移變慢；TTL 短讓變更很快，但會增加 DNS 伺服器的負擔。很少變動的記錄用小時，緊急時可能需要搬移的記錄用分鐘。"
+  },
+  {
+   "kind": "html",
+   "en": "Check it",
+   "zh": "考考自己"
+  },
+  {
+   "kind": "js",
+   "en": "'Browser cache'",
+   "zh": "'瀏覽器快取'"
+  },
+  {
+   "kind": "js",
+   "en": "'“Do I already know encore.example?”'",
+   "zh": "'「我已經知道 encore.example 了嗎？」'"
+  },
+  {
+   "kind": "js",
+   "en": "'OS cache'",
+   "zh": "'作業系統快取'"
+  },
+  {
+   "kind": "js",
+   "en": "'Ask the operating system\\'s resolver cache.'",
+   "zh": "'詢問作業系統的解析器快取。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Recursive resolver'",
+   "zh": "'遞迴解析器'"
+  },
+  {
+   "kind": "js",
+   "en": "'Ask the resolver (your ISP\\'s, or 1.1.1.1 / 8.8.8.8). It does the legwork.'",
+   "zh": "'詢問解析器（你的 ISP 的，或 1.1.1.1 / 8.8.8.8）。由它負責跑腿。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Root server'",
+   "zh": "'根伺服器'"
+  },
+  {
+   "kind": "js",
+   "en": "'Root: “I don\\'t know encore.example, but .example is handled by these servers.”'",
+   "zh": "'根伺服器：「我不知道 encore.example，但 .example 是由這幾台伺服器負責的。」'"
+  },
+  {
+   "kind": "js",
+   "en": "'TLD server: “encore.example is handled by ns1.encore.example.”'",
+   "zh": "'頂級網域伺服器：「encore.example 是由 ns1.encore.example 負責的。」'"
+  },
+  {
+   "kind": "js",
+   "en": "'Authoritative server'",
+   "zh": "'權威伺服器'"
+  },
+  {
+   "kind": "js",
+   "en": "'ns1.encore.example: “encore.example is 203.0.113.7, TTL 300 s.” The real answer.'",
+   "zh": "'ns1.encore.example：「encore.example 是 203.0.113.7，TTL 300 秒。」這才是真正的答案。'"
+  },
+  {
+   "kind": "js",
+   "en": "`${esc(name)}<small>${ms ? ms + ' ms' : '0 ms'}</small>`",
+   "zh": "`${esc(name)}<small>${ms ? ms + ' 毫秒' : '0 毫秒'}</small>`"
+  },
+  {
+   "kind": "js",
+   "en": "'✓ cached'",
+   "zh": "'✓ 已快取'"
+  },
+  {
+   "kind": "js",
+   "en": "`${name}: cached answer → 203.0.113.7`",
+   "zh": "`${name}：快取中的答案 → 203.0.113.7`"
+  },
+  {
+   "kind": "js",
+   "en": "'✓ answer'",
+   "zh": "'✓ 答案'"
+  },
+  {
+   "kind": "js",
+   "en": "'→ next'",
+   "zh": "'→ 下一個'"
+  },
+  {
+   "kind": "js",
+   "en": "`${name}: ${say}`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "' ms'",
+   "zh": "' 毫秒'"
+  },
+  {
+   "kind": "js",
+   "en": "'<li class=\"mut\">Caches cleared. The next lookup walks the whole chain.</li>'",
+   "zh": "'<li class=\"mut\">快取已清除。下一次查詢會走完整條鏈。</li>'"
+  },
+  {
+   "kind": "js",
+   "en": "'1 minute'",
+   "zh": "'1 分鐘'"
+  },
+  {
+   "kind": "js",
+   "en": "'5 minutes'",
+   "zh": "'5 分鐘'"
+  },
+  {
+   "kind": "js",
+   "en": "'1 hour'",
+   "zh": "'1 小時'"
+  },
+  {
+   "kind": "js",
+   "en": "'1 day'",
+   "zh": "'1 天'"
+  },
+  {
+   "kind": "js",
+   "en": "' min'",
+   "zh": "' 分鐘'"
+  },
+  {
+   "kind": "js",
+   "en": "' day'",
+   "zh": "' 天'"
+  },
+  {
+   "kind": "js",
+   "en": "'ttl '",
+   "zh": "'TTL '"
+  },
+  {
+   "kind": "js",
+   "en": "`time after the switch: 0 → ${fmtDur(span)}`",
+   "zh": "`切換後經過的時間：0 → ${fmtDur(span)}`"
+  },
+  {
+   "kind": "js",
+   "en": "`✕ With a ${label} TTL, resolvers keep the old address for up to ${label}. ${old}% of fans still reach the old, shut-down server an hour later and see an error.`",
+   "zh": "`✕ TTL 是 ${label} 時，解析器最多會保留舊位址 ${label}。一小時後仍有 ${old}% 的歌迷連到已經關掉的舊伺服器，看到錯誤畫面。`"
+  },
+  {
+   "kind": "js",
+   "en": "`✓ With a ${label} TTL, every cache expires within ${label}. The move is practically instant.`",
+   "zh": "`✓ TTL 是 ${label} 時，每個快取都會在 ${label} 內過期。搬遷幾乎是瞬間完成的。`"
+  },
+  {
+   "kind": "js",
+   "en": "'Pick a TTL, then switch servers.'",
+   "zh": "'選一個 TTL，然後切換伺服器。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Lab 1: <b>look up encore.example</b> with empty caches.'",
+   "zh": "'實驗室 1：在快取都是空的情況下<b>查詢 encore.example</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'A cold lookup walks the whole chain: root, .example, then Encore\\'s own server.'",
+   "zh": "'冷查詢會走完整條鏈：根伺服器、.example，最後是 Encore 自己的伺服器。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Look it up <b>again</b>.'",
+   "zh": "'<b>再</b>查一次。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Now the browser has it cached: 0 ms.'",
+   "zh": "'現在瀏覽器已經快取了它：0 毫秒。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Lab 2: with a <b>1 day</b> TTL, switch to the new server.'",
+   "zh": "'實驗室 2：在 TTL 為 <b>1 天</b>時，切換到新伺服器。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Watch how long fans keep reaching the old address.'",
+   "zh": "'看看歌迷會持續連到舊位址多久。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Set the TTL to <b>1 minute</b> (as if lowered a day earlier) and switch again.'",
+   "zh": "'把 TTL 設成 <b>1 分鐘</b>（假設一天前就調低了），再切換一次。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Every cache expires within a minute, so the move is close to instant.'",
+   "zh": "'每個快取都會在一分鐘內過期，所以搬遷幾乎是瞬間完成的。'"
+  },
+  {
+   "kind": "js",
+   "en": "'$ dig encore.example'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "';; QUESTION SECTION:'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "';encore.example.            IN  A'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "';; ANSWER SECTION:'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'encore.example.     <span class=\"key\">300</span>  IN  <span class=\"key\">A</span>  <span class=\"s\">203.0.113.7</span>'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "';; Query time: <span class=\"s\">23 msec</span>'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "';; SERVER: 1.1.1.1#53'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\">; Encore\\'s zone file (the authoritative records)</span>'",
+   "zh": "'<span class=\"c\">; Encore 的區域檔（權威記錄）</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'encore.example.   300   IN  A      203.0.113.7'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'www               300   IN  <span class=\"key\">CNAME</span>  encore.example.'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'encore.example.   3600  IN  <span class=\"key\">MX</span> 10  mail.encore.example.'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Asks your resolver for a record and prints the full answer. <code>dig +trace encore.example</code> walks the chain from the root, exactly like the cold lookup in lab 1.'",
+   "zh": "'向你的解析器查詢一筆記錄，並印出完整的答案。<code>dig +trace encore.example</code> 會從根伺服器開始走完整條鏈，就跟實驗室 1 的冷查詢一樣。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The question'",
+   "zh": "'問題'"
+  },
+  {
+   "kind": "js",
+   "en": "'Name, class (IN = internet) and record type (A = IPv4 address).'",
+   "zh": "'名稱、類別（IN = internet）和記錄類型（A = IPv4 位址）。'"
+  },
+  {
+   "kind": "js",
+   "en": "'A record + TTL'",
+   "zh": "'A 記錄＋TTL'"
+  },
+  {
+   "kind": "js",
+   "en": "'“encore.example is 203.0.113.7, and you may cache that for 300 seconds.” The 300 counts down in every cache. That\\'s lab 2.'",
+   "zh": "'「encore.example 是 203.0.113.7，你可以把它快取 300 秒。」這個 300 會在每個快取裡倒數。這就是實驗室 2。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Query time'",
+   "zh": "'查詢時間'"
+  },
+  {
+   "kind": "js",
+   "en": "'Run it twice: the second answer usually comes from the resolver\\'s cache, in a few milliseconds.'",
+   "zh": "'跑兩次：第二次的答案通常來自解析器的快取，只要幾毫秒。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Which resolver'",
+   "zh": "'哪個解析器'"
+  },
+  {
+   "kind": "js",
+   "en": "'The recursive resolver that answered: here Cloudflare\\'s 1.1.1.1.'",
+   "zh": "'回答的遞迴解析器：這裡是 Cloudflare 的 1.1.1.1。'"
+  },
+  {
+   "kind": "js",
+   "en": "'CNAME'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'www is an alias: “look up encore.example instead”. Handy for pointing many names at one place.'",
+   "zh": "'www 是一個別名：「改查 encore.example」。很適合把很多名稱指向同一個地方。'"
+  },
+  {
+   "kind": "js",
+   "en": "'MX'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Where email for encore.example is delivered. It has its own TTL: email servers rarely move, so 1 hour is fine.'",
+   "zh": "'encore.example 的 email 要送到哪裡。它有自己的 TTL：郵件伺服器很少搬家，所以 1 小時就夠了。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Dee changed the DNS record an hour ago. Dee sees the new server, but many fans still reach the old one. Why?'",
+   "zh": "'Dee 一小時前改了 DNS 記錄。Dee 自己看到的是新伺服器，但很多歌迷還是連到舊的。為什麼？'"
+  },
+  {
+   "kind": "js",
+   "en": "'DNS changes take exactly 24 hours to propagate'",
+   "zh": "'DNS 變更剛好需要 24 小時傳播'"
+  },
+  {
+   "kind": "js",
+   "en": "'There\\'s no fixed propagation time. It depends on the TTL of the old record.'",
+   "zh": "'沒有固定的傳播時間。它取決於舊記錄的 TTL。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Their resolvers cached the old answer and will keep it until its TTL expires'",
+   "zh": "'他們的解析器快取了舊答案，會一直保留到 TTL 到期'"
+  },
+  {
+   "kind": "js",
+   "en": "'Dee\\'s own cache happened to be fresh. Everyone else waits for their cached copy to expire.'",
+   "zh": "'Dee 自己的快取剛好是新的。其他人都在等自己的快取副本過期。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The new server is blocking them'",
+   "zh": "'新伺服器擋住了他們'"
+  },
+  {
+   "kind": "js",
+   "en": "'They aren\\'t reaching the new server at all. They\\'re still being sent to the old address.'",
+   "zh": "'他們根本沒有連到新伺服器，而是仍然被送到舊位址。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Encore will move to a new server next week. The record has a 1-day TTL. What\\'s the best plan?'",
+   "zh": "'Encore 下週要搬到新伺服器。記錄的 TTL 是 1 天。最好的計畫是什麼？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Change the IP and lower the TTL at the same moment'",
+   "zh": "'在同一時間更改 IP 並調低 TTL'"
+  },
+  {
+   "kind": "js",
+   "en": "'Caches still hold the old answer with its 1-day TTL. Lowering it now only affects future copies.'",
+   "zh": "'快取裡仍然保留著 TTL 為 1 天的舊答案。現在調低只會影響之後的副本。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Lower the TTL to 1 minute at least a day before, switch, then raise it again later'",
+   "zh": "'至少提前一天把 TTL 調到 1 分鐘，然後切換，之後再調回來'"
+  },
+  {
+   "kind": "js",
+   "en": "'Once the old 1-day copies have expired, every cache holds the short TTL, and the switch takes about a minute.'",
+   "zh": "'舊的 1 天副本都過期之後，每個快取都會持有短的 TTL，切換大約只要一分鐘。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Keep the TTL, and shut the old server down right away'",
+   "zh": "'TTL 不變，並立刻關掉舊伺服器'"
+  },
+  {
+   "kind": "js",
+   "en": "'Fans with cached answers would hit a dead server for up to a day.'",
+   "zh": "'有快取答案的歌迷，最多會有一整天都連到一台掛掉的伺服器。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Why is a typical DNS lookup in a browser close to 0 ms?'",
+   "zh": "'為什麼瀏覽器中典型的 DNS 查詢接近 0 毫秒？'"
+  },
+  {
+   "kind": "js",
+   "en": "'DNS servers are very fast'",
+   "zh": "'DNS 伺服器非常快'"
+  },
+  {
+   "kind": "js",
+   "en": "'A full cold lookup still takes tens of milliseconds.'",
+   "zh": "'完整的冷查詢仍然要花幾十毫秒。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The answer is usually already cached in the browser, the OS or the resolver'",
+   "zh": "'答案通常已經快取在瀏覽器、作業系統或解析器裡'"
+  },
+  {
+   "kind": "js",
+   "en": "'Caching at every layer is what makes DNS cheap. It\\'s also what makes changes slow.'",
+   "zh": "'每一層的快取讓 DNS 很便宜，也正是它讓變更變慢。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Browsers skip DNS for popular sites'",
+   "zh": "'瀏覽器對熱門網站會跳過 DNS'"
+  },
+  {
+   "kind": "js",
+   "en": "'Every name gets resolved. Usually from a cache.'",
+   "zh": "'每個名稱都會被解析，通常是從快取裡。'"
+  }
+ ]
+}

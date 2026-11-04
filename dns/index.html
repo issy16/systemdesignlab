@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Follow a DNS lookup from the browser to the authoritative server, then move Encore to a new server and see what TTL does.">
+<title>DNS · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/explainer.css">
+</head>
+<body>
+<!-- Plan. Stuck point: "DNS is the phone book" doesn't explain caching, TTL, or why a change "takes 24 hours to propagate".
+     Lab 1: step through a lookup, cold then cached. Lab 2: change the server IP with a long vs short TTL.
+     One difference: DNS answers are cached for their TTL; lower it before a change, not after. -->
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="Sections"><a href="#lab">Lookup</a><a href="#move">Moving</a><a href="#real">dig</a><a href="#recap">Recap</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>page 21 · stage 6 · talk to the world</span><span class="hot">97</span></div>
+  <div class="eyebrow">DNS</div>
+  <h1>Encore moved to a new server. <em>Half the fans are still knocking on the old door.</em></h1>
+  <div class="scenario"><b>Encore</b>Before a browser can talk to encore.example, it has to turn the name into an IP address. That lookup goes through several servers and gets cached at every step. Dee is about to move Encore to a new server, and the caches are about to matter a lot.</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">Open the lab ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>lab 1 · one lookup</span><span class="hot" id="tag">cold</span></div>
+  <h2>Who knows where encore.example lives?</h2>
+  <p>Each server either answers from its cache or points to the next one that knows more. Times are typical, simulated values.</p>
+  <div class="lab">
+    <div class="row" style="margin:0"><button class="btn primary" id="look" type="button">Look up encore.example</button><button class="btn sm" id="clear" type="button">🧹 Clear all caches</button></div>
+    <div class="pipe" id="hops" style="margin:0"></div>
+    <ul class="log" id="dlog" aria-label="Lookup log"><li class="mut">Press “Look up”.</li></ul>
+    <div class="meters" style="margin:0"><div class="meter"><div class="k">Lookup time</div><div class="v" id="mT">–</div></div><div class="meter"><div class="k">Answered by</div><div class="v" id="mBy" style="font-size:18px">–</div></div></div>
+  </div>
+</section>
+
+<section class="panel" id="move">
+  <div class="panel-label"><span>lab 2 · moving servers</span><span class="hot" id="tag2">ttl 1 day</span></div>
+  <h2>Change the address, then wait for the caches</h2>
+  <p>Dee points encore.example at a new server and shuts the old one down. Resolvers all over the world cached the old address at different moments, and each keeps it until its <b>TTL</b> (time to live) runs out.</p>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><label for="ttl">TTL on the record: <b id="ttlV">1 day</b></label><input type="range" id="ttl" min="0" max="3" step="1" value="3"></div>
+      <div class="ctl"><span class="lab-k">&nbsp;</span><div><button class="btn primary" id="go" type="button">Switch to the new server</button></div></div>
+    </div>
+    <canvas class="chart" id="chart" aria-label="Share of fans reaching the new server over time"></canvas>
+    <div class="legend"><span><i style="background:var(--ok)"></i>fans reaching the new server</span><span id="axis"></span></div>
+    <div class="meters" style="margin:0"><div class="meter"><div class="k">Everyone switched after</div><div class="v" id="mAll">–</div></div><div class="meter"><div class="k">Still hitting the old server after 1 hour</div><div class="v" id="mOld">–</div></div></div>
+    <div class="status" id="st2" role="status">Pick a TTL, then switch servers.</div>
+  </div>
+  <h3>Try this</h3>
+  <ol class="missions" id="missions"></ol>
+  <div class="takeaway"><div class="t">The one difference</div><p>DNS changes don't “propagate”: every cache just keeps the old answer until its <b>TTL</b> expires. A long TTL means fewer lookups and faster pages, and slow changes. Lower the TTL <b>a day before</b> a planned move (so old long-TTL copies expire first), then switch, then raise it again.</p></div>
+  <div class="takeaway"><div class="t">DNS in one line</div><p>DNS turns a name into an address by asking a chain of servers (root → top-level domain → the domain's own server), and every answer is cached along the way for as long as its TTL says.</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>act 3 · the real thing</span><span class="hot">dig + zone file</span></div>
+  <h2>Ask DNS yourself</h2>
+  <p><code>dig</code> is the standard tool for querying DNS (on Windows, <code>nslookup</code>). Below it, the records Encore publishes. <b>Hover or tap a line.</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="Example dig output and DNS zone records"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 pick a line</div><p id="exP">Each highlighted line maps to the labs.</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>recap · keep this</span><span class="hot">♥</span></div>
+  <h2>The whole page on one screen</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">Chain</div><div class="t">Resolution</div><p>Browser → OS → recursive resolver → root → TLD → authoritative server. Only a cold lookup walks the whole chain.</p></div>
+    <div class="card"><div class="sub">Cache</div><div class="t">TTL</div><p>Every answer carries a TTL. Every layer caches it that long, which is why most lookups take 0 ms, and why changes are slow.</p></div>
+    <div class="card"><div class="sub">Records</div><div class="t">A, CNAME, MX…</div><p>A: name → IPv4 address. AAAA: IPv6. CNAME: an alias for another name. MX: where email goes. TXT: verification and policies.</p></div>
+  </div>
+  <div class="takeaway"><div class="t">The tradeoff</div><p>Long TTLs cut lookup traffic and latency but make changes and failovers slow; short TTLs make changes fast but put more load on your DNS servers. Use hours for records that rarely change, and minutes for records you may need to move in an emergency.</p></div>
+  <h3 style="margin-top:26px">Check it <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="Pages"></nav>
+</main>
+
+<script src="../assets/explainer.js"></script>
+<script>
+(() => {
+const { $, el, esc } = X;
+const flags = { cold: false, warm: false, slow: false, fast: false };
+
+/* ---------- lab 1: a lookup ---------- */
+const HOPS = [
+  ['browser', 'Browser cache', 0, '“Do I already know encore.example?”'],
+  ['os', 'OS cache', 0, 'Ask the operating system\'s resolver cache.'],
+  ['resolver', 'Recursive resolver', 10, 'Ask the resolver (your ISP\'s, or 1.1.1.1 / 8.8.8.8). It does the legwork.'],
+  ['root', 'Root server', 20, 'Root: “I don\'t know encore.example, but .example is handled by these servers.”'],
+  ['tld', '.example server', 25, 'TLD server: “encore.example is handled by ns1.encore.example.”'],
+  ['auth', 'Authoritative server', 30, 'ns1.encore.example: “encore.example is 203.0.113.7, TTL 300 s.” The real answer.'],
+];
+let cached = new Set(), busy = false;
+function drawHops(states = {}) {
+  const p = $('#hops'); p.innerHTML = '';
+  HOPS.forEach(([k, name, ms]) => { const st = el('div', 'stage'); const c = el('div', 'chip', `${esc(name)}<small>${ms ? ms + ' ms' : '0 ms'}</small>`); st.append(c); p.append(st); if (states[k]) X.chip(c, states[k][0], states[k][1]); });
+}
+$('#look').addEventListener('click', async () => {
+  if (busy) return; busy = true; $('#look').disabled = true;
+  const log = $('#dlog'); log.innerHTML = '';
+  const states = {}; let total = 0, by = null;
+  for (const [k, name, ms, say] of HOPS) {
+    states[k] = ['run']; drawHops(states); await X.sleep(320);
+    total += ms;
+    if (cached.has(k)) { states[k] = ['ok', '✓ cached']; by = name; log.append(el('li', 'ok', esc(`${name}: cached answer → 203.0.113.7`))); drawHops(states); break; }
+    states[k] = k === 'auth' ? ['ok', '✓ answer'] : ['wait', '→ next']; drawHops(states);
+    log.append(el('li', k === 'auth' ? 'ok' : '', esc(`${name}: ${say}`)));
+    if (k === 'auth') by = name;
+  }
+  ['browser', 'os', 'resolver'].forEach(k => cached.add(k));
+  $('#mT').textContent = total + ' ms'; $('#mBy').textContent = by;
+  $('#tag').textContent = by === 'Authoritative server' ? 'cold' : 'cached';
+  if (by === 'Authoritative server') flags.cold = true; else if (flags.cold) flags.warm = true;
+  busy = false; $('#look').disabled = false; mis.update(flags);
+});
+$('#clear').addEventListener('click', () => { cached = new Set(); drawHops(); $('#dlog').innerHTML = '<li class="mut">Caches cleared. The next lookup walks the whole chain.</li>'; $('#mT').textContent = '–'; $('#mBy').textContent = '–'; });
+drawHops();
+
+/* ---------- lab 2: TTL and moving servers ---------- */
+const TTLS = [[60, '1 minute'], [300, '5 minutes'], [3600, '1 hour'], [86400, '1 day']];
+const RES = (() => { const s = { r: 21 }; return Array.from({ length: 200 }, () => X.rnd(s)); })(); // when each resolver last cached, as a fraction of the TTL
+const fmtDur = sec => sec < 3600 ? Math.round(sec / 60) + ' min' : sec < 86400 ? (sec / 3600).toFixed(sec % 3600 ? 1 : 0) + ' h' : (sec / 86400).toFixed(0) + ' day';
+let ti = 3, switched = null;
+function shareAt(ttl, t) { return RES.filter(f => (1 - f) * ttl <= t).length / RES.length; } // remaining cache time = (1 - f) * ttl
+function drawMove() {
+  const [ttl, label] = TTLS[ti];
+  $('#ttlV').textContent = label; $('#tag2').textContent = 'ttl ' + label;
+  const span = Math.max(ttl * 1.2, 3600);
+  const pts = Array.from({ length: 60 }, (_, i) => (switched ? shareAt(switched, (i / 59) * span) : 0) * 100);
+  X.lineChart($('#chart'), [{ data: pts, token: '--ok' }], { max: 100, unit: '%', points: 60 });
+  $('#axis').textContent = `time after the switch: 0 → ${fmtDur(span)}`;
+  if (!switched) { $('#mAll').textContent = '–'; $('#mOld').textContent = '–'; return; }
+  $('#mAll').textContent = fmtDur(switched);
+  $('#mAll').parentElement.className = 'meter' + (switched > 3600 ? ' bad' : ' ok');
+  const old = Math.round((1 - shareAt(switched, 3600)) * 100);
+  $('#mOld').textContent = old + '%';
+  $('#mOld').parentElement.className = 'meter' + (old ? ' bad' : ' ok');
+  const st = $('#st2');
+  st.className = 'status ' + (switched > 3600 ? 'bad' : 'ok');
+  st.textContent = switched > 3600 ? `✕ With a ${label} TTL, resolvers keep the old address for up to ${label}. ${old}% of fans still reach the old, shut-down server an hour later and see an error.` : `✓ With a ${label} TTL, every cache expires within ${label}. The move is practically instant.`;
+}
+$('#ttl').addEventListener('input', e => { ti = +e.target.value; switched = null; drawMove(); $('#st2').className = 'status'; $('#st2').textContent = 'Pick a TTL, then switch servers.'; });
+$('#go').addEventListener('click', () => {
+  switched = TTLS[ti][0]; drawMove();
+  if (switched >= 86400) flags.slow = true; if (switched <= 60) flags.fast = true;
+  mis.update(flags);
+});
+addEventListener('resize', drawMove);
+requestAnimationFrame(drawMove);
+
+const mis = X.missions($('#missions'), [
+  { text: 'Lab 1: <b>look up encore.example</b> with empty caches.', hint: 'A cold lookup walks the whole chain: root, .example, then Encore\'s own server.', check: f => f.cold },
+  { text: 'Look it up <b>again</b>.', hint: 'Now the browser has it cached: 0 ms.', check: f => f.warm },
+  { text: 'Lab 2: with a <b>1 day</b> TTL, switch to the new server.', hint: 'Watch how long fans keep reaching the old address.', check: f => f.slow },
+  { text: 'Set the TTL to <b>1 minute</b> (as if lowered a day earlier) and switch again.', hint: 'Every cache expires within a minute, so the move is close to instant.', check: f => f.fast },
+]);
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['$ dig encore.example', 'dig'],
+  [';; QUESTION SECTION:', null],
+  [';encore.example.            IN  A', 'question'],
+  [';; ANSWER SECTION:', null],
+  ['encore.example.     <span class="key">300</span>  IN  <span class="key">A</span>  <span class="s">203.0.113.7</span>', 'answer'],
+  [';; Query time: <span class="s">23 msec</span>', 'time'],
+  [';; SERVER: 1.1.1.1#53', 'server'],
+  ['', null],
+  ['<span class="c">; Encore\'s zone file (the authoritative records)</span>', null],
+  ['encore.example.   300   IN  A      203.0.113.7', 'answer'],
+  ['www               300   IN  <span class="key">CNAME</span>  encore.example.', 'cname'],
+  ['encore.example.   3600  IN  <span class="key">MX</span> 10  mail.encore.example.', 'mx'],
+], {
+  dig: ['dig', 'Asks your resolver for a record and prints the full answer. <code>dig +trace encore.example</code> walks the chain from the root, exactly like the cold lookup in lab 1.'],
+  question: ['The question', 'Name, class (IN = internet) and record type (A = IPv4 address).'],
+  answer: ['A record + TTL', '“encore.example is 203.0.113.7, and you may cache that for 300 seconds.” The 300 counts down in every cache. That\'s lab 2.'],
+  time: ['Query time', 'Run it twice: the second answer usually comes from the resolver\'s cache, in a few milliseconds.'],
+  server: ['Which resolver', 'The recursive resolver that answered: here Cloudflare\'s 1.1.1.1.'],
+  cname: ['CNAME', 'www is an alias: “look up encore.example instead”. Handy for pointing many names at one place.'],
+  mx: ['MX', 'Where email for encore.example is delivered. It has its own TTL: email servers rarely move, so 1 hour is fine.'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: 'Dee changed the DNS record an hour ago. Dee sees the new server, but many fans still reach the old one. Why?', opts: [
+    ['DNS changes take exactly 24 hours to propagate', false, 'There\'s no fixed propagation time. It depends on the TTL of the old record.'],
+    ['Their resolvers cached the old answer and will keep it until its TTL expires', true, 'Dee\'s own cache happened to be fresh. Everyone else waits for their cached copy to expire.'],
+    ['The new server is blocking them', false, 'They aren\'t reaching the new server at all. They\'re still being sent to the old address.'],
+  ] },
+  { q: 'Encore will move to a new server next week. The record has a 1-day TTL. What\'s the best plan?', opts: [
+    ['Change the IP and lower the TTL at the same moment', false, 'Caches still hold the old answer with its 1-day TTL. Lowering it now only affects future copies.'],
+    ['Lower the TTL to 1 minute at least a day before, switch, then raise it again later', true, 'Once the old 1-day copies have expired, every cache holds the short TTL, and the switch takes about a minute.'],
+    ['Keep the TTL, and shut the old server down right away', false, 'Fans with cached answers would hit a dead server for up to a day.'],
+  ] },
+  { q: 'Why is a typical DNS lookup in a browser close to 0 ms?', opts: [
+    ['DNS servers are very fast', false, 'A full cold lookup still takes tens of milliseconds.'],
+    ['The answer is usually already cached in the browser, the OS or the resolver', true, 'Caching at every layer is what makes DNS cheap. It\'s also what makes changes slow.'],
+    ['Browsers skip DNS for popular sites', false, 'Every name gets resolved. Usually from a cache.'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'dns');
+})();
+</script>
+</body>
+</html>

@@ -143,6 +143,12 @@ const FLOWS = {
     ['click', '#phases > div:nth-child(5) > div > div:nth-of-type(2) button:nth-child(1)', 100],
     ['click', '#phases > div:nth-child(5) > div > div:nth-of-type(2) button:nth-child(2)', 300],
   ],
+  dns: [
+    ['click', '#look', 2600],
+    ['click', '#look', 1000],
+    ['click', '#go', 300],
+    ['fill', ['#ttl', '0'], 100], ['click', '#go', 300],
+  ],
 };
 
 (async () => {

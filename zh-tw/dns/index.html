@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW" data-lang="zh-tw" data-slug="dns">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="跟著一次 DNS 查詢從瀏覽器一路走到權威伺服器，再把 Encore 搬到新伺服器，看看 TTL 有什麼影響。">
+<title>DNS · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/explainer.css">
+</head>
+<body>
+<!-- Plan. Stuck point: "DNS is the phone book" doesn't explain caching, TTL, or why a change "takes 24 hours to propagate".
+     Lab 1: step through a lookup, cold then cached. Lab 2: change the server IP with a long vs short TTL.
+     One difference: DNS answers are cached for their TTL; lower it before a change, not after. -->
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="章節"><a href="#lab">查詢</a><a href="#move">搬家</a><a href="#real">dig</a><a href="#recap">重點整理</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>第 21 頁 · 階段 6 · 與外界溝通</span><span class="hot">97</span></div>
+  <div class="eyebrow">DNS</div>
+  <h1>Encore 搬到新伺服器了。<em>一半的歌迷還在敲舊的門。</em></h1>
+  <div class="scenario"><b>Encore</b>瀏覽器在和 encore.example 通訊之前，必須先把名稱轉成 IP 位址。這次查詢會經過好幾台伺服器，而且每一步都會被快取。Dee 正準備把 Encore 搬到新的伺服器，這些快取即將變得非常重要。</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">打開實驗室 ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>實驗室 1 · 一次查詢</span><span class="hot" id="tag">冷查詢</span></div>
+  <h2>誰知道 encore.example 住在哪裡？</h2>
+  <p>每台伺服器要不是從快取回答，就是指向下一台知道更多的伺服器。時間是典型的模擬值。</p>
+  <div class="lab">
+    <div class="row" style="margin:0"><button class="btn primary" id="look" type="button">查詢 encore.example</button><button class="btn sm" id="clear" type="button">🧹 清除所有快取</button></div>
+    <div class="pipe" id="hops" style="margin:0"></div>
+    <ul class="log" id="dlog" aria-label="查詢紀錄"><li class="mut">按「查詢」。</li></ul>
+    <div class="meters" style="margin:0"><div class="meter"><div class="k">查詢時間</div><div class="v" id="mT">–</div></div><div class="meter"><div class="k">回答者</div><div class="v" id="mBy" style="font-size:18px">–</div></div></div>
+  </div>
+</section>
+
+<section class="panel" id="move">
+  <div class="panel-label"><span>實驗室 2 · 搬伺服器</span><span class="hot" id="tag2">TTL 1 天</span></div>
+  <h2>更改位址，然後等待快取過期</h2>
+  <p>Dee 把 encore.example 指向新伺服器，並關掉舊的那台。世界各地的解析器在不同時間點快取了舊位址，每一台都會保留它，直到 <b>TTL</b>（存活時間）用完為止。</p>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><label for="ttl">記錄的 TTL：<b id="ttlV">1 天</b></label><input type="range" id="ttl" min="0" max="3" step="1" value="3"></div>
+      <div class="ctl"><span class="lab-k">&nbsp;</span><div><button class="btn primary" id="go" type="button">切換到新伺服器</button></div></div>
+    </div>
+    <canvas class="chart" id="chart" aria-label="隨時間連到新伺服器的歌迷比例"></canvas>
+    <div class="legend"><span><i style="background:var(--ok)"></i>連到新伺服器的歌迷</span><span id="axis"></span></div>
+    <div class="meters" style="margin:0"><div class="meter"><div class="k">所有人完成切換的時間</div><div class="v" id="mAll">–</div></div><div class="meter"><div class="k">1 小時後仍連到舊伺服器的比例</div><div class="v" id="mOld">–</div></div></div>
+    <div class="status" id="st2" role="status">選一個 TTL，然後切換伺服器。</div>
+  </div>
+  <h3>試試看</h3>
+  <ol class="missions" id="missions"></ol>
+  <div class="takeaway"><div class="t">關鍵差別</div><p>DNS 變更並不會「傳播」：每個快取只是保留舊答案，直到它的 <b>TTL</b> 到期。TTL 長，查詢次數少、頁面更快，但變更很慢。在計畫好的搬遷<b>前一天</b>先調低 TTL（讓舊的長 TTL 副本先過期），然後切換，之後再調回來。</p></div>
+  <div class="takeaway"><div class="t">一句話說清楚 DNS</div><p>DNS 透過詢問一連串的伺服器（根伺服器 → 頂級網域 → 該網域自己的伺服器）把名稱轉成位址，而每個答案在沿途都會依 TTL 的長度被快取。</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>第 3 幕 · 真實世界</span><span class="hot">dig＋區域檔</span></div>
+  <h2>自己問問 DNS</h2>
+  <p><code>dig</code> 是查詢 DNS 的標準工具（Windows 上用 <code>nslookup</code>）。下面是 Encore 公開的記錄。<b>把滑鼠移到某一行上，或點一下。</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="dig 輸出與 DNS 區域記錄範例"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 選一行</div><p id="exP">每一行反白後，都會對應到實驗室。</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>重點整理 · 帶走這些</span><span class="hot">♥</span></div>
+  <h2>整頁濃縮在一個畫面</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">一條鏈</div><div class="t">解析</div><p>瀏覽器 → 作業系統 → 遞迴解析器 → 根伺服器 → 頂級網域 → 權威伺服器。只有冷查詢才會走完整條鏈。</p></div>
+    <div class="card"><div class="sub">快取</div><div class="t">TTL</div><p>每個答案都帶著 TTL。每一層都會快取那麼久，這就是為什麼大多數查詢只要 0 毫秒，也是為什麼變更很慢。</p></div>
+    <div class="card"><div class="sub">記錄</div><div class="t">A, CNAME, MX…</div><p>A：名稱 → IPv4 位址。AAAA：IPv6。CNAME：另一個名稱的別名。MX：email 要送去哪裡。TXT：驗證與政策。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">取捨</div><p>TTL 長能減少查詢流量和延遲，但讓變更和故障轉移變慢；TTL 短讓變更很快，但會增加 DNS 伺服器的負擔。很少變動的記錄用小時，緊急時可能需要搬移的記錄用分鐘。</p></div>
+  <h3 style="margin-top:26px">考考自己 <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="頁面"></nav>
+</main>
+
+<script src="../../assets/explainer.js"></script>
+<script src="../../assets/i18n.zh-tw.js"></script>
+<script>
+(() => {
+const { $, el, esc } = X;
+const flags = { cold: false, warm: false, slow: false, fast: false };
+
+/* ---------- lab 1: a lookup ---------- */
+const HOPS = [
+  ['browser', '瀏覽器快取', 0, '「我已經知道 encore.example 了嗎？」'],
+  ['os', '作業系統快取', 0, '詢問作業系統的解析器快取。'],
+  ['resolver', '遞迴解析器', 10, '詢問解析器（你的 ISP 的，或 1.1.1.1 / 8.8.8.8）。由它負責跑腿。'],
+  ['root', '根伺服器', 20, '根伺服器：「我不知道 encore.example，但 .example 是由這幾台伺服器負責的。」'],
+  ['tld', '.example server', 25, '頂級網域伺服器：「encore.example 是由 ns1.encore.example 負責的。」'],
+  ['auth', '權威伺服器', 30, 'ns1.encore.example：「encore.example 是 203.0.113.7，TTL 300 秒。」這才是真正的答案。'],
+];
+let cached = new Set(), busy = false;
+function drawHops(states = {}) {
+  const p = $('#hops'); p.innerHTML = '';
+  HOPS.forEach(([k, name, ms]) => { const st = el('div', 'stage'); const c = el('div', 'chip', `${esc(name)}<small>${ms ? ms + ' 毫秒' : '0 毫秒'}</small>`); st.append(c); p.append(st); if (states[k]) X.chip(c, states[k][0], states[k][1]); });
+}
+$('#look').addEventListener('click', async () => {
+  if (busy) return; busy = true; $('#look').disabled = true;
+  const log = $('#dlog'); log.innerHTML = '';
+  const states = {}; let total = 0, by = null;
+  for (const [k, name, ms, say] of HOPS) {
+    states[k] = ['run']; drawHops(states); await X.sleep(320);
+    total += ms;
+    if (cached.has(k)) { states[k] = ['ok', '✓ 已快取']; by = name; log.append(el('li', 'ok', esc(`${name}：快取中的答案 → 203.0.113.7`))); drawHops(states); break; }
+    states[k] = k === 'auth' ? ['ok', '✓ 答案'] : ['wait', '→ 下一個']; drawHops(states);
+    log.append(el('li', k === 'auth' ? 'ok' : '', esc(`${name}: ${say}`)));
+    if (k === 'auth') by = name;
+  }
+  ['browser', 'os', 'resolver'].forEach(k => cached.add(k));
+  $('#mT').textContent = total + ' 毫秒'; $('#mBy').textContent = by;
+  $('#tag').textContent = by === '權威伺服器' ? 'cold' : 'cached';
+  if (by === '權威伺服器') flags.cold = true; else if (flags.cold) flags.warm = true;
+  busy = false; $('#look').disabled = false; mis.update(flags);
+});
+$('#clear').addEventListener('click', () => { cached = new Set(); drawHops(); $('#dlog').innerHTML = '<li class="mut">快取已清除。下一次查詢會走完整條鏈。</li>'; $('#mT').textContent = '–'; $('#mBy').textContent = '–'; });
+drawHops();
+
+/* ---------- lab 2: TTL and moving servers ---------- */
+const TTLS = [[60, '1 分鐘'], [300, '5 分鐘'], [3600, '1 小時'], [86400, '1 天']];
+const RES = (() => { const s = { r: 21 }; return Array.from({ length: 200 }, () => X.rnd(s)); })(); // when each resolver last cached, as a fraction of the TTL
+const fmtDur = sec => sec < 3600 ? Math.round(sec / 60) + ' 分鐘' : sec < 86400 ? (sec / 3600).toFixed(sec % 3600 ? 1 : 0) + ' h' : (sec / 86400).toFixed(0) + ' 天';
+let ti = 3, switched = null;
+function shareAt(ttl, t) { return RES.filter(f => (1 - f) * ttl <= t).length / RES.length; } // remaining cache time = (1 - f) * ttl
+function drawMove() {
+  const [ttl, label] = TTLS[ti];
+  $('#ttlV').textContent = label; $('#tag2').textContent = 'TTL ' + label;
+  const span = Math.max(ttl * 1.2, 3600);
+  const pts = Array.from({ length: 60 }, (_, i) => (switched ? shareAt(switched, (i / 59) * span) : 0) * 100);
+  X.lineChart($('#chart'), [{ data: pts, token: '--ok' }], { max: 100, unit: '%', points: 60 });
+  $('#axis').textContent = `切換後經過的時間：0 → ${fmtDur(span)}`;
+  if (!switched) { $('#mAll').textContent = '–'; $('#mOld').textContent = '–'; return; }
+  $('#mAll').textContent = fmtDur(switched);
+  $('#mAll').parentElement.className = 'meter' + (switched > 3600 ? ' bad' : ' ok');
+  const old = Math.round((1 - shareAt(switched, 3600)) * 100);
+  $('#mOld').textContent = old + '%';
+  $('#mOld').parentElement.className = 'meter' + (old ? ' bad' : ' ok');
+  const st = $('#st2');
+  st.className = 'status ' + (switched > 3600 ? 'bad' : 'ok');
+  st.textContent = switched > 3600 ? `✕ TTL 是 ${label} 時，解析器最多會保留舊位址 ${label}。一小時後仍有 ${old}% 的歌迷連到已經關掉的舊伺服器，看到錯誤畫面。` : `✓ TTL 是 ${label} 時，每個快取都會在 ${label} 內過期。搬遷幾乎是瞬間完成的。`;
+}
+$('#ttl').addEventListener('input', e => { ti = +e.target.value; switched = null; drawMove(); $('#st2').className = 'status'; $('#st2').textContent = '選一個 TTL，然後切換伺服器。'; });
+$('#go').addEventListener('click', () => {
+  switched = TTLS[ti][0]; drawMove();
+  if (switched >= 86400) flags.slow = true; if (switched <= 60) flags.fast = true;
+  mis.update(flags);
+});
+addEventListener('resize', drawMove);
+requestAnimationFrame(drawMove);
+
+const mis = X.missions($('#missions'), [
+  { text: '實驗室 1：在快取都是空的情況下<b>查詢 encore.example</b>。', hint: '冷查詢會走完整條鏈：根伺服器、.example，最後是 Encore 自己的伺服器。', check: f => f.cold },
+  { text: '<b>再</b>查一次。', hint: '現在瀏覽器已經快取了它：0 毫秒。', check: f => f.warm },
+  { text: '實驗室 2：在 TTL 為 <b>1 天</b>時，切換到新伺服器。', hint: '看看歌迷會持續連到舊位址多久。', check: f => f.slow },
+  { text: '把 TTL 設成 <b>1 分鐘</b>（假設一天前就調低了），再切換一次。', hint: '每個快取都會在一分鐘內過期，所以搬遷幾乎是瞬間完成的。', check: f => f.fast },
+]);
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['$ dig encore.example', 'dig'],
+  [';; QUESTION SECTION:', null],
+  [';encore.example.            IN  A', 'question'],
+  [';; ANSWER SECTION:', null],
+  ['encore.example.     <span class="key">300</span>  IN  <span class="key">A</span>  <span class="s">203.0.113.7</span>', 'answer'],
+  [';; Query time: <span class="s">23 msec</span>', 'time'],
+  [';; SERVER: 1.1.1.1#53', 'server'],
+  ['', null],
+  ['<span class="c">; Encore 的區域檔（權威記錄）</span>', null],
+  ['encore.example.   300   IN  A      203.0.113.7', 'answer'],
+  ['www               300   IN  <span class="key">CNAME</span>  encore.example.', 'cname'],
+  ['encore.example.   3600  IN  <span class="key">MX</span> 10  mail.encore.example.', 'mx'],
+], {
+  dig: ['dig', '向你的解析器查詢一筆記錄，並印出完整的答案。<code>dig +trace encore.example</code> 會從根伺服器開始走完整條鏈，就跟實驗室 1 的冷查詢一樣。'],
+  question: ['問題', '名稱、類別（IN = internet）和記錄類型（A = IPv4 位址）。'],
+  answer: ['A 記錄＋TTL', '「encore.example 是 203.0.113.7，你可以把它快取 300 秒。」這個 300 會在每個快取裡倒數。這就是實驗室 2。'],
+  time: ['查詢時間', '跑兩次：第二次的答案通常來自解析器的快取，只要幾毫秒。'],
+  server: ['哪個解析器', '回答的遞迴解析器：這裡是 Cloudflare 的 1.1.1.1。'],
+  cname: ['CNAME', 'www 是一個別名：「改查 encore.example」。很適合把很多名稱指向同一個地方。'],
+  mx: ['MX', 'encore.example 的 email 要送到哪裡。它有自己的 TTL：郵件伺服器很少搬家，所以 1 小時就夠了。'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: 'Dee 一小時前改了 DNS 記錄。Dee 自己看到的是新伺服器，但很多歌迷還是連到舊的。為什麼？', opts: [
+    ['DNS 變更剛好需要 24 小時傳播', false, '沒有固定的傳播時間。它取決於舊記錄的 TTL。'],
+    ['他們的解析器快取了舊答案，會一直保留到 TTL 到期', true, 'Dee 自己的快取剛好是新的。其他人都在等自己的快取副本過期。'],
+    ['新伺服器擋住了他們', false, '他們根本沒有連到新伺服器，而是仍然被送到舊位址。'],
+  ] },
+  { q: 'Encore 下週要搬到新伺服器。記錄的 TTL 是 1 天。最好的計畫是什麼？', opts: [
+    ['在同一時間更改 IP 並調低 TTL', false, '快取裡仍然保留著 TTL 為 1 天的舊答案。現在調低只會影響之後的副本。'],
+    ['至少提前一天把 TTL 調到 1 分鐘，然後切換，之後再調回來', true, '舊的 1 天副本都過期之後，每個快取都會持有短的 TTL，切換大約只要一分鐘。'],
+    ['TTL 不變，並立刻關掉舊伺服器', false, '有快取答案的歌迷，最多會有一整天都連到一台掛掉的伺服器。'],
+  ] },
+  { q: '為什麼瀏覽器中典型的 DNS 查詢接近 0 毫秒？', opts: [
+    ['DNS 伺服器非常快', false, '完整的冷查詢仍然要花幾十毫秒。'],
+    ['答案通常已經快取在瀏覽器、作業系統或解析器裡', true, '每一層的快取讓 DNS 很便宜，也正是它讓變更變慢。'],
+    ['瀏覽器對熱門網站會跳過 DNS', false, '每個名稱都會被解析，通常是從快取裡。'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'dns');
+})();
+</script>
+</body>
+</html>
