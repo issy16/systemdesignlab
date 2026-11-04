@@ -403,7 +403,7 @@
   },
   {
    "kind": "js",
-   "en": "`<span style=\"display:block;${cur ? 'background:#24365a;' : ''}${past ? 'opacity:.55' : ''}\">${cur ? '▶ ' : past ? '✓ ' : '  '}${esc(l[0])}</span>`",
+   "en": "`<span style=\"display:block;${cur ? 'background:var(--code-hl);' : ''}${past ? 'opacity:.55' : ''}\">${cur ? '▶ ' : past ? '✓ ' : '  '}${esc(l[0])}</span>`",
    "zh": "="
   },
   {

@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="zh-Hans-CN" data-lang="zh-cn" data-slug="locking-deadlocks">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="比较没有锁、乐观锁与悲观锁在两个人编辑同一笔数据时的差别，再制造一个死结并把它修好。">
+<title>锁与死结 · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/explainer.css">
+</head>
+<body>
+<!-- Plan. Stuck point: "optimistic vs pessimistic" sounds like personality types; deadlocks sound exotic.
+     Lab 1: two admins edit one concert (lost edit). None / optimistic (version) / pessimistic (lock).
+     Lab 2: two transfers lock two rows in opposite order -> deadlock; fix with a consistent lock order. -->
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="章节"><a href="#lab">锁</a><a href="#deadlock">死结</a><a href="#real">SQL</a><a href="#recap">重点整理</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>第 13 页 · 阶段 4 · 保持数据正确</span><span class="hot">36 · 37 · 40</span></div>
+  <div class="eyebrow">乐观锁、悲观锁、死结</div>
+  <h1>两个人编辑同一场演唱会。<em>只有一个人的修改留下来，而且无声无息。</em></h1>
+  <div class="scenario"><b>Encore</b>Ana 把票价调高到 $95。同一时间，Dee 在另一个分页把开演时间改成 20:30 并按下保存。Dee 的表单里还是旧的票价。票价又变回 $80，而且没有人知道。</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">打开实验室 ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>实验室 1 · 先弄坏，再修好</span><span class="hot" id="tag">没有锁</span></div>
+  <h2>两个编辑表单，一笔数据</h2>
+  <p>这场演唱会一开始是<b>票价 $80、20:00 开演、版本 1</b>。每位管理员加载编辑表单、修改一个字段，然后保存整张表单。</p>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">锁</span><div id="modeSeg"></div></div>
+      <div class="ctl"><span class="lab-k">运行</span>
+        <div class="presets"><button class="btn sm" id="sA" type="button">单步运行 Ana</button><button class="btn sm" id="sD" type="button">单步运行 Dee</button><button class="btn sm" id="r1" type="button">↺ 重置</button><button class="btn sm primary" id="i1" type="button">交错运行</button></div></div>
+    </div>
+    <div class="compare" style="margin:0">
+      <div><h3>Ana（调高票价）</h3><pre class="sqlbox" id="cA"></pre><p class="mono" id="vA" style="font-size:13px;margin:6px 0 0"></p></div>
+      <div><h3>Dee（修改时间）</h3><pre class="sqlbox" id="cD"></pre><p class="mono" id="vD" style="font-size:13px;margin:6px 0 0"></p></div>
+    </div>
+    <div class="meters" style="margin:0">
+      <div class="meter"><div class="k">数据库中的票价</div><div class="v" id="mP">$80</div></div>
+      <div class="meter"><div class="k">开演时间</div><div class="v" id="mT">20:00</div></div>
+      <div class="meter"><div class="k">版本</div><div class="v" id="mV">1</div></div>
+      <div class="meter"><div class="k">锁</div><div class="v" id="mL">–</div></div>
+    </div>
+    <ul class="log" id="log1" aria-label="运行过的内容"><li class="mut">你运行的每一步都会出现在这里。</li></ul>
+    <div class="status" id="st1" role="status">单步运行两位管理员，或按「交错运行」。</div>
+  </div>
+  <div class="compare">
+    <div><h3>乐观锁（Optimistic locking）</h3><p style="margin:0">假设冲突很少见。不挡任何人，而是在保存时检查数据有没有被改过（一个<b>版本</b>号码）。如果改过，就拒绝这次保存，让用户重试。冲突少的时候成本很低。</p></div>
+    <div><h3>悲观锁（Pessimistic locking）</h3><p style="margin:0">假设冲突一定会发生。在编辑前先<b>锁住</b>数据，让其他人排队等。不会有被拒绝的保存，但大家要等，而且忘记释放的锁会挡住所有人。</p></div>
+  </div>
+</section>
+
+<section class="panel" id="deadlock">
+  <div class="panel-label"><span>实验室 2 · 死结</span><span class="hot">40</span></div>
+  <h2>两笔永远在等对方的转移</h2>
+  <p>Ana 把座位从第 1 晚移到第 2 晚。同一时间，Ben 把座位从第 2 晚移到第 1 晚。每笔转移在修改前都会先锁住两场演唱会。</p>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">锁定顺序</span><div id="ordSeg"></div></div>
+      <div class="ctl"><span class="lab-k">运行</span>
+        <div class="presets"><button class="btn sm" id="sT1" type="button">单步运行 Ana 的转移</button><button class="btn sm" id="sT2" type="button">单步运行 Ben 的转移</button><button class="btn sm" id="r2" type="button">↺ 重置</button><button class="btn sm primary" id="i2" type="button">交错运行</button></div></div>
+    </div>
+    <div class="compare" style="margin:0">
+      <div><h3>Ana：第 1 晚 → 第 2 晚</h3><pre class="sqlbox" id="cT1"></pre></div>
+      <div><h3>Ben：第 2 晚 → 第 1 晚</h3><pre class="sqlbox" id="cT2"></pre></div>
+    </div>
+    <div class="status" id="wf" role="status">等待图：没有人在等。</div>
+  </div>
+  <h3>试试看</h3>
+  <ol class="missions" id="missions"></ol>
+  <div class="takeaway"><div class="t">关键差别</div><p><b>死结（deadlock）</b>需要一个循环：A 握着 B 要的东西，同时 B 握着 A 要的东西。数据库会侦测到循环，并终止其中一个交易。预防的方法是让每个交易都<b>以同样的顺序</b>取得锁（例如 id 小的先锁）。这样第二个交易只会等待，而不会去抢另一把锁。</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>第 3 幕 · 真实世界</span><span class="hot">sql</span></div>
+  <h2>三种策略，用 SQL 写出来</h2>
+  <p><b>把鼠标移到某一行上，或点一下。</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="乐观锁、悲观锁与锁定顺序的 SQL"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 选一行</div><p id="exP">每一行反白后，都会对应到实验室里的一种模式。</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>重点整理 · 带走这些</span><span class="hot">♥</span></div>
+  <h2>整页浓缩在一个画面</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">保存时检查</div><div class="t">乐观锁</div><p>一个版本字段。<code>UPDATE … WHERE version = 1</code>；影响 0 列代表别人先保存了。最适合冲突很少的情况。</p></div>
+    <div class="card"><div class="sub">先上锁</div><div class="t">悲观锁</div><p>在交易中使用 <code>SELECT … FOR UPDATE</code>。其他人要等。最适合短暂、竞争激烈的操作，例如座位库存。</p></div>
+    <div class="card"><div class="sub">永远等待</div><div class="t">死结</div><p>两个交易各自握着对方需要的锁。用一致的锁定顺序和短交易来预防；数据库终止其中一个时就重试。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">取舍</div><p>乐观锁从不阻挡，但会把冲突丢回给用户或重试程序。悲观锁让人等待来避免冲突，而你取得的每一把锁都是一次死结的机会。大多数网页应用程序对编辑表单用乐观锁，对热门计数器用短暂的悲观锁。</p></div>
+  <h3 style="margin-top:26px">考考自己 <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="页面"></nav>
+</main>
+
+<script src="../../assets/explainer.js"></script>
+<script src="../../assets/i18n.zh-cn.js"></script>
+<script>
+(() => {
+const { $, el, esc } = X;
+
+/* ---------- lab 1: edit forms ---------- */
+const LOAD = { none: 'SELECT * FROM concerts WHERE id = 7', opt: 'SELECT *, version FROM concerts WHERE id = 7', pess: 'BEGIN; SELECT * … FOR UPDATE' };
+function progs(mode) {
+  const load = (s, me) => {
+    if (mode === 'pess') { if (s.lock && s.lock !== me.name) return 'blocked'; s.lock = me.name; }
+    me.form = { price: s.db.price, time: s.db.time, version: s.db.version };
+  };
+  const save = field => (s, me) => {
+    me.form[field] = field === 'price' ? 95 : '20:30';
+    if (mode === 'opt' && s.db.version !== me.form.version) { me.rejected = (me.rejected || 0) + 1; return 'rejected'; }
+    s.db.price = me.form.price; s.db.time = me.form.time; s.db.version++;
+    if (mode === 'pess') s.lock = null;
+    return 'done';
+  };
+  return {
+    Ana: [[LOAD[mode], load], [mode === 'opt' ? 'UPDATE … SET price = 95 WHERE version = ?' : mode === 'pess' ? 'UPDATE … SET price = 95; COMMIT' : 'UPDATE … SET price = 95, time = …', save('price')]],
+    Dee: [[LOAD[mode], load], [mode === 'opt' ? 'UPDATE … SET time = 20:30 WHERE version = ?' : mode === 'pess' ? 'UPDATE … SET time = 20:30; COMMIT' : 'UPDATE … SET price = …, time = 20:30', save('time')]],
+  };
+}
+const MODES = ['none', 'opt', 'pess'];
+let m1 = 'none', A = null;
+function init1() { return { mode: m1, p: progs(m1), db: { price: 80, time: '20:00', version: 1 }, lock: null, who: { Ana: { name: 'Ana', pc: 0 }, Dee: { name: 'Dee', pc: 0 } }, order: [] }; }
+const runs = [];
+function log1(cls, t) { const l = $('#log1'); if (l.querySelector('.mut')) l.innerHTML = ''; l.append(el('li', cls, esc(t))); l.scrollTop = l.scrollHeight; }
+function step1(name) {
+  const me = A.who[name];
+  if (me.end) return false;
+  const [label, run] = A.p[name][me.pc];
+  const r = run(A, me);
+  if (r === 'blocked') { log1('wait', `${name}：${label}  ⏸ 等待中：${A.lock} 锁住了这一列`); render1(); return false; }
+  A.order.push(name);
+  if (r === 'rejected') { log1('wait', `${name}：${label}  → 0 列：版本已经变了。「别人已经保存过了。请重新加载再试一次。」`); me.pc = 0; }
+  else if (r === 'done') { me.end = true; log1(me.rejected ? 'ok' : '', `${name}：${label}  → 已保存（版本 ${A.db.version}）`); }
+  else { me.pc++; log1('', `${name}: ${label}  → form shows $${me.form.price}, ${me.form.time}${A.mode === 'opt' ? `, version ${me.form.version}` : ''}`); }
+  render1();
+  if (A.who.Ana.end && A.who.Dee.end && !A.recorded) {
+    A.recorded = true;
+    runs.push({ k: 'edit', mode: A.mode, both: A.db.price === 95 && A.db.time === '20:30', inter: A.order.indexOf('Dee') < A.order.lastIndexOf('Ana') || A.mode === 'pess' && A.waited, rejected: !!A.who.Dee.rejected });
+    mis.update(runs);
+  }
+  return true;
+}
+function render1() {
+  ['Ana', 'Dee'].forEach(n => {
+    const me = A.who[n], id = n === 'Ana' ? 'A' : 'D';
+    $('#c' + id).innerHTML = A.p[n].map((l, i) => `<span style="display:block;${!me.end && i === me.pc ? 'background:var(--code-hl);' : ''}${i < me.pc || me.end ? 'opacity:.55' : ''}">${!me.end && i === me.pc ? '▶ ' : i < me.pc || me.end ? '✓ ' : '  '}${esc(l[0])}</span>`).join('');
+    $('#v' + id).textContent = me.form ? `form: $${me.form.price}, ${me.form.time}${A.mode === 'opt' ? `, version ${me.form.version}` : ''}${me.end ? ' · saved' : ''}` : '';
+  });
+  $('#mP').textContent = '$' + A.db.price; $('#mT').textContent = A.db.time; $('#mV').textContent = A.db.version;
+  $('#mL').textContent = A.mode !== 'pess' ? '–' : A.lock ? A.lock : 'free';
+  $('#tag').textContent = { none: '没有锁', opt: 'optimistic', pess: 'pessimistic' }[A.mode];
+  const st = $('#st1');
+  if (!(A.who.Ana.end && A.who.Dee.end)) { st.className = 'status'; st.textContent = '单步运行两位管理员，或按「交错运行」。'; return; }
+  const both = A.db.price === 95 && A.db.time === '20:30';
+  st.className = 'status ' + (both ? 'ok' : 'bad');
+  st.textContent = both
+    ? (A.mode === 'opt' ? '✓ 两个修改都保留了。Dee 第一次保存被拒绝，因为版本已经变了，所以 Dee 重新加载，在 Ana 的新票价之上再保存一次。' : A.mode === 'pess' ? '✓ 两个修改都保留了。Dee 必须等 Ana 的锁释放，然后加载有新票价的表单。' : '✓ 两个修改都保留了，因为 Ana 在 Dee 加载表单前就完成了。时机刚好而已。')
+    : `✕ Ana 的票价修改不见了：票价是 $${A.db.price}。Dee 的表单是在 Ana 保存之前加载的，保存时把旧票价写了回去。没有错误，也没有警告。`;
+}
+async function inter1() {
+  A = init1(); $('#log1').innerHTML = ''; render1();
+  const seq = ['Ana', 'Dee', 'Ana', 'Dee', 'Dee', 'Dee', 'Dee'];
+  for (const n of seq) {
+    if (A.who.Ana.end && A.who.Dee.end) break;
+    const ok = step1(n);
+    if (!ok && n === 'Dee') A.waited = true;
+    if (!ok && !A.who.Ana.end && n === 'Dee') { await X.sleep(250); step1('Ana'); }
+    await X.sleep(250);
+  }
+}
+X.seg($('#modeSeg'), ['没有锁', '乐观锁（版本）', '悲观锁（上锁）'], i => { m1 = MODES[i]; A = init1(); $('#log1').innerHTML = '<li class="mut">你运行的每一步都会出现在这里。</li>'; render1(); }, 0);
+$('#sA').addEventListener('click', () => step1('Ana'));
+$('#sD').addEventListener('click', () => { if (!step1('Dee')) A.waited = true; });
+$('#r1').addEventListener('click', () => { A = init1(); $('#log1').innerHTML = '<li class="mut">你运行的每一步都会出现在这里。</li>'; render1(); });
+$('#i1').addEventListener('click', inter1);
+A = init1(); render1();
+
+/* ---------- lab 2: deadlock ---------- */
+let ordered = false, D = null;
+function init2() {
+  const t1 = ['N1', 'N2'], t2 = ordered ? ['N1', 'N2'] : ['N2', 'N1'];
+  return { locks: {}, t: { T1: { name: 'Ana', need: t1, pc: 0 }, T2: { name: 'Ben', need: t2, pc: 0 } }, dead: false, victim: null };
+}
+const label2 = (tx, i) => i < 2 ? `SELECT … WHERE id = ${tx.need[i] === 'N1' ? 'night_1' : 'night_2'} FOR UPDATE` : 'UPDATE both; COMMIT';
+function step2(k) {
+  const tx = D.t[k];
+  if (tx.done || D.dead && D.victim === k) return;
+  if (tx.pc < 2) {
+    const r = tx.need[tx.pc], holder = D.locks[r];
+    if (holder && holder !== k) { tx.waiting = r; }
+    else { D.locks[r] = k; tx.waiting = null; tx.pc++; }
+  } else { tx.done = true; Object.keys(D.locks).forEach(r => D.locks[r] === k && delete D.locks[r]); }
+  // other transaction may now proceed
+  const o = D.t[k === 'T1' ? 'T2' : 'T1'];
+  if (o.waiting && !D.locks[o.waiting]) { D.locks[o.waiting] = k === 'T1' ? 'T2' : 'T1'; o.waiting = null; o.pc++; }
+  if (D.t.T1.waiting && D.t.T2.waiting && D.locks[D.t.T1.waiting] === 'T2' && D.locks[D.t.T2.waiting] === 'T1') {
+    D.dead = true; D.victim = 'T2';
+    Object.keys(D.locks).forEach(r => D.locks[r] === 'T2' && delete D.locks[r]);
+    D.t.T2.waiting = null; D.t.T2.aborted = true;
+    D.locks[D.t.T1.waiting] = 'T1'; D.t.T1.waiting = null; D.t.T1.pc++;
+  }
+  render2();
+  if ((D.t.T1.done || D.t.T1.aborted) && (D.t.T2.done || D.t.T2.aborted) && !D.recorded) { D.recorded = true; runs.push({ k: 'dead', ordered, dead: D.dead }); mis.update(runs); }
+}
+function render2() {
+  ['T1', 'T2'].forEach(k => {
+    const tx = D.t[k];
+    $('#c' + k).innerHTML = [0, 1, 2].map(i => {
+      const cur = !tx.done && !tx.aborted && i === tx.pc, past = i < tx.pc || tx.done;
+      return `<span style="display:block;${cur ? 'background:var(--code-hl);' : ''}${past ? 'opacity:.55' : ''}">${cur ? (tx.waiting ? '⏸ ' : '▶ ') : past ? '✓ ' : '  '}${esc(label2(tx, i))}</span>`;
+    }).join('') + (tx.aborted ? '\n✕ ERROR：侦测到死结（deadlock detected）。交易已回滚。' : '');
+  });
+  const w = [];
+  ['T1', 'T2'].forEach(k => { const tx = D.t[k]; if (tx.waiting) w.push(`${tx.name} 在等 ${D.t[D.locks[tx.waiting]].name}（${tx.waiting === 'N1' ? '第 1 晚' : '第 2 晚'}）`); });
+  const wf = $('#wf');
+  if (D.dead) { wf.className = 'status bad'; wf.textContent = '✕ 死结：Ana 在等 Ben，同时 Ben 在等 Ana。数据库发现了这个循环，终止了 Ben 的交易。Ben 的转移失败了，必须重试。'; }
+  else if (D.t.T1.done && D.t.T2.done) { wf.className = 'status ok'; wf.textContent = ordered ? '✓ 没有死结。两人都先锁第 1 晚，所以 Ben 只是在第一步等到 Ana 提交为止。' : '✓ 两笔转移都完成了，因为它们没有重叠。'; }
+  else if (w.length) { wf.className = 'status wait'; wf.textContent = '等待图：' + w.join(' · '); }
+  else { wf.className = 'status'; wf.textContent = '等待图：没有人在等。'; }
+}
+async function inter2() { D = init2(); render2(); for (const k of ['T1', 'T2', 'T1', 'T2', 'T1', 'T2', 'T1', 'T2']) { step2(k); await X.sleep(300); } }
+X.seg($('#ordSeg'), ['照程序写的顺序', '一律先锁第 1 晚'], i => { ordered = i === 1; D = init2(); render2(); }, 0);
+$('#sT1').addEventListener('click', () => step2('T1'));
+$('#sT2').addEventListener('click', () => step2('T2'));
+$('#r2').addEventListener('click', () => { D = init2(); render2(); });
+$('#i2').addEventListener('click', inter2);
+D = init2(); render2();
+
+const mis = X.missions($('#missions'), [
+  { text: '实验室 1，<b>没有锁</b>：按<b>交错运行</b>。', hint: '两人都加载表单，Ana 保存，接着 Dee 把旧票价存了回去。Ana 的修改无声无息地消失了。', check: r => r.some(x => x.k === 'edit' && x.mode === 'none' && !x.both) },
+  { text: '切换到<b>乐观锁</b>，交错运行。', hint: 'Dee 的保存影响 0 列，因为版本变了。Dee 重新加载再保存一次，两个修改都留下来了。', check: r => r.some(x => x.k === 'edit' && x.mode === 'opt' && x.both && x.rejected) },
+  { text: '切换到<b>悲观锁</b>，交错运行。', hint: '在 Ana 提交并释放锁之前，Dee 连表单都加载不了。', check: r => r.some(x => x.k === 'edit' && x.mode === 'pess' && x.both) },
+  { text: '实验室 2：在锁定顺序为<b>照程序写的顺序</b>时，按<b>交错运行</b>。', hint: '每笔转移各自拿到第一把锁，然后等待对方手上的那把。数据库终止了其中一个。', check: r => r.some(x => x.k === 'dead' && !x.ordered && x.dead) },
+  { text: '切换到<b>一律先锁第 1 晚</b>，再交错运行一次。', hint: '同样的转移、同样的时机，没有死结。', check: r => r.some(x => x.k === 'dead' && x.ordered && !x.dead) },
+]);
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="c">-- 乐观锁：保存时检查版本</span>', null],
+  ['<span class="key">SELECT</span> price, start_time, version <span class="key">FROM</span> concerts <span class="key">WHERE</span> id = 7;', 'optread'],
+  ['<span class="key">UPDATE</span> concerts <span class="key">SET</span> start_time = <span class="s">\'20:30\'</span>, version = version + 1', 'optwrite'],
+  ['<span class="key">WHERE</span> id = 7 <span class="key">AND</span> version = 1;  <span class="c">-- 0 rows? reload and retry</span>', 'optwrite'],
+  ['', null],
+  ['<span class="c">-- 悲观锁：上锁、修改、提交</span>', null],
+  ['<span class="key">BEGIN</span>;', 'pess'],
+  ['<span class="key">SELECT</span> * <span class="key">FROM</span> concerts <span class="key">WHERE</span> id = 7 <span class="key">FOR UPDATE</span>;', 'pess'],
+  ['<span class="key">UPDATE</span> concerts <span class="key">SET</span> price = 95 <span class="key">WHERE</span> id = 7;', null],
+  ['<span class="key">COMMIT</span>;', 'commit'],
+  ['', null],
+  ['<span class="c">-- 避免死结：一律以相同顺序上锁</span>', null],
+  ['<span class="key">SELECT</span> * <span class="key">FROM</span> concerts <span class="key">WHERE</span> id <span class="key">IN</span> (1, 2)', 'order'],
+  ['<span class="key">ORDER BY</span> id <span class="key">FOR UPDATE</span>;', 'order'],
+  ['<span class="c">-- ERROR: deadlock detected → 捕捉它并重试整个交易</span>', 'retry'],
+], {
+  optread: ['记住版本', '加载数据时一并加载版本。它会跟着编辑表单走，通常是一个隐藏字段。'],
+  optwrite: ['有条件的保存', '只有在版本还是你加载时的那个时才更新。影响 0 列代表中间有人保存过：显示「请重新加载再试一次」。很多 ORM 会帮你做（Rails 的 <code>lock_version</code>、Hibernate 的 <code>@Version</code>）。'],
+  pess: ['锁住这一列', '<code>FOR UPDATE</code> 会持有锁直到交易结束。其他要同一列的人都得等。绝对不要在人填表单时一直开着数据库锁；长时间的编辑请用乐观锁。'],
+  commit: ['释放', 'COMMIT（或 ROLLBACK）会释放锁。交易短，等待就短，死结也更少。'],
+  order: ['一致的顺序', '在一条语句中锁住所有需要的列，并依 id 排序。两笔转移就不可能再各自握着其中一列。'],
+  retry: ['还是发生时', 'Postgres 和 MySQL 会侦测死结，并以错误终止其中一个交易。把它当成一般的暂时性失败：重试整个交易。'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: 'Encore 的管理后台让好几位员工编辑演唱会信息。冲突很少见，而且一次编辑要好几分钟。哪种做法最合适？', opts: [
+    ['悲观锁：有人打开表单时就锁住那一列', false, '锁会被持有好几分钟，挡住其他所有人，而且对方关掉分页时还会一直卡着。'],
+    ['乐观锁：一个版本字段，冲突时显示「别人已经保存过了」', true, '没有人需要等待，少见的冲突也会在保存时被抓到，而不是无声地覆盖。'],
+    ['不加锁：反正冲突很少见', false, '很少不等于从不。真的发生时，一次编辑就会消失得无影无踪。'],
+  ] },
+  { q: 'Postgres 每天会在座位转移时记录几次「deadlock detected」。最好的修法是什么？', opts: [
+    ['关掉死结侦测', false, '那样两个交易就会永远等下去，而不是其中一个失败。'],
+    ['以一致的顺序（依 id）锁定各列、让交易保持简短，并在遇到死结错误时重试', true, '排序消除了循环。短交易和重试则处理剩下的情况。'],
+    ['增加数据库服务器', false, '死结来自锁定顺序，而不是容量。'],
+  ] },
+  { q: '乐观锁的保存影响了 0 列，代表什么？', opts: [
+    ['数据库挂了', false, '挂掉的数据库会返回错误，而不是 0 列。'],
+    ['你加载之后，这笔数据被改过（或被删除了）：重新加载再试一次', true, '<code>WHERE version = ?</code> 不再符合，这正是你想要的信号。'],
+    ['保存成功了，只是比较慢', false, '0 列代表什么都没写入。'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'locking-deadlocks');
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Compare no locking, optimistic and pessimistic locking on two people editing one record, then create a deadlock and fix it.">
+<title>Locking and Deadlocks · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/explainer.css">
+</head>
+<body>
+<!-- Plan. Stuck point: "optimistic vs pessimistic" sounds like personality types; deadlocks sound exotic.
+     Lab 1: two admins edit one concert (lost edit). None / optimistic (version) / pessimistic (lock).
+     Lab 2: two transfers lock two rows in opposite order -> deadlock; fix with a consistent lock order. -->
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="Sections"><a href="#lab">Locking</a><a href="#deadlock">Deadlock</a><a href="#real">The SQL</a><a href="#recap">Recap</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>page 13 · stage 4 · keep data correct</span><span class="hot">36 · 37 · 40</span></div>
+  <div class="eyebrow">Optimistic locking, pessimistic locking, deadlocks</div>
+  <h1>Two people edit the same concert. <em>Only one of them wins, silently.</em></h1>
+  <div class="scenario"><b>Encore</b>Ana raises the ticket price to $95. At the same moment Dee, in another tab, changes the start time to 20:30 and hits Save. Dee's form still had the old price. The price is back to $80, and nobody knows.</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">Open the lab ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>lab 1 · break it, then fix it</span><span class="hot" id="tag">no locking</span></div>
+  <h2>Two edit forms, one record</h2>
+  <p>The concert starts as <b>price $80, start 20:00, version 1</b>. Each admin loads the edit form, changes one field, and saves the whole form.</p>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">Locking</span><div id="modeSeg"></div></div>
+      <div class="ctl"><span class="lab-k">Run it</span>
+        <div class="presets"><button class="btn sm" id="sA" type="button">Step Ana</button><button class="btn sm" id="sD" type="button">Step Dee</button><button class="btn sm" id="r1" type="button">↺ Reset</button><button class="btn sm primary" id="i1" type="button">Interleave</button></div></div>
+    </div>
+    <div class="compare" style="margin:0">
+      <div><h3>Ana (raise the price)</h3><pre class="sqlbox" id="cA"></pre><p class="mono" id="vA" style="font-size:13px;margin:6px 0 0"></p></div>
+      <div><h3>Dee (change the time)</h3><pre class="sqlbox" id="cD"></pre><p class="mono" id="vD" style="font-size:13px;margin:6px 0 0"></p></div>
+    </div>
+    <div class="meters" style="margin:0">
+      <div class="meter"><div class="k">Price in the database</div><div class="v" id="mP">$80</div></div>
+      <div class="meter"><div class="k">Start time</div><div class="v" id="mT">20:00</div></div>
+      <div class="meter"><div class="k">Version</div><div class="v" id="mV">1</div></div>
+      <div class="meter"><div class="k">Lock</div><div class="v" id="mL">–</div></div>
+    </div>
+    <ul class="log" id="log1" aria-label="What ran"><li class="mut">Each step you run appears here.</li></ul>
+    <div class="status" id="st1" role="status">Step the two admins, or press Interleave.</div>
+  </div>
+  <div class="compare">
+    <div><h3>Optimistic locking</h3><p style="margin:0">Assume conflicts are rare. Don't block anyone; instead, check at save time that the record hasn't changed (a <b>version</b> number). If it has, reject the save and let the user retry. Cheap when conflicts are rare.</p></div>
+    <div><h3>Pessimistic locking</h3><p style="margin:0">Assume conflicts will happen. <b>Lock</b> the record before editing, so others wait their turn. No rejected saves, but people wait, and a forgotten lock blocks everyone.</p></div>
+  </div>
+</section>
+
+<section class="panel" id="deadlock">
+  <div class="panel-label"><span>lab 2 · deadlock</span><span class="hot">40</span></div>
+  <h2>Two transfers that wait for each other forever</h2>
+  <p>Ana moves seats from Night 1 to Night 2. At the same time Ben moves seats from Night 2 to Night 1. Each transfer locks both concerts before changing them.</p>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">Lock order</span><div id="ordSeg"></div></div>
+      <div class="ctl"><span class="lab-k">Run it</span>
+        <div class="presets"><button class="btn sm" id="sT1" type="button">Step Ana's transfer</button><button class="btn sm" id="sT2" type="button">Step Ben's transfer</button><button class="btn sm" id="r2" type="button">↺ Reset</button><button class="btn sm primary" id="i2" type="button">Interleave</button></div></div>
+    </div>
+    <div class="compare" style="margin:0">
+      <div><h3>Ana: Night 1 → Night 2</h3><pre class="sqlbox" id="cT1"></pre></div>
+      <div><h3>Ben: Night 2 → Night 1</h3><pre class="sqlbox" id="cT2"></pre></div>
+    </div>
+    <div class="status" id="wf" role="status">Wait-for graph: nobody is waiting.</div>
+  </div>
+  <h3>Try this</h3>
+  <ol class="missions" id="missions"></ol>
+  <div class="takeaway"><div class="t">The one difference</div><p>A <b>deadlock</b> needs a cycle: A holds what B wants while B holds what A wants. Databases detect the cycle and kill one transaction. You prevent it by making every transaction take locks <b>in the same order</b> (for example, lowest id first). Then the second one simply waits instead of grabbing the other lock.</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>act 3 · the real thing</span><span class="hot">sql</span></div>
+  <h2>All three strategies, in SQL</h2>
+  <p><b>Hover or tap a line.</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="Optimistic and pessimistic locking SQL, and lock ordering"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 pick a line</div><p id="exP">Each highlighted line maps to a mode in the labs.</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>recap · keep this</span><span class="hot">♥</span></div>
+  <h2>The whole page on one screen</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">Check at save</div><div class="t">Optimistic</div><p>A version column. <code>UPDATE … WHERE version = 1</code>; 0 rows means someone else saved first. Best when conflicts are rare.</p></div>
+    <div class="card"><div class="sub">Lock first</div><div class="t">Pessimistic</div><p><code>SELECT … FOR UPDATE</code> inside a transaction. Others wait. Best for short, contended operations like seat inventory.</p></div>
+    <div class="card"><div class="sub">Wait forever</div><div class="t">Deadlock</div><p>Two transactions each hold a lock the other needs. Prevent it with a consistent lock order and short transactions; retry when the database aborts one.</p></div>
+  </div>
+  <div class="takeaway"><div class="t">The tradeoff</div><p>Optimistic locking never blocks but pushes conflicts back to users or retry code. Pessimistic locking avoids conflicts by making people wait, and every lock you take is a chance to deadlock. Most web apps use optimistic locking for edit forms and short pessimistic locks for hot counters.</p></div>
+  <h3 style="margin-top:26px">Check it <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="Pages"></nav>
+</main>
+
+<script src="../assets/explainer.js"></script>
+<script>
+(() => {
+const { $, el, esc } = X;
+
+/* ---------- lab 1: edit forms ---------- */
+const LOAD = { none: 'SELECT * FROM concerts WHERE id = 7', opt: 'SELECT *, version FROM concerts WHERE id = 7', pess: 'BEGIN; SELECT * … FOR UPDATE' };
+function progs(mode) {
+  const load = (s, me) => {
+    if (mode === 'pess') { if (s.lock && s.lock !== me.name) return 'blocked'; s.lock = me.name; }
+    me.form = { price: s.db.price, time: s.db.time, version: s.db.version };
+  };
+  const save = field => (s, me) => {
+    me.form[field] = field === 'price' ? 95 : '20:30';
+    if (mode === 'opt' && s.db.version !== me.form.version) { me.rejected = (me.rejected || 0) + 1; return 'rejected'; }
+    s.db.price = me.form.price; s.db.time = me.form.time; s.db.version++;
+    if (mode === 'pess') s.lock = null;
+    return 'done';
+  };
+  return {
+    Ana: [[LOAD[mode], load], [mode === 'opt' ? 'UPDATE … SET price = 95 WHERE version = ?' : mode === 'pess' ? 'UPDATE … SET price = 95; COMMIT' : 'UPDATE … SET price = 95, time = …', save('price')]],
+    Dee: [[LOAD[mode], load], [mode === 'opt' ? 'UPDATE … SET time = 20:30 WHERE version = ?' : mode === 'pess' ? 'UPDATE … SET time = 20:30; COMMIT' : 'UPDATE … SET price = …, time = 20:30', save('time')]],
+  };
+}
+const MODES = ['none', 'opt', 'pess'];
+let m1 = 'none', A = null;
+function init1() { return { mode: m1, p: progs(m1), db: { price: 80, time: '20:00', version: 1 }, lock: null, who: { Ana: { name: 'Ana', pc: 0 }, Dee: { name: 'Dee', pc: 0 } }, order: [] }; }
+const runs = [];
+function log1(cls, t) { const l = $('#log1'); if (l.querySelector('.mut')) l.innerHTML = ''; l.append(el('li', cls, esc(t))); l.scrollTop = l.scrollHeight; }
+function step1(name) {
+  const me = A.who[name];
+  if (me.end) return false;
+  const [label, run] = A.p[name][me.pc];
+  const r = run(A, me);
+  if (r === 'blocked') { log1('wait', `${name}: ${label}  ⏸ waits: ${A.lock} has the row locked`); render1(); return false; }
+  A.order.push(name);
+  if (r === 'rejected') { log1('wait', `${name}: ${label}  → 0 rows: the version changed. “Someone else saved this. Reload and try again.”`); me.pc = 0; }
+  else if (r === 'done') { me.end = true; log1(me.rejected ? 'ok' : '', `${name}: ${label}  → saved (version ${A.db.version})`); }
+  else { me.pc++; log1('', `${name}: ${label}  → form shows $${me.form.price}, ${me.form.time}${A.mode === 'opt' ? `, version ${me.form.version}` : ''}`); }
+  render1();
+  if (A.who.Ana.end && A.who.Dee.end && !A.recorded) {
+    A.recorded = true;
+    runs.push({ k: 'edit', mode: A.mode, both: A.db.price === 95 && A.db.time === '20:30', inter: A.order.indexOf('Dee') < A.order.lastIndexOf('Ana') || A.mode === 'pess' && A.waited, rejected: !!A.who.Dee.rejected });
+    mis.update(runs);
+  }
+  return true;
+}
+function render1() {
+  ['Ana', 'Dee'].forEach(n => {
+    const me = A.who[n], id = n === 'Ana' ? 'A' : 'D';
+    $('#c' + id).innerHTML = A.p[n].map((l, i) => `<span style="display:block;${!me.end && i === me.pc ? 'background:var(--code-hl);' : ''}${i < me.pc || me.end ? 'opacity:.55' : ''}">${!me.end && i === me.pc ? '▶ ' : i < me.pc || me.end ? '✓ ' : '  '}${esc(l[0])}</span>`).join('');
+    $('#v' + id).textContent = me.form ? `form: $${me.form.price}, ${me.form.time}${A.mode === 'opt' ? `, version ${me.form.version}` : ''}${me.end ? ' · saved' : ''}` : '';
+  });
+  $('#mP').textContent = '$' + A.db.price; $('#mT').textContent = A.db.time; $('#mV').textContent = A.db.version;
+  $('#mL').textContent = A.mode !== 'pess' ? '–' : A.lock ? A.lock : 'free';
+  $('#tag').textContent = { none: 'no locking', opt: 'optimistic', pess: 'pessimistic' }[A.mode];
+  const st = $('#st1');
+  if (!(A.who.Ana.end && A.who.Dee.end)) { st.className = 'status'; st.textContent = 'Step the two admins, or press Interleave.'; return; }
+  const both = A.db.price === 95 && A.db.time === '20:30';
+  st.className = 'status ' + (both ? 'ok' : 'bad');
+  st.textContent = both
+    ? (A.mode === 'opt' ? '✓ Both changes kept. Dee\'s first save was rejected because the version had changed, so Dee reloaded and saved on top of Ana\'s price.' : A.mode === 'pess' ? '✓ Both changes kept. Dee had to wait for Ana\'s lock, then loaded the form with the new price.' : '✓ Both changes kept, because Ana finished before Dee loaded the form. Lucky timing.')
+    : `✕ Ana's price change is gone: the price is $${A.db.price}. Dee's form was loaded before Ana saved, and saving it wrote the old price back. No error, no warning.`;
+}
+async function inter1() {
+  A = init1(); $('#log1').innerHTML = ''; render1();
+  const seq = ['Ana', 'Dee', 'Ana', 'Dee', 'Dee', 'Dee', 'Dee'];
+  for (const n of seq) {
+    if (A.who.Ana.end && A.who.Dee.end) break;
+    const ok = step1(n);
+    if (!ok && n === 'Dee') A.waited = true;
+    if (!ok && !A.who.Ana.end && n === 'Dee') { await X.sleep(250); step1('Ana'); }
+    await X.sleep(250);
+  }
+}
+X.seg($('#modeSeg'), ['No locking', 'Optimistic (version)', 'Pessimistic (lock)'], i => { m1 = MODES[i]; A = init1(); $('#log1').innerHTML = '<li class="mut">Each step you run appears here.</li>'; render1(); }, 0);
+$('#sA').addEventListener('click', () => step1('Ana'));
+$('#sD').addEventListener('click', () => { if (!step1('Dee')) A.waited = true; });
+$('#r1').addEventListener('click', () => { A = init1(); $('#log1').innerHTML = '<li class="mut">Each step you run appears here.</li>'; render1(); });
+$('#i1').addEventListener('click', inter1);
+A = init1(); render1();
+
+/* ---------- lab 2: deadlock ---------- */
+let ordered = false, D = null;
+function init2() {
+  const t1 = ['N1', 'N2'], t2 = ordered ? ['N1', 'N2'] : ['N2', 'N1'];
+  return { locks: {}, t: { T1: { name: 'Ana', need: t1, pc: 0 }, T2: { name: 'Ben', need: t2, pc: 0 } }, dead: false, victim: null };
+}
+const label2 = (tx, i) => i < 2 ? `SELECT … WHERE id = ${tx.need[i] === 'N1' ? 'night_1' : 'night_2'} FOR UPDATE` : 'UPDATE both; COMMIT';
+function step2(k) {
+  const tx = D.t[k];
+  if (tx.done || D.dead && D.victim === k) return;
+  if (tx.pc < 2) {
+    const r = tx.need[tx.pc], holder = D.locks[r];
+    if (holder && holder !== k) { tx.waiting = r; }
+    else { D.locks[r] = k; tx.waiting = null; tx.pc++; }
+  } else { tx.done = true; Object.keys(D.locks).forEach(r => D.locks[r] === k && delete D.locks[r]); }
+  // other transaction may now proceed
+  const o = D.t[k === 'T1' ? 'T2' : 'T1'];
+  if (o.waiting && !D.locks[o.waiting]) { D.locks[o.waiting] = k === 'T1' ? 'T2' : 'T1'; o.waiting = null; o.pc++; }
+  if (D.t.T1.waiting && D.t.T2.waiting && D.locks[D.t.T1.waiting] === 'T2' && D.locks[D.t.T2.waiting] === 'T1') {
+    D.dead = true; D.victim = 'T2';
+    Object.keys(D.locks).forEach(r => D.locks[r] === 'T2' && delete D.locks[r]);
+    D.t.T2.waiting = null; D.t.T2.aborted = true;
+    D.locks[D.t.T1.waiting] = 'T1'; D.t.T1.waiting = null; D.t.T1.pc++;
+  }
+  render2();
+  if ((D.t.T1.done || D.t.T1.aborted) && (D.t.T2.done || D.t.T2.aborted) && !D.recorded) { D.recorded = true; runs.push({ k: 'dead', ordered, dead: D.dead }); mis.update(runs); }
+}
+function render2() {
+  ['T1', 'T2'].forEach(k => {
+    const tx = D.t[k];
+    $('#c' + k).innerHTML = [0, 1, 2].map(i => {
+      const cur = !tx.done && !tx.aborted && i === tx.pc, past = i < tx.pc || tx.done;
+      return `<span style="display:block;${cur ? 'background:var(--code-hl);' : ''}${past ? 'opacity:.55' : ''}">${cur ? (tx.waiting ? '⏸ ' : '▶ ') : past ? '✓ ' : '  '}${esc(label2(tx, i))}</span>`;
+    }).join('') + (tx.aborted ? '\n✕ ERROR: deadlock detected. Transaction rolled back.' : '');
+  });
+  const w = [];
+  ['T1', 'T2'].forEach(k => { const tx = D.t[k]; if (tx.waiting) w.push(`${tx.name} waits for ${D.t[D.locks[tx.waiting]].name} (${tx.waiting === 'N1' ? 'Night 1' : 'Night 2'})`); });
+  const wf = $('#wf');
+  if (D.dead) { wf.className = 'status bad'; wf.textContent = '✕ Deadlock: Ana waited for Ben while Ben waited for Ana. The database found the cycle and killed Ben\'s transaction. Ben\'s transfer failed and must be retried.'; }
+  else if (D.t.T1.done && D.t.T2.done) { wf.className = 'status ok'; wf.textContent = ordered ? '✓ No deadlock. Both lock Night 1 first, so Ben simply waited at the first step until Ana committed.' : '✓ Both transfers finished, because they didn\'t overlap.'; }
+  else if (w.length) { wf.className = 'status wait'; wf.textContent = 'Wait-for graph: ' + w.join(' · '); }
+  else { wf.className = 'status'; wf.textContent = 'Wait-for graph: nobody is waiting.'; }
+}
+async function inter2() { D = init2(); render2(); for (const k of ['T1', 'T2', 'T1', 'T2', 'T1', 'T2', 'T1', 'T2']) { step2(k); await X.sleep(300); } }
+X.seg($('#ordSeg'), ['As written', 'Always Night 1 first'], i => { ordered = i === 1; D = init2(); render2(); }, 0);
+$('#sT1').addEventListener('click', () => step2('T1'));
+$('#sT2').addEventListener('click', () => step2('T2'));
+$('#r2').addEventListener('click', () => { D = init2(); render2(); });
+$('#i2').addEventListener('click', inter2);
+D = init2(); render2();
+
+const mis = X.missions($('#missions'), [
+  { text: 'Lab 1, <b>No locking</b>: press <b>Interleave</b>.', hint: 'Both load the form, Ana saves, then Dee saves the old price back. Ana\'s change is lost without any error.', check: r => r.some(x => x.k === 'edit' && x.mode === 'none' && !x.both) },
+  { text: 'Switch to <b>Optimistic</b> and interleave.', hint: 'Dee\'s save matches 0 rows because the version changed. Dee reloads and saves again, and both changes survive.', check: r => r.some(x => x.k === 'edit' && x.mode === 'opt' && x.both && x.rejected) },
+  { text: 'Switch to <b>Pessimistic</b> and interleave.', hint: 'Dee can\'t even load the form until Ana commits and releases the lock.', check: r => r.some(x => x.k === 'edit' && x.mode === 'pess' && x.both) },
+  { text: 'Lab 2: press <b>Interleave</b> with the lock order <b>As written</b>.', hint: 'Each transfer grabs its first lock, then waits for the other\'s. The database kills one.', check: r => r.some(x => x.k === 'dead' && !x.ordered && x.dead) },
+  { text: 'Switch to <b>Always Night 1 first</b> and interleave again.', hint: 'Same transfers, same timing, no deadlock.', check: r => r.some(x => x.k === 'dead' && x.ordered && !x.dead) },
+]);
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="c">-- optimistic: version check at save time</span>', null],
+  ['<span class="key">SELECT</span> price, start_time, version <span class="key">FROM</span> concerts <span class="key">WHERE</span> id = 7;', 'optread'],
+  ['<span class="key">UPDATE</span> concerts <span class="key">SET</span> start_time = <span class="s">\'20:30\'</span>, version = version + 1', 'optwrite'],
+  ['<span class="key">WHERE</span> id = 7 <span class="key">AND</span> version = 1;  <span class="c">-- 0 rows? reload and retry</span>', 'optwrite'],
+  ['', null],
+  ['<span class="c">-- pessimistic: lock, change, commit</span>', null],
+  ['<span class="key">BEGIN</span>;', 'pess'],
+  ['<span class="key">SELECT</span> * <span class="key">FROM</span> concerts <span class="key">WHERE</span> id = 7 <span class="key">FOR UPDATE</span>;', 'pess'],
+  ['<span class="key">UPDATE</span> concerts <span class="key">SET</span> price = 95 <span class="key">WHERE</span> id = 7;', null],
+  ['<span class="key">COMMIT</span>;', 'commit'],
+  ['', null],
+  ['<span class="c">-- avoid deadlocks: always lock in the same order</span>', null],
+  ['<span class="key">SELECT</span> * <span class="key">FROM</span> concerts <span class="key">WHERE</span> id <span class="key">IN</span> (1, 2)', 'order'],
+  ['<span class="key">ORDER BY</span> id <span class="key">FOR UPDATE</span>;', 'order'],
+  ['<span class="c">-- ERROR: deadlock detected → catch it and retry the transaction</span>', 'retry'],
+], {
+  optread: ['Remember the version', 'Load the version along with the data. It travels with the edit form, often as a hidden field.'],
+  optwrite: ['Conditional save', 'Only update if the version is still the one you loaded. 0 rows updated means someone saved in between: show “reload and try again”. Many ORMs do this for you (Rails <code>lock_version</code>, Hibernate <code>@Version</code>).'],
+  pess: ['Lock the row', '<code>FOR UPDATE</code> holds a lock until the transaction ends. Anyone else asking for the same row waits. Never keep a database lock open while a human fills in a form; for long edits, use optimistic locking.'],
+  commit: ['Release', 'COMMIT (or ROLLBACK) releases the locks. Short transactions mean short waits and fewer deadlocks.'],
+  order: ['Consistent order', 'Lock all the rows you need in one statement, sorted by id. Two transfers can no longer each hold one of the pair.'],
+  retry: ['When it happens anyway', 'Postgres and MySQL detect deadlocks and abort one transaction with an error. Treat it like any temporary failure: retry the whole transaction.'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: 'Encore\'s admin panel lets several staff edit concert details. Conflicts are rare, and edits take minutes. Which approach fits best?', opts: [
+    ['Pessimistic: lock the row when someone opens the form', false, 'The lock would be held for minutes, blocking everyone else, and stays stuck if they close the tab.'],
+    ['Optimistic: a version column, and a “someone else saved this” message on conflict', true, 'Nobody waits, and the rare conflict is caught at save time instead of silently overwriting.'],
+    ['No locking: conflicts are rare anyway', false, 'Rare isn\'t never. When it happens, an edit vanishes without a trace.'],
+  ] },
+  { q: 'Postgres logs “deadlock detected” a few times a day on seat transfers. What\'s the best fix?', opts: [
+    ['Turn off deadlock detection', false, 'Then the two transactions would wait forever instead of one failing.'],
+    ['Lock the rows in a consistent order (by id), keep transactions short, and retry on deadlock errors', true, 'Ordering removes the cycle. Short transactions and retries handle whatever is left.'],
+    ['Add more database servers', false, 'Deadlocks come from lock order, not capacity.'],
+  ] },
+  { q: 'What does an optimistic save that updates 0 rows mean?', opts: [
+    ['The database is down', false, 'A down database returns an error, not 0 rows.'],
+    ['The record changed (or was deleted) since you loaded it: reload and retry', true, 'The <code>WHERE version = ?</code> no longer matches, which is exactly the signal you wanted.'],
+    ['The save worked, but slowly', false, '0 rows means nothing was written.'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'locking-deadlocks');
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,835 @@
+{
+ "page": "locking-deadlocks",
+ "segments": [
+  {
+   "kind": "attr",
+   "en": "width=device-width, initial-scale=1, viewport-fit=cover",
+   "zh": "="
+  },
+  {
+   "kind": "attr",
+   "en": "Compare no locking, optimistic and pessimistic locking on two people editing one record, then create a deadlock and fix it.",
+   "zh": "比較沒有鎖、樂觀鎖與悲觀鎖在兩個人編輯同一筆資料時的差別，再製造一個死結並把它修好。"
+  },
+  {
+   "kind": "attr",
+   "en": "Sections",
+   "zh": "章節"
+  },
+  {
+   "kind": "attr",
+   "en": "What ran",
+   "zh": "執行過的內容"
+  },
+  {
+   "kind": "attr",
+   "en": "Optimistic and pessimistic locking SQL, and lock ordering",
+   "zh": "樂觀鎖、悲觀鎖與鎖定順序的 SQL"
+  },
+  {
+   "kind": "attr",
+   "en": "Pages",
+   "zh": "頁面"
+  },
+  {
+   "kind": "html",
+   "en": "Locking and Deadlocks · System Design Lab",
+   "zh": "鎖與死結 · System Design Lab"
+  },
+  {
+   "kind": "html",
+   "en": "<!-- Plan. Stuck point: \"optimistic vs pessimistic\" sounds like personality types; deadlocks sound exotic.\n     Lab 1: two admins edit one concert (lost edit). None / optimistic (version) / pessimistic (lock).\n     Lab 2: two transfers lock two rows in opposite order -> deadlock; fix with a consistent lock order. -->",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "system<b>.design.lab</b>",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "Locking",
+   "zh": "鎖"
+  },
+  {
+   "kind": "html",
+   "en": "Deadlock",
+   "zh": "死結"
+  },
+  {
+   "kind": "html",
+   "en": "The SQL",
+   "zh": "SQL"
+  },
+  {
+   "kind": "html",
+   "en": "Recap",
+   "zh": "重點整理"
+  },
+  {
+   "kind": "html",
+   "en": "page 13 · stage 4 · keep data correct",
+   "zh": "第 13 頁 · 階段 4 · 保持資料正確"
+  },
+  {
+   "kind": "html",
+   "en": "Optimistic locking, pessimistic locking, deadlocks",
+   "zh": "樂觀鎖、悲觀鎖、死結"
+  },
+  {
+   "kind": "html",
+   "en": "Two people edit the same concert. <em>Only one of them wins, silently.</em>",
+   "zh": "兩個人編輯同一場演唱會。<em>只有一個人的修改留下來，而且無聲無息。</em>"
+  },
+  {
+   "kind": "html",
+   "en": "<b>Encore</b>Ana raises the ticket price to $95. At the same moment Dee, in another tab, changes the start time to 20:30 and hits Save. Dee's form still had the old price. The price is back to $80, and nobody knows.",
+   "zh": "<b>Encore</b>Ana 把票價調高到 $95。同一時間，Dee 在另一個分頁把開演時間改成 20:30 並按下儲存。Dee 的表單裡還是舊的票價。票價又變回 $80，而且沒有人知道。"
+  },
+  {
+   "kind": "html",
+   "en": "Open the lab ↓",
+   "zh": "打開實驗室 ↓"
+  },
+  {
+   "kind": "html",
+   "en": "lab 1 · break it, then fix it",
+   "zh": "實驗室 1 · 先弄壞，再修好"
+  },
+  {
+   "kind": "html",
+   "en": "no locking",
+   "zh": "沒有鎖"
+  },
+  {
+   "kind": "html",
+   "en": "Two edit forms, one record",
+   "zh": "兩個編輯表單，一筆資料"
+  },
+  {
+   "kind": "html",
+   "en": "The concert starts as <b>price $80, start 20:00, version 1</b>. Each admin loads the edit form, changes one field, and saves the whole form.",
+   "zh": "這場演唱會一開始是<b>票價 $80、20:00 開演、版本 1</b>。每位管理員載入編輯表單、修改一個欄位，然後儲存整張表單。"
+  },
+  {
+   "kind": "html",
+   "en": "Run it",
+   "zh": "執行"
+  },
+  {
+   "kind": "html",
+   "en": "Step Ana",
+   "zh": "單步執行 Ana"
+  },
+  {
+   "kind": "html",
+   "en": "Step Dee",
+   "zh": "單步執行 Dee"
+  },
+  {
+   "kind": "html",
+   "en": "↺ Reset",
+   "zh": "↺ 重設"
+  },
+  {
+   "kind": "html",
+   "en": "Interleave",
+   "zh": "交錯執行"
+  },
+  {
+   "kind": "html",
+   "en": "Ana (raise the price)",
+   "zh": "Ana（調高票價）"
+  },
+  {
+   "kind": "html",
+   "en": "Dee (change the time)",
+   "zh": "Dee（修改時間）"
+  },
+  {
+   "kind": "html",
+   "en": "Price in the database",
+   "zh": "資料庫中的票價"
+  },
+  {
+   "kind": "html",
+   "en": "Start time",
+   "zh": "開演時間"
+  },
+  {
+   "kind": "html",
+   "en": "Version",
+   "zh": "版本"
+  },
+  {
+   "kind": "html",
+   "en": "Lock",
+   "zh": "鎖"
+  },
+  {
+   "kind": "html",
+   "en": "Each step you run appears here.",
+   "zh": "你執行的每一步都會出現在這裡。"
+  },
+  {
+   "kind": "html",
+   "en": "Step the two admins, or press Interleave.",
+   "zh": "單步執行兩位管理員，或按「交錯執行」。"
+  },
+  {
+   "kind": "html",
+   "en": "Optimistic locking",
+   "zh": "樂觀鎖（Optimistic locking）"
+  },
+  {
+   "kind": "html",
+   "en": "Assume conflicts are rare. Don't block anyone; instead, check at save time that the record hasn't changed (a <b>version</b> number). If it has, reject the save and let the user retry. Cheap when conflicts are rare.",
+   "zh": "假設衝突很少見。不擋任何人，而是在儲存時檢查資料有沒有被改過（一個<b>版本</b>號碼）。如果改過，就拒絕這次儲存，讓使用者重試。衝突少的時候成本很低。"
+  },
+  {
+   "kind": "html",
+   "en": "Pessimistic locking",
+   "zh": "悲觀鎖（Pessimistic locking）"
+  },
+  {
+   "kind": "html",
+   "en": "Assume conflicts will happen. <b>Lock</b> the record before editing, so others wait their turn. No rejected saves, but people wait, and a forgotten lock blocks everyone.",
+   "zh": "假設衝突一定會發生。在編輯前先<b>鎖住</b>資料，讓其他人排隊等。不會有被拒絕的儲存，但大家要等，而且忘記釋放的鎖會擋住所有人。"
+  },
+  {
+   "kind": "html",
+   "en": "lab 2 · deadlock",
+   "zh": "實驗室 2 · 死結"
+  },
+  {
+   "kind": "html",
+   "en": "Two transfers that wait for each other forever",
+   "zh": "兩筆永遠在等對方的轉移"
+  },
+  {
+   "kind": "html",
+   "en": "Ana moves seats from Night 1 to Night 2. At the same time Ben moves seats from Night 2 to Night 1. Each transfer locks both concerts before changing them.",
+   "zh": "Ana 把座位從第 1 晚移到第 2 晚。同一時間，Ben 把座位從第 2 晚移到第 1 晚。每筆轉移在修改前都會先鎖住兩場演唱會。"
+  },
+  {
+   "kind": "html",
+   "en": "Lock order",
+   "zh": "鎖定順序"
+  },
+  {
+   "kind": "html",
+   "en": "Step Ana's transfer",
+   "zh": "單步執行 Ana 的轉移"
+  },
+  {
+   "kind": "html",
+   "en": "Step Ben's transfer",
+   "zh": "單步執行 Ben 的轉移"
+  },
+  {
+   "kind": "html",
+   "en": "Ana: Night 1 → Night 2",
+   "zh": "Ana：第 1 晚 → 第 2 晚"
+  },
+  {
+   "kind": "html",
+   "en": "Ben: Night 2 → Night 1",
+   "zh": "Ben：第 2 晚 → 第 1 晚"
+  },
+  {
+   "kind": "html",
+   "en": "Wait-for graph: nobody is waiting.",
+   "zh": "等待圖：沒有人在等。"
+  },
+  {
+   "kind": "html",
+   "en": "Try this",
+   "zh": "試試看"
+  },
+  {
+   "kind": "html",
+   "en": "The one difference",
+   "zh": "關鍵差別"
+  },
+  {
+   "kind": "html",
+   "en": "A <b>deadlock</b> needs a cycle: A holds what B wants while B holds what A wants. Databases detect the cycle and kill one transaction. You prevent it by making every transaction take locks <b>in the same order</b> (for example, lowest id first). Then the second one simply waits instead of grabbing the other lock.",
+   "zh": "<b>死結（deadlock）</b>需要一個循環：A 握著 B 要的東西，同時 B 握著 A 要的東西。資料庫會偵測到循環，並終止其中一個交易。預防的方法是讓每個交易都<b>以同樣的順序</b>取得鎖（例如 id 小的先鎖）。這樣第二個交易只會等待，而不會去搶另一把鎖。"
+  },
+  {
+   "kind": "html",
+   "en": "act 3 · the real thing",
+   "zh": "第 3 幕 · 真實世界"
+  },
+  {
+   "kind": "html",
+   "en": "sql",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "All three strategies, in SQL",
+   "zh": "三種策略，用 SQL 寫出來"
+  },
+  {
+   "kind": "html",
+   "en": "<b>Hover or tap a line.</b>",
+   "zh": "<b>把滑鼠移到某一行上，或點一下。</b>"
+  },
+  {
+   "kind": "html",
+   "en": "👆 pick a line",
+   "zh": "👆 選一行"
+  },
+  {
+   "kind": "html",
+   "en": "Each highlighted line maps to a mode in the labs.",
+   "zh": "每一行反白後，都會對應到實驗室裡的一種模式。"
+  },
+  {
+   "kind": "html",
+   "en": "recap · keep this",
+   "zh": "重點整理 · 帶走這些"
+  },
+  {
+   "kind": "html",
+   "en": "The whole page on one screen",
+   "zh": "整頁濃縮在一個畫面"
+  },
+  {
+   "kind": "html",
+   "en": "Check at save",
+   "zh": "儲存時檢查"
+  },
+  {
+   "kind": "html",
+   "en": "Optimistic",
+   "zh": "樂觀鎖"
+  },
+  {
+   "kind": "html",
+   "en": "A version column. <code>UPDATE … WHERE version = 1</code>; 0 rows means someone else saved first. Best when conflicts are rare.",
+   "zh": "一個版本欄位。<code>UPDATE … WHERE version = 1</code>；影響 0 列代表別人先儲存了。最適合衝突很少的情況。"
+  },
+  {
+   "kind": "html",
+   "en": "Lock first",
+   "zh": "先上鎖"
+  },
+  {
+   "kind": "html",
+   "en": "Pessimistic",
+   "zh": "悲觀鎖"
+  },
+  {
+   "kind": "html",
+   "en": "<code>SELECT … FOR UPDATE</code> inside a transaction. Others wait. Best for short, contended operations like seat inventory.",
+   "zh": "在交易中使用 <code>SELECT … FOR UPDATE</code>。其他人要等。最適合短暫、競爭激烈的操作，例如座位庫存。"
+  },
+  {
+   "kind": "html",
+   "en": "Wait forever",
+   "zh": "永遠等待"
+  },
+  {
+   "kind": "html",
+   "en": "Two transactions each hold a lock the other needs. Prevent it with a consistent lock order and short transactions; retry when the database aborts one.",
+   "zh": "兩個交易各自握著對方需要的鎖。用一致的鎖定順序和短交易來預防；資料庫終止其中一個時就重試。"
+  },
+  {
+   "kind": "html",
+   "en": "The tradeoff",
+   "zh": "取捨"
+  },
+  {
+   "kind": "html",
+   "en": "Optimistic locking never blocks but pushes conflicts back to users or retry code. Pessimistic locking avoids conflicts by making people wait, and every lock you take is a chance to deadlock. Most web apps use optimistic locking for edit forms and short pessimistic locks for hot counters.",
+   "zh": "樂觀鎖從不阻擋，但會把衝突丟回給使用者或重試程式。悲觀鎖讓人等待來避免衝突，而你取得的每一把鎖都是一次死結的機會。大多數網頁應用程式對編輯表單用樂觀鎖，對熱門計數器用短暫的悲觀鎖。"
+  },
+  {
+   "kind": "html",
+   "en": "Check it",
+   "zh": "考考自己"
+  },
+  {
+   "kind": "js",
+   "en": "'SELECT * FROM concerts WHERE id = 7'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'SELECT *, version FROM concerts WHERE id = 7'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'BEGIN; SELECT * … FOR UPDATE'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'UPDATE … SET price = 95 WHERE version = ?'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'UPDATE … SET price = 95; COMMIT'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'UPDATE … SET price = 95, time = …'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'UPDATE … SET time = 20:30 WHERE version = ?'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'UPDATE … SET time = 20:30; COMMIT'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'UPDATE … SET price = …, time = 20:30'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Ana'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Dee'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "`${name}: ${label}  ⏸ waits: ${A.lock} has the row locked`",
+   "zh": "`${name}：${label}  ⏸ 等待中：${A.lock} 鎖住了這一列`"
+  },
+  {
+   "kind": "js",
+   "en": "`${name}: ${label}  → 0 rows: the version changed. “Someone else saved this. Reload and try again.”`",
+   "zh": "`${name}：${label}  → 0 列：版本已經變了。「別人已經儲存過了。請重新載入再試一次。」`"
+  },
+  {
+   "kind": "js",
+   "en": "`${name}: ${label}  → saved (version ${A.db.version})`",
+   "zh": "`${name}：${label}  → 已儲存（版本 ${A.db.version}）`"
+  },
+  {
+   "kind": "js",
+   "en": "`${name}: ${label}  → form shows $${me.form.price}, ${me.form.time}${A.mode === 'opt' ? `, version ${me.form.version}` : ''}`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "`<span style=\"display:block;${!me.end && i === me.pc ? 'background:var(--code-hl);' : ''}${i < me.pc || me.end ? 'opacity:.55' : ''}\">${!me.end && i === me.pc ? '▶ ' : i < me.pc || me.end ? '✓ ' : '  '}${esc(l[0])}</span>`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "`form: $${me.form.price}, ${me.form.time}${A.mode === 'opt' ? `, version ${me.form.version}` : ''}${me.end ? ' · saved' : ''}`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'no locking'",
+   "zh": "'沒有鎖'"
+  },
+  {
+   "kind": "js",
+   "en": "'Step the two admins, or press Interleave.'",
+   "zh": "'單步執行兩位管理員，或按「交錯執行」。'"
+  },
+  {
+   "kind": "js",
+   "en": "'✓ Both changes kept. Dee\\'s first save was rejected because the version had changed, so Dee reloaded and saved on top of Ana\\'s price.'",
+   "zh": "'✓ 兩個修改都保留了。Dee 第一次儲存被拒絕，因為版本已經變了，所以 Dee 重新載入，在 Ana 的新票價之上再儲存一次。'"
+  },
+  {
+   "kind": "js",
+   "en": "'✓ Both changes kept. Dee had to wait for Ana\\'s lock, then loaded the form with the new price.'",
+   "zh": "'✓ 兩個修改都保留了。Dee 必須等 Ana 的鎖釋放，然後載入有新票價的表單。'"
+  },
+  {
+   "kind": "js",
+   "en": "'✓ Both changes kept, because Ana finished before Dee loaded the form. Lucky timing.'",
+   "zh": "'✓ 兩個修改都保留了，因為 Ana 在 Dee 載入表單前就完成了。時機剛好而已。'"
+  },
+  {
+   "kind": "js",
+   "en": "`✕ Ana's price change is gone: the price is $${A.db.price}. Dee's form was loaded before Ana saved, and saving it wrote the old price back. No error, no warning.`",
+   "zh": "`✕ Ana 的票價修改不見了：票價是 $${A.db.price}。Dee 的表單是在 Ana 儲存之前載入的，儲存時把舊票價寫了回去。沒有錯誤，也沒有警告。`"
+  },
+  {
+   "kind": "js",
+   "en": "'No locking'",
+   "zh": "'沒有鎖'"
+  },
+  {
+   "kind": "js",
+   "en": "'Optimistic (version)'",
+   "zh": "'樂觀鎖（版本）'"
+  },
+  {
+   "kind": "js",
+   "en": "'Pessimistic (lock)'",
+   "zh": "'悲觀鎖（上鎖）'"
+  },
+  {
+   "kind": "js",
+   "en": "'<li class=\"mut\">Each step you run appears here.</li>'",
+   "zh": "'<li class=\"mut\">你執行的每一步都會出現在這裡。</li>'"
+  },
+  {
+   "kind": "js",
+   "en": "'Ben'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "`SELECT … WHERE id = ${tx.need[i] === 'N1' ? 'night_1' : 'night_2'} FOR UPDATE`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'UPDATE both; COMMIT'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "`<span style=\"display:block;${cur ? 'background:var(--code-hl);' : ''}${past ? 'opacity:.55' : ''}\">${cur ? (tx.waiting ? '⏸ ' : '▶ ') : past ? '✓ ' : '  '}${esc(label2(tx, i))}</span>`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'\\n✕ ERROR: deadlock detected. Transaction rolled back.'",
+   "zh": "'\\n✕ ERROR：偵測到死結（deadlock detected）。交易已回滾。'"
+  },
+  {
+   "kind": "js",
+   "en": "`${tx.name} waits for ${D.t[D.locks[tx.waiting]].name} (${tx.waiting === 'N1' ? 'Night 1' : 'Night 2'})`",
+   "zh": "`${tx.name} 在等 ${D.t[D.locks[tx.waiting]].name}（${tx.waiting === 'N1' ? '第 1 晚' : '第 2 晚'}）`"
+  },
+  {
+   "kind": "js",
+   "en": "'✕ Deadlock: Ana waited for Ben while Ben waited for Ana. The database found the cycle and killed Ben\\'s transaction. Ben\\'s transfer failed and must be retried.'",
+   "zh": "'✕ 死結：Ana 在等 Ben，同時 Ben 在等 Ana。資料庫發現了這個循環，終止了 Ben 的交易。Ben 的轉移失敗了，必須重試。'"
+  },
+  {
+   "kind": "js",
+   "en": "'✓ No deadlock. Both lock Night 1 first, so Ben simply waited at the first step until Ana committed.'",
+   "zh": "'✓ 沒有死結。兩人都先鎖第 1 晚，所以 Ben 只是在第一步等到 Ana 提交為止。'"
+  },
+  {
+   "kind": "js",
+   "en": "'✓ Both transfers finished, because they didn\\'t overlap.'",
+   "zh": "'✓ 兩筆轉移都完成了，因為它們沒有重疊。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Wait-for graph: '",
+   "zh": "'等待圖：'"
+  },
+  {
+   "kind": "js",
+   "en": "'Wait-for graph: nobody is waiting.'",
+   "zh": "'等待圖：沒有人在等。'"
+  },
+  {
+   "kind": "js",
+   "en": "'As written'",
+   "zh": "'照程式寫的順序'"
+  },
+  {
+   "kind": "js",
+   "en": "'Always Night 1 first'",
+   "zh": "'一律先鎖第 1 晚'"
+  },
+  {
+   "kind": "js",
+   "en": "'Lab 1, <b>No locking</b>: press <b>Interleave</b>.'",
+   "zh": "'實驗室 1，<b>沒有鎖</b>：按<b>交錯執行</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Both load the form, Ana saves, then Dee saves the old price back. Ana\\'s change is lost without any error.'",
+   "zh": "'兩人都載入表單，Ana 儲存，接著 Dee 把舊票價存了回去。Ana 的修改無聲無息地消失了。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Switch to <b>Optimistic</b> and interleave.'",
+   "zh": "'切換到<b>樂觀鎖</b>，交錯執行。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Dee\\'s save matches 0 rows because the version changed. Dee reloads and saves again, and both changes survive.'",
+   "zh": "'Dee 的儲存影響 0 列，因為版本變了。Dee 重新載入再儲存一次，兩個修改都留下來了。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Switch to <b>Pessimistic</b> and interleave.'",
+   "zh": "'切換到<b>悲觀鎖</b>，交錯執行。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Dee can\\'t even load the form until Ana commits and releases the lock.'",
+   "zh": "'在 Ana 提交並釋放鎖之前，Dee 連表單都載入不了。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Lab 2: press <b>Interleave</b> with the lock order <b>As written</b>.'",
+   "zh": "'實驗室 2：在鎖定順序為<b>照程式寫的順序</b>時，按<b>交錯執行</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Each transfer grabs its first lock, then waits for the other\\'s. The database kills one.'",
+   "zh": "'每筆轉移各自拿到第一把鎖，然後等待對方手上的那把。資料庫終止了其中一個。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Switch to <b>Always Night 1 first</b> and interleave again.'",
+   "zh": "'切換到<b>一律先鎖第 1 晚</b>，再交錯執行一次。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Same transfers, same timing, no deadlock.'",
+   "zh": "'同樣的轉移、同樣的時機，沒有死結。'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\">-- optimistic: version check at save time</span>'",
+   "zh": "'<span class=\"c\">-- 樂觀鎖：儲存時檢查版本</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">SELECT</span> price, start_time, version <span class=\"key\">FROM</span> concerts <span class=\"key\">WHERE</span> id = 7;'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">UPDATE</span> concerts <span class=\"key\">SET</span> start_time = <span class=\"s\">\\'20:30\\'</span>, version = version + 1'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">WHERE</span> id = 7 <span class=\"key\">AND</span> version = 1;  <span class=\"c\">-- 0 rows? reload and retry</span>'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\">-- pessimistic: lock, change, commit</span>'",
+   "zh": "'<span class=\"c\">-- 悲觀鎖：上鎖、修改、提交</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">BEGIN</span>;'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">SELECT</span> * <span class=\"key\">FROM</span> concerts <span class=\"key\">WHERE</span> id = 7 <span class=\"key\">FOR UPDATE</span>;'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">UPDATE</span> concerts <span class=\"key\">SET</span> price = 95 <span class=\"key\">WHERE</span> id = 7;'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">COMMIT</span>;'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\">-- avoid deadlocks: always lock in the same order</span>'",
+   "zh": "'<span class=\"c\">-- 避免死結：一律以相同順序上鎖</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">SELECT</span> * <span class=\"key\">FROM</span> concerts <span class=\"key\">WHERE</span> id <span class=\"key\">IN</span> (1, 2)'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">ORDER BY</span> id <span class=\"key\">FOR UPDATE</span>;'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\">-- ERROR: deadlock detected → catch it and retry the transaction</span>'",
+   "zh": "'<span class=\"c\">-- ERROR: deadlock detected → 捕捉它並重試整個交易</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'Remember the version'",
+   "zh": "'記住版本'"
+  },
+  {
+   "kind": "js",
+   "en": "'Load the version along with the data. It travels with the edit form, often as a hidden field.'",
+   "zh": "'載入資料時一併載入版本。它會跟著編輯表單走，通常是一個隱藏欄位。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Conditional save'",
+   "zh": "'有條件的儲存'"
+  },
+  {
+   "kind": "js",
+   "en": "'Only update if the version is still the one you loaded. 0 rows updated means someone saved in between: show “reload and try again”. Many ORMs do this for you (Rails <code>lock_version</code>, Hibernate <code>@Version</code>).'",
+   "zh": "'只有在版本還是你載入時的那個時才更新。影響 0 列代表中間有人儲存過：顯示「請重新載入再試一次」。很多 ORM 會幫你做（Rails 的 <code>lock_version</code>、Hibernate 的 <code>@Version</code>）。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Lock the row'",
+   "zh": "'鎖住這一列'"
+  },
+  {
+   "kind": "js",
+   "en": "'<code>FOR UPDATE</code> holds a lock until the transaction ends. Anyone else asking for the same row waits. Never keep a database lock open while a human fills in a form; for long edits, use optimistic locking.'",
+   "zh": "'<code>FOR UPDATE</code> 會持有鎖直到交易結束。其他要同一列的人都得等。絕對不要在人填表單時一直開著資料庫鎖；長時間的編輯請用樂觀鎖。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Release'",
+   "zh": "'釋放'"
+  },
+  {
+   "kind": "js",
+   "en": "'COMMIT (or ROLLBACK) releases the locks. Short transactions mean short waits and fewer deadlocks.'",
+   "zh": "'COMMIT（或 ROLLBACK）會釋放鎖。交易短，等待就短，死結也更少。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Consistent order'",
+   "zh": "'一致的順序'"
+  },
+  {
+   "kind": "js",
+   "en": "'Lock all the rows you need in one statement, sorted by id. Two transfers can no longer each hold one of the pair.'",
+   "zh": "'在一條語句中鎖住所有需要的列，並依 id 排序。兩筆轉移就不可能再各自握著其中一列。'"
+  },
+  {
+   "kind": "js",
+   "en": "'When it happens anyway'",
+   "zh": "'還是發生時'"
+  },
+  {
+   "kind": "js",
+   "en": "'Postgres and MySQL detect deadlocks and abort one transaction with an error. Treat it like any temporary failure: retry the whole transaction.'",
+   "zh": "'Postgres 和 MySQL 會偵測死結，並以錯誤終止其中一個交易。把它當成一般的暫時性失敗：重試整個交易。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Encore\\'s admin panel lets several staff edit concert details. Conflicts are rare, and edits take minutes. Which approach fits best?'",
+   "zh": "'Encore 的管理後台讓好幾位員工編輯演唱會資訊。衝突很少見，而且一次編輯要好幾分鐘。哪種做法最合適？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Pessimistic: lock the row when someone opens the form'",
+   "zh": "'悲觀鎖：有人打開表單時就鎖住那一列'"
+  },
+  {
+   "kind": "js",
+   "en": "'The lock would be held for minutes, blocking everyone else, and stays stuck if they close the tab.'",
+   "zh": "'鎖會被持有好幾分鐘，擋住其他所有人，而且對方關掉分頁時還會一直卡著。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Optimistic: a version column, and a “someone else saved this” message on conflict'",
+   "zh": "'樂觀鎖：一個版本欄位，衝突時顯示「別人已經儲存過了」'"
+  },
+  {
+   "kind": "js",
+   "en": "'Nobody waits, and the rare conflict is caught at save time instead of silently overwriting.'",
+   "zh": "'沒有人需要等待，少見的衝突也會在儲存時被抓到，而不是無聲地覆蓋。'"
+  },
+  {
+   "kind": "js",
+   "en": "'No locking: conflicts are rare anyway'",
+   "zh": "'不加鎖：反正衝突很少見'"
+  },
+  {
+   "kind": "js",
+   "en": "'Rare isn\\'t never. When it happens, an edit vanishes without a trace.'",
+   "zh": "'很少不等於從不。真的發生時，一次編輯就會消失得無影無蹤。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Postgres logs “deadlock detected” a few times a day on seat transfers. What\\'s the best fix?'",
+   "zh": "'Postgres 每天會在座位轉移時記錄幾次「deadlock detected」。最好的修法是什麼？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Turn off deadlock detection'",
+   "zh": "'關掉死結偵測'"
+  },
+  {
+   "kind": "js",
+   "en": "'Then the two transactions would wait forever instead of one failing.'",
+   "zh": "'那樣兩個交易就會永遠等下去，而不是其中一個失敗。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Lock the rows in a consistent order (by id), keep transactions short, and retry on deadlock errors'",
+   "zh": "'以一致的順序（依 id）鎖定各列、讓交易保持簡短，並在遇到死結錯誤時重試'"
+  },
+  {
+   "kind": "js",
+   "en": "'Ordering removes the cycle. Short transactions and retries handle whatever is left.'",
+   "zh": "'排序消除了循環。短交易和重試則處理剩下的情況。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Add more database servers'",
+   "zh": "'增加資料庫伺服器'"
+  },
+  {
+   "kind": "js",
+   "en": "'Deadlocks come from lock order, not capacity.'",
+   "zh": "'死結來自鎖定順序，而不是容量。'"
+  },
+  {
+   "kind": "js",
+   "en": "'What does an optimistic save that updates 0 rows mean?'",
+   "zh": "'樂觀鎖的儲存影響了 0 列，代表什麼？'"
+  },
+  {
+   "kind": "js",
+   "en": "'The database is down'",
+   "zh": "'資料庫掛了'"
+  },
+  {
+   "kind": "js",
+   "en": "'A down database returns an error, not 0 rows.'",
+   "zh": "'掛掉的資料庫會回傳錯誤，而不是 0 列。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The record changed (or was deleted) since you loaded it: reload and retry'",
+   "zh": "'你載入之後，這筆資料被改過（或被刪除了）：重新載入再試一次'"
+  },
+  {
+   "kind": "js",
+   "en": "'The <code>WHERE version = ?</code> no longer matches, which is exactly the signal you wanted.'",
+   "zh": "'<code>WHERE version = ?</code> 不再符合，這正是你想要的訊號。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The save worked, but slowly'",
+   "zh": "'儲存成功了，只是比較慢'"
+  },
+  {
+   "kind": "js",
+   "en": "'0 rows means nothing was written.'",
+   "zh": "'0 列代表什麼都沒寫入。'"
+  }
+ ]
+}

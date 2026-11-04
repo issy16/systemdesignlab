@@ -157,7 +157,7 @@ p{margin:0 0 12px;max-width:68ch}
 .yaml{background:var(--code);color:#e6e6ea;border:1.5px solid var(--ink);padding:10px 0;font-family:var(--mono);font-size:13px;line-height:1.55;overflow-x:auto}
 .yaml .ln{display:block;padding:0 14px;white-space:pre;border-left:3px solid transparent;cursor:default}
 .yaml .ln[data-k]{cursor:pointer}
-.yaml .ln[data-k]:hover,.yaml .ln.active{background:#24365a;border-left-color:var(--accent)}
+.yaml .ln[data-k]:hover,.yaml .ln.active{background:var(--code-hl);border-left-color:var(--accent)}
 .yaml .c{color:#7f8aa0} .yaml .key{color:#9cc2ff} .yaml .s{color:#9fd8b8}
 .explain{border:1.5px solid var(--line);background:var(--card);padding:14px 16px;position:sticky;top:76px;align-self:start}
 .explain .t{font-family:var(--label);font-size:13px;text-transform:uppercase;color:var(--accent-ink);margin-bottom:6px}
@@ -359,3 +359,6 @@ h2{font-size:clamp(20px,3vw,26px);line-height:1.25}
 :root:lang(zh-Hant){--body:"IBM Plex Sans","Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;--mono:"IBM Plex Mono","Noto Sans TC","PingFang TC",monospace;--label:"Silkscreen","Noto Sans TC","PingFang TC",monospace}
 :root:lang(zh-Hans){--body:"IBM Plex Sans","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;--mono:"IBM Plex Mono","Noto Sans SC","PingFang SC",monospace;--label:"Silkscreen","Noto Sans SC","PingFang SC",monospace}
 :root:lang(zh) p,:root:lang(zh) li{line-height:1.75}
+
+/* highlighted line inside dark code boxes (code boxes are dark in both themes) */
+:root{--code-hl:#24365a}

@@ -92,6 +92,13 @@ const FLOWS = {
     ['click', seg('modeSeg', 3), 100], ['click', '#inter', 2500],
     ['click', '#runT', 300],
   ],
+  'locking-deadlocks': [
+    ['click', '#i1', 1800],
+    ['click', seg('modeSeg', 2), 100], ['click', '#i1', 2200],
+    ['click', seg('modeSeg', 3), 100], ['click', '#i1', 2200],
+    ['click', '#i2', 3000],
+    ['click', seg('ordSeg', 2), 100], ['click', '#i2', 3000],
+  ],
 };
 
 (async () => {

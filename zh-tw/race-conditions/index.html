@@ -145,7 +145,7 @@ function drawCode(who) {
   const me = S.fans[who];
   $('#code' + who).innerHTML = PROGS[S.mode].map((l, i) => {
     const cur = !me.end && i === me.pc, past = i < me.pc || (me.end && i <= me.pc);
-    return `<span style="display:block;${cur ? 'background:#24365a;' : ''}${past ? 'opacity:.55' : ''}">${cur ? '▶ ' : past ? '✓ ' : '  '}${esc(l[0])}</span>`;
+    return `<span style="display:block;${cur ? 'background:var(--code-hl);' : ''}${past ? 'opacity:.55' : ''}">${cur ? '▶ ' : past ? '✓ ' : '  '}${esc(l[0])}</span>`;
   }).join('');
   $('#var' + who).textContent = me.end ? (me.end === 'ticket' ? '→ 拿到票了 🎟' : '→「抱歉，已售完」') : S.mode === 'atomic' ? (me.rows != null ? `rowsUpdated = ${me.rows}` : '') : (me.seats != null ? `區域變數 seats = ${me.seats}` : '');
 }
