@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Load Encore's concert page over HTTP/1.1, HTTP/2 and HTTP/3, and see how multiplexing and QUIC change the waterfall.">
+<title>HTTP/2 and HTTP/3 · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/explainer.css">
+</head>
+<body>
+<!-- Plan. Stuck point: "HTTP/2 is faster" without knowing why; HTTP/3 sounds like the same thing again.
+     Lab: a page with 24 resources; waterfall for HTTP/1.1 (6 connections, one request at a time), HTTP/2 (one connection, multiplexed), HTTP/3 (QUIC over UDP).
+     RTT slider and a lossy-network toggle. One difference: HTTP/2 fixed request queueing; HTTP/3 also fixed TCP's head-of-line blocking and handshake cost. -->
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="Sections"><a href="#lab">Lab</a><a href="#real">The config</a><a href="#recap">Recap</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>page 23 · stage 6 · talk to the world</span><span class="hot">99</span></div>
+  <div class="eyebrow">HTTP/2, HTTP/3, QUIC</div>
+  <h1>Same page, same server. <em>Twice as fast, just by changing the protocol.</em></h1>
+  <div class="scenario"><b>Encore</b>The concert page is one HTML file plus 23 images, scripts and stylesheets. Fans on phones are far from Encore's servers, so every round trip costs a lot. Cai wants to know what switching protocols would actually change.</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">Open the lab ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>lab · load the concert page</span><span class="hot" id="tag">http/1.1</span></div>
+  <h2>The request waterfall</h2>
+  <p>Each row is one file; the bar shows when it was requested and when it finished. Simulated timings, not a benchmark.</p>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">Protocol</span><div id="protoSeg"></div></div>
+      <div class="ctl"><label for="rtt">Round trip to the server: <b id="rttV">100 ms</b></label><input type="range" id="rtt" min="0" max="2" step="1" value="1"></div>
+      <div class="ctl"><span class="lab-k">Network</span><div id="lossSeg"></div></div>
+      <div class="ctl"><span class="lab-k">&nbsp;</span><div><button class="btn primary" id="load" type="button">Load the page</button></div></div>
+    </div>
+    <div id="wf" style="display:grid;gap:2px" aria-label="Request waterfall"></div>
+    <div class="legend"><span><i style="background:var(--muted)"></i>connecting (handshakes)</span><span><i style="background:var(--accent)"></i>request → response</span><span><i style="background:var(--wait)"></i>waiting in a queue</span><span><i style="background:var(--bad)"></i>stalled by a lost packet</span></div>
+    <div class="meters" style="margin:0">
+      <div class="meter"><div class="k">Page loaded</div><div class="v" id="mLoad">–</div></div>
+      <div class="meter"><div class="k">Connections</div><div class="v" id="mConn">–</div></div>
+      <div class="meter"><div class="k">Round trips before the first byte</div><div class="v" id="mSetup">–</div></div>
+    </div>
+    <ul class="log" id="runs" aria-label="Runs"><li class="mut">Each load is listed here so you can compare.</li></ul>
+    <div class="status" id="status" role="status">Pick a protocol and load the page.</div>
+  </div>
+  <h3>Try this</h3>
+  <ol class="missions" id="missions"></ol>
+  <div class="cards">
+    <div class="card"><div class="sub">1997</div><div class="t">HTTP/1.1</div><p>One request at a time per connection. Browsers open about 6 connections per site and queue the rest.</p></div>
+    <div class="card"><div class="sub">2015</div><div class="t">HTTP/2</div><p>One TCP connection, many requests at once (multiplexing), compressed headers. But TCP still delivers bytes in order, so one lost packet stalls every request.</p></div>
+    <div class="card"><div class="sub">2022</div><div class="t">HTTP/3</div><p>HTTP over QUIC, which runs on UDP. Streams are independent, so a loss only delays its own stream, and the connection and encryption are set up in one round trip.</p></div>
+  </div>
+  <div class="takeaway"><div class="t">The one difference</div><p><b>HTTP/2</b> removed the queue: many requests share one connection instead of waiting for a free one. <b>HTTP/3</b> removed what was left in the way: TCP's in-order delivery (head-of-line blocking, page 22) and the extra round trips of separate TCP and TLS handshakes.</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>act 2 · the real thing</span><span class="hot">curl + nginx</span></div>
+  <h2>Check it, then turn it on</h2>
+  <p>Your app code doesn't change at all: the protocol is negotiated between browser and server. <b>Hover or tap a line.</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="Example curl commands and nginx configuration"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 pick a line</div><p id="exP">Each highlighted line maps to the lab.</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>recap · keep this</span><span class="hot">♥</span></div>
+  <h2>The whole page on one screen</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">Many at once</div><div class="t">Multiplexing</div><p>HTTP/2 and HTTP/3 send many requests over one connection. No more queueing, no more 6-connection limit.</p></div>
+    <div class="card"><div class="sub">Independent</div><div class="t">QUIC streams</div><p>HTTP/3's streams don't block each other on loss. Biggest win on lossy mobile networks.</p></div>
+    <div class="card"><div class="sub">Faster start</div><div class="t">Fewer round trips</div><p>QUIC combines connecting and encrypting into one round trip (zero when resuming). Matters most when the server is far away.</p></div>
+  </div>
+  <div class="takeaway"><div class="t">The tradeoff</div><p>Upgrading is mostly free speed, enabled in your CDN or web server. Costs: some networks block UDP (browsers fall back to HTTP/2), QUIC uses more CPU than TCP today, and debugging tools are younger. Tricks from the HTTP/1 era (bundling everything, domain sharding) matter much less now.</p></div>
+  <h3 style="margin-top:26px">Check it <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="Pages"></nav>
+</main>
+
+<script src="../assets/explainer.js"></script>
+<script>
+(() => {
+const { $, el, esc } = X;
+const RTTS = [20, 100, 300];
+const FILES = ['index.html', 'app.css', 'app.js', 'vendor.js', 'fonts.css', 'logo.svg', ...Array.from({ length: 12 }, (_, i) => `poster-${i + 1}.jpg`), 'seatmap.js', 'seatmap.json', 'reviews.json', 'icons.svg', 'analytics.js', 'avatar.png'];
+const XFER = FILES.map((f, i) => (f.endsWith('.jpg') ? 60 : f.endsWith('.js') ? 45 : 20) + (i % 3) * 5);
+
+/* ---------- timing model (pure): one schedule per protocol ---------- */
+function schedule(proto, rtt, lossy) {
+  const rows = [];
+  const setupRtts = proto === 2 ? 1 : 2;                // QUIC: 1 RTT; TCP + TLS 1.3: 2 RTT
+  const setup = setupRtts * rtt;
+  const htmlEnd = setup + rtt + XFER[0];
+  rows.push({ f: FILES[0], conn: [0, setup], wait: null, req: [setup, htmlEnd] });
+  const lostIdx = lossy ? 9 : -1, lossAt = htmlEnd + rtt / 2, stall = Math.round(rtt * 1.5 + 200);
+  if (proto === 0) {                                     // 6 connections, one request at a time each
+    const free = [htmlEnd, htmlEnd + setup, htmlEnd + setup, htmlEnd + setup, htmlEnd + setup, htmlEnd + setup];
+    for (let i = 1; i < FILES.length; i++) {
+      let c = 0; for (let k = 1; k < 6; k++) if (free[k] < free[c]) c = k;
+      const start = free[c];
+      let end = start + rtt + XFER[i];
+      const hit = i === lostIdx;
+      if (hit) end += stall;
+      rows.push({ f: FILES[i], conn: c > 0 && start === htmlEnd + setup ? [htmlEnd, htmlEnd + setup] : null, wait: start > htmlEnd + (c > 0 ? setup : 0) ? [htmlEnd, start] : null, req: [start, end], stalled: hit });
+      free[c] = end;
+    }
+    return { rows, conns: 6, setupRtts, load: Math.max(...rows.map(r => r.req[1])) };
+  }
+  for (let i = 1; i < FILES.length; i++) {               // one connection, everything at once
+    const start = htmlEnd;
+    let end = start + rtt + XFER[i] + Math.floor(i / 6) * 8;  // small cost for sharing the pipe
+    let stalled = false;
+    if (lossy && (proto === 1 ? end > lossAt : i === lostIdx)) { end += stall; stalled = true; } // TCP: every stream in flight waits; QUIC: only the one stream
+    rows.push({ f: FILES[i], conn: null, wait: null, req: [start, end], stalled });
+  }
+  return { rows, conns: 1, setupRtts, load: Math.max(...rows.map(r => r.req[1])) };
+}
+
+/* ---------- UI ---------- */
+let proto = 0, rttI = 1, lossy = false;
+const runs = [];
+const NAMES = ['HTTP/1.1', 'HTTP/2', 'HTTP/3'];
+function draw(sch) {
+  const box = $('#wf'); box.innerHTML = '';
+  const max = Math.max(1, sch ? sch.load : 1);
+  (sch ? sch.rows : []).forEach(r => {
+    const row = el('div'); row.style.cssText = 'display:grid;grid-template-columns:110px 1fr;gap:8px;align-items:center;font-family:var(--mono);font-size:11px';
+    const bar = el('div'); bar.style.cssText = 'position:relative;height:12px;background:var(--panel-2)';
+    const seg = ([a, b], token) => { const s = el('i'); s.style.cssText = `position:absolute;top:0;bottom:0;left:${(a / max) * 100}%;width:${Math.max(0.4, ((b - a) / max) * 100)}%;background:var(${token})`; bar.append(s); };
+    if (r.conn) seg(r.conn, '--muted');
+    if (r.wait) seg(r.wait, '--wait');
+    seg(r.req, r.stalled ? '--bad' : '--accent');
+    row.append(el('span', '', esc(r.f)), bar); box.append(row);
+  });
+}
+function load() {
+  const rtt = RTTS[rttI], sch = schedule(proto, rtt, lossy);
+  draw(sch);
+  $('#mLoad').textContent = X.fmt(sch.load) + ' ms';
+  $('#mConn').textContent = sch.conns;
+  $('#mSetup').textContent = sch.setupRtts + 1;
+  const stalled = sch.rows.filter(r => r.stalled).length;
+  runs.push({ proto, rtt, lossy, load: sch.load, stalled });
+  const ul = $('#runs'); if (runs.length === 1) ul.innerHTML = '';
+  ul.append(el('li', '', esc(`${NAMES[proto].padEnd(8)} · ${String(rtt).padStart(3)} ms RTT · ${lossy ? 'lossy ' : 'clean '} → ${X.fmt(sch.load).padStart(5)} ms${stalled ? ` · ${stalled} files stalled` : ''}`)));
+  const st = $('#status');
+  if (proto === 0) { st.className = 'status wait'; st.textContent = `⚠ HTTP/1.1: only 6 requests can be in flight; the other ${FILES.length - 7} wait in queues (yellow). Each new connection also pays its own handshakes.`; }
+  else if (proto === 1 && lossy) { st.className = 'status bad'; st.textContent = `✕ HTTP/2 on a lossy network: one lost TCP packet stalled ${stalled} files at once (red), because TCP must deliver every byte in order before any stream can continue.`; }
+  else if (proto === 1) { st.className = 'status ok'; st.textContent = '✓ HTTP/2: every file is requested at once over a single connection. No queues.'; }
+  else { st.className = 'status ok'; st.textContent = lossy ? `✓ HTTP/3: the same lost packet only stalled ${stalled} file; the other streams kept going. And QUIC needed one round trip fewer to connect.` : '✓ HTTP/3: multiplexed like HTTP/2, and connected one round trip sooner.'; }
+  mis.update(runs);
+}
+X.seg($('#protoSeg'), NAMES, i => { proto = i; $('#tag').textContent = NAMES[i].toLowerCase(); }, 0);
+X.seg($('#lossSeg'), ['Clean', 'Lossy (one packet lost)'], i => { lossy = i === 1; }, 0);
+$('#rtt').addEventListener('input', e => { rttI = +e.target.value; $('#rttV').textContent = RTTS[rttI] + ' ms'; });
+$('#load').addEventListener('click', load);
+const best = (r, p, l) => r.filter(x => x.proto === p && x.lossy === l);
+const mis = X.missions($('#missions'), [
+  { text: 'Load the page with <b>HTTP/1.1</b>.', hint: 'See the yellow queues: only six files can be in flight at a time.', check: r => best(r, 0, false).length > 0 },
+  { text: 'Switch to <b>HTTP/2</b> and load again.', hint: 'Everything is requested at once on a single connection. Compare the times in the list.', check: r => best(r, 1, false).some(x => best(r, 0, false).some(y => y.rtt === x.rtt && x.load < y.load)) },
+  { text: 'Keep HTTP/2, set the network to <b>Lossy</b>, and load.', hint: 'One lost packet. Count the red bars.', check: r => best(r, 1, true).some(x => x.stalled > 3) },
+  { text: 'Now try <b>HTTP/3</b> on the same lossy network.', hint: 'Same lost packet. How many files does it stall now?', check: r => best(r, 2, true).some(x => x.stalled <= 1) },
+]);
+draw(null);
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['$ curl -sI --http2 https://encore.example | head -1', 'curl'],
+  ['HTTP/2 200', 'curl'],
+  ['$ curl -sI --http3 https://encore.example | head -1', 'curl3'],
+  ['HTTP/3 200', 'curl3'],
+  ['', null],
+  ['<span class="c"># nginx 1.25+</span>', null],
+  ['<span class="key">listen</span> 443 ssl;', 'tcp'],
+  ['<span class="key">http2</span> on;', 'h2'],
+  ['<span class="key">listen</span> 443 quic reuseport;', 'quic'],
+  ['<span class="key">add_header</span> Alt-Svc <span class="s">\'h3=":443"; ma=86400\'</span>;', 'altsvc'],
+], {
+  curl: ['Check HTTP/2', 'Ask for HTTP/2 explicitly and print the status line. Browser devtools show the same thing in the Network tab\'s “Protocol” column.'],
+  curl3: ['Check HTTP/3', 'Needs a curl built with HTTP/3 support. If it falls back, the server or the network doesn\'t offer QUIC.'],
+  tcp: ['TCP listener', 'HTTP/1.1 and HTTP/2 both run over TCP + TLS on port 443.'],
+  h2: ['HTTP/2', 'One line. Browsers only use HTTP/2 over HTTPS, and negotiate it during the TLS handshake.'],
+  quic: ['QUIC listener', 'HTTP/3 runs on QUIC over UDP, on the same port number. This is the lab\'s “HTTP/3”.'],
+  altsvc: ['Alt-Svc', 'Browsers connect with TCP first. This header tells them “HTTP/3 is available here”, so the next connections can use QUIC.'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: 'Encore switches its CDN from HTTP/1.1 to HTTP/2. Which old optimization matters much less now?', opts: [
+    ['Compressing images', false, 'Still important: smaller files are faster with any protocol.'],
+    ['Splitting files across several domains so browsers open more connections', true, 'That trick worked around HTTP/1.1\'s per-connection queueing. HTTP/2 multiplexes on one connection, so the extra connections just cost handshakes.'],
+    ['Using a CDN', false, 'Being close to fans still saves round trips on every protocol.'],
+  ] },
+  { q: 'Why does HTTP/3 help most on bad mobile networks?', opts: [
+    ['It compresses data harder', false, 'Header compression is similar. The difference is how loss is handled.'],
+    ['A lost packet only delays its own stream instead of every stream on the connection', true, 'HTTP/2 over TCP suffers head-of-line blocking; QUIC streams are independent. It also reconnects faster when a phone switches networks.'],
+    ['It uses TCP more efficiently', false, 'HTTP/3 doesn\'t use TCP at all: it runs on QUIC over UDP.'],
+  ] },
+  { q: 'Cai enables HTTP/3, but a few fans\' office networks block UDP. What happens for them?', opts: [
+    ['The site breaks for them', false, 'Browsers handle this gracefully.'],
+    ['Their browsers keep using HTTP/2 over TCP, as before', true, 'HTTP/3 is advertised (Alt-Svc) and tried; if QUIC can\'t get through, the browser falls back.'],
+    ['They get HTTP/1.0', false, 'They fall back to HTTP/2, not to a much older version.'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'http2-http3');
+})();
+</script>
+</body>
+</html>

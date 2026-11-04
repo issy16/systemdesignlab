@@ -154,6 +154,12 @@ const FLOWS = {
     ['fill', ['#loss', '15'], 100], ['click', '#player .btn.primary', 5000],
     ['click', seg('useSeg', 2), 100], ['click', '#player .btn.primary', 5000],
   ],
+  'http2-http3': [
+    ['click', '#load', 200],
+    ['click', seg('protoSeg', 2), 100], ['click', '#load', 200],
+    ['click', seg('lossSeg', 2), 100], ['click', '#load', 200],
+    ['click', seg('protoSeg', 3), 100], ['click', '#load', 200],
+  ],
 };
 
 (async () => {

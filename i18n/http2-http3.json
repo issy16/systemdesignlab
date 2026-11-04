@@ -1,0 +1,670 @@
+{
+ "page": "http2-http3",
+ "segments": [
+  {
+   "kind": "attr",
+   "en": "width=device-width, initial-scale=1, viewport-fit=cover",
+   "zh": "="
+  },
+  {
+   "kind": "attr",
+   "en": "Load Encore's concert page over HTTP/1.1, HTTP/2 and HTTP/3, and see how multiplexing and QUIC change the waterfall.",
+   "zh": "分別用 HTTP/1.1、HTTP/2 和 HTTP/3 載入 Encore 的演唱會頁面，看看多工與 QUIC 怎麼改變瀑布圖。"
+  },
+  {
+   "kind": "attr",
+   "en": "Sections",
+   "zh": "章節"
+  },
+  {
+   "kind": "attr",
+   "en": "Request waterfall",
+   "zh": "請求瀑布圖"
+  },
+  {
+   "kind": "attr",
+   "en": "Runs",
+   "zh": "執行紀錄"
+  },
+  {
+   "kind": "attr",
+   "en": "Example curl commands and nginx configuration",
+   "zh": "curl 指令與 nginx 設定範例"
+  },
+  {
+   "kind": "attr",
+   "en": "Pages",
+   "zh": "頁面"
+  },
+  {
+   "kind": "html",
+   "en": "HTTP/2 and HTTP/3 · System Design Lab",
+   "zh": "HTTP/2 與 HTTP/3 · System Design Lab"
+  },
+  {
+   "kind": "html",
+   "en": "system<b>.design.lab</b>",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "Lab",
+   "zh": "實驗室"
+  },
+  {
+   "kind": "html",
+   "en": "The config",
+   "zh": "設定"
+  },
+  {
+   "kind": "html",
+   "en": "Recap",
+   "zh": "重點整理"
+  },
+  {
+   "kind": "html",
+   "en": "page 23 · stage 6 · talk to the world",
+   "zh": "第 23 頁 · 階段 6 · 與外界溝通"
+  },
+  {
+   "kind": "html",
+   "en": "HTTP/2, HTTP/3, QUIC",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "Same page, same server. <em>Twice as fast, just by changing the protocol.</em>",
+   "zh": "同一個頁面、同一台伺服器。<em>只換了協定，就快了一倍。</em>"
+  },
+  {
+   "kind": "html",
+   "en": "<b>Encore</b>The concert page is one HTML file plus 23 images, scripts and stylesheets. Fans on phones are far from Encore's servers, so every round trip costs a lot. Cai wants to know what switching protocols would actually change.",
+   "zh": "<b>Encore</b>演唱會頁面是一個 HTML 檔案，加上 23 個圖片、腳本和樣式表。用手機的歌迷離 Encore 的伺服器很遠，所以每一次來回都很昂貴。Cai 想知道換協定到底會改變什麼。"
+  },
+  {
+   "kind": "html",
+   "en": "Open the lab ↓",
+   "zh": "打開實驗室 ↓"
+  },
+  {
+   "kind": "html",
+   "en": "lab · load the concert page",
+   "zh": "實驗室 · 載入演唱會頁面"
+  },
+  {
+   "kind": "html",
+   "en": "http/1.1",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "The request waterfall",
+   "zh": "請求瀑布圖"
+  },
+  {
+   "kind": "html",
+   "en": "Each row is one file; the bar shows when it was requested and when it finished. Simulated timings, not a benchmark.",
+   "zh": "每一列是一個檔案；長條顯示它何時被請求、何時完成。時間是模擬的，不是效能基準。"
+  },
+  {
+   "kind": "html",
+   "en": "Protocol",
+   "zh": "協定"
+  },
+  {
+   "kind": "html",
+   "en": "Round trip to the server: <b id=\"rttV\">100 ms</b>",
+   "zh": "到伺服器的來回時間：<b id=\"rttV\">100 ms</b>"
+  },
+  {
+   "kind": "html",
+   "en": "Network",
+   "zh": "網路"
+  },
+  {
+   "kind": "html",
+   "en": "&nbsp;",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "Load the page",
+   "zh": "載入頁面"
+  },
+  {
+   "kind": "html",
+   "en": "<i style=\"background:var(--muted)\"></i>connecting (handshakes)",
+   "zh": "<i style=\"background:var(--muted)\"></i>連線中（交握）"
+  },
+  {
+   "kind": "html",
+   "en": "<i style=\"background:var(--accent)\"></i>request → response",
+   "zh": "<i style=\"background:var(--accent)\"></i>請求 → 回應"
+  },
+  {
+   "kind": "html",
+   "en": "<i style=\"background:var(--wait)\"></i>waiting in a queue",
+   "zh": "<i style=\"background:var(--wait)\"></i>在佇列中等待"
+  },
+  {
+   "kind": "html",
+   "en": "<i style=\"background:var(--bad)\"></i>stalled by a lost packet",
+   "zh": "<i style=\"background:var(--bad)\"></i>被遺失的封包卡住"
+  },
+  {
+   "kind": "html",
+   "en": "Page loaded",
+   "zh": "頁面載入完成"
+  },
+  {
+   "kind": "html",
+   "en": "Connections",
+   "zh": "連線數"
+  },
+  {
+   "kind": "html",
+   "en": "Round trips before the first byte",
+   "zh": "收到第一個位元組前的來回次數"
+  },
+  {
+   "kind": "html",
+   "en": "Each load is listed here so you can compare.",
+   "zh": "每次載入都會列在這裡，方便比較。"
+  },
+  {
+   "kind": "html",
+   "en": "Pick a protocol and load the page.",
+   "zh": "選一個協定，然後載入頁面。"
+  },
+  {
+   "kind": "html",
+   "en": "Try this",
+   "zh": "試試看"
+  },
+  {
+   "kind": "html",
+   "en": "HTTP/1.1",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "One request at a time per connection. Browsers open about 6 connections per site and queue the rest.",
+   "zh": "每條連線一次只能處理一個請求。瀏覽器對每個網站大約開 6 條連線，其他的都要排隊。"
+  },
+  {
+   "kind": "html",
+   "en": "HTTP/2",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "One TCP connection, many requests at once (multiplexing), compressed headers. But TCP still delivers bytes in order, so one lost packet stalls every request.",
+   "zh": "一條 TCP 連線同時處理很多請求（多工，multiplexing），並壓縮標頭。但 TCP 仍然依序傳遞位元組，所以遺失一個封包就會卡住所有請求。"
+  },
+  {
+   "kind": "html",
+   "en": "HTTP/3",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "HTTP over QUIC, which runs on UDP. Streams are independent, so a loss only delays its own stream, and the connection and encryption are set up in one round trip.",
+   "zh": "跑在 QUIC 上的 HTTP，而 QUIC 跑在 UDP 上。各個串流彼此獨立，所以遺失只會延遲它自己的串流，而且連線和加密在一次來回內就建立好。"
+  },
+  {
+   "kind": "html",
+   "en": "The one difference",
+   "zh": "關鍵差別"
+  },
+  {
+   "kind": "html",
+   "en": "<b>HTTP/2</b> removed the queue: many requests share one connection instead of waiting for a free one. <b>HTTP/3</b> removed what was left in the way: TCP's in-order delivery (head-of-line blocking, page 22) and the extra round trips of separate TCP and TLS handshakes.",
+   "zh": "<b>HTTP/2</b> 拿掉了佇列：很多請求共用一條連線，而不是等待空閒的連線。<b>HTTP/3</b> 則拿掉了剩下的障礙：TCP 的依序傳遞（隊頭阻塞，見第 22 頁），以及分開進行 TCP 和 TLS 交握所多花的來回。"
+  },
+  {
+   "kind": "html",
+   "en": "act 2 · the real thing",
+   "zh": "第 2 幕 · 真實世界"
+  },
+  {
+   "kind": "html",
+   "en": "curl + nginx",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "Check it, then turn it on",
+   "zh": "先檢查，再開啟"
+  },
+  {
+   "kind": "html",
+   "en": "Your app code doesn't change at all: the protocol is negotiated between browser and server. <b>Hover or tap a line.</b>",
+   "zh": "你的 App 程式碼完全不用改：協定是由瀏覽器和伺服器協商的。<b>把滑鼠移到某一行上，或點一下。</b>"
+  },
+  {
+   "kind": "html",
+   "en": "👆 pick a line",
+   "zh": "👆 選一行"
+  },
+  {
+   "kind": "html",
+   "en": "Each highlighted line maps to the lab.",
+   "zh": "每一行反白後，都會對應到實驗室。"
+  },
+  {
+   "kind": "html",
+   "en": "recap · keep this",
+   "zh": "重點整理 · 帶走這些"
+  },
+  {
+   "kind": "html",
+   "en": "The whole page on one screen",
+   "zh": "整頁濃縮在一個畫面"
+  },
+  {
+   "kind": "html",
+   "en": "Many at once",
+   "zh": "同時處理很多個"
+  },
+  {
+   "kind": "html",
+   "en": "Multiplexing",
+   "zh": "多工"
+  },
+  {
+   "kind": "html",
+   "en": "HTTP/2 and HTTP/3 send many requests over one connection. No more queueing, no more 6-connection limit.",
+   "zh": "HTTP/2 和 HTTP/3 在一條連線上傳送很多請求。不再排隊，也不再有 6 條連線的限制。"
+  },
+  {
+   "kind": "html",
+   "en": "Independent",
+   "zh": "彼此獨立"
+  },
+  {
+   "kind": "html",
+   "en": "QUIC streams",
+   "zh": "QUIC 串流"
+  },
+  {
+   "kind": "html",
+   "en": "HTTP/3's streams don't block each other on loss. Biggest win on lossy mobile networks.",
+   "zh": "HTTP/3 的串流不會因為遺失而互相阻塞。在會掉封包的行動網路上效益最大。"
+  },
+  {
+   "kind": "html",
+   "en": "Faster start",
+   "zh": "更快開始"
+  },
+  {
+   "kind": "html",
+   "en": "Fewer round trips",
+   "zh": "更少的來回"
+  },
+  {
+   "kind": "html",
+   "en": "QUIC combines connecting and encrypting into one round trip (zero when resuming). Matters most when the server is far away.",
+   "zh": "QUIC 把連線和加密合併成一次來回（恢復連線時甚至是零次）。伺服器越遠，差別越大。"
+  },
+  {
+   "kind": "html",
+   "en": "The tradeoff",
+   "zh": "取捨"
+  },
+  {
+   "kind": "html",
+   "en": "Upgrading is mostly free speed, enabled in your CDN or web server. Costs: some networks block UDP (browsers fall back to HTTP/2), QUIC uses more CPU than TCP today, and debugging tools are younger. Tricks from the HTTP/1 era (bundling everything, domain sharding) matter much less now.",
+   "zh": "升級大致上是免費的速度，在 CDN 或網頁伺服器上開啟即可。代價：有些網路會擋 UDP（瀏覽器會退回 HTTP/2）、QUIC 目前比 TCP 更耗 CPU，除錯工具也比較新。HTTP/1 時代的技巧（全部打包成一包、網域分散）現在重要性低很多。"
+  },
+  {
+   "kind": "html",
+   "en": "Check it",
+   "zh": "考考自己"
+  },
+  {
+   "kind": "js",
+   "en": "'logo.svg'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "`poster-${i + 1}.jpg`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'seatmap.json'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'reviews.json'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'icons.svg'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'HTTP/1.1'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'HTTP/2'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'HTTP/3'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'display:grid;grid-template-columns:110px 1fr;gap:8px;align-items:center;font-family:var(--mono);font-size:11px'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'position:relative;height:12px;background:var(--panel-2)'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "`position:absolute;top:0;bottom:0;left:${(a / max) * 100}%;width:${Math.max(0.4, ((b - a) / max) * 100)}%;background:var(${token})`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "' ms'",
+   "zh": "' 毫秒'"
+  },
+  {
+   "kind": "js",
+   "en": "`${NAMES[proto].padEnd(8)} · ${String(rtt).padStart(3)} ms RTT · ${lossy ? 'lossy ' : 'clean '} → ${X.fmt(sch.load).padStart(5)} ms${stalled ? ` · ${stalled} files stalled` : ''}`",
+   "zh": "`${NAMES[proto].padEnd(8)} · RTT ${String(rtt).padStart(3)} 毫秒 · ${lossy ? '有遺失' : '無遺失'} → ${X.fmt(sch.load).padStart(5)} 毫秒${stalled ? ` · ${stalled} 個檔案被卡住` : ''}`"
+  },
+  {
+   "kind": "js",
+   "en": "`⚠ HTTP/1.1: only 6 requests can be in flight; the other ${FILES.length - 7} wait in queues (yellow). Each new connection also pays its own handshakes.`",
+   "zh": "`⚠ HTTP/1.1：同時只能有 6 個請求在進行；其他 ${FILES.length - 7} 個在佇列中等待（黃色）。每條新連線也要付出自己的交握成本。`"
+  },
+  {
+   "kind": "js",
+   "en": "`✕ HTTP/2 on a lossy network: one lost TCP packet stalled ${stalled} files at once (red), because TCP must deliver every byte in order before any stream can continue.`",
+   "zh": "`✕ 在會掉封包的網路上使用 HTTP/2：一個遺失的 TCP 封包同時卡住了 ${stalled} 個檔案（紅色），因為 TCP 必須依序送完每個位元組，任何串流才能繼續。`"
+  },
+  {
+   "kind": "js",
+   "en": "'✓ HTTP/2: every file is requested at once over a single connection. No queues.'",
+   "zh": "'✓ HTTP/2：所有檔案都在同一條連線上同時被請求。沒有佇列。'"
+  },
+  {
+   "kind": "js",
+   "en": "`✓ HTTP/3: the same lost packet only stalled ${stalled} file; the other streams kept going. And QUIC needed one round trip fewer to connect.`",
+   "zh": "`✓ HTTP/3：同樣遺失的封包只卡住了 ${stalled} 個檔案；其他串流照常進行。而且 QUIC 少一次來回就連上了。`"
+  },
+  {
+   "kind": "js",
+   "en": "'✓ HTTP/3: multiplexed like HTTP/2, and connected one round trip sooner.'",
+   "zh": "'✓ HTTP/3：跟 HTTP/2 一樣多工，而且早一次來回就連上了。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Clean'",
+   "zh": "'無遺失'"
+  },
+  {
+   "kind": "js",
+   "en": "'Lossy (one packet lost)'",
+   "zh": "'會掉封包（遺失一個封包）'"
+  },
+  {
+   "kind": "js",
+   "en": "'Load the page with <b>HTTP/1.1</b>.'",
+   "zh": "'用 <b>HTTP/1.1</b> 載入頁面。'"
+  },
+  {
+   "kind": "js",
+   "en": "'See the yellow queues: only six files can be in flight at a time.'",
+   "zh": "'看看黃色的佇列：同時只能有六個檔案在傳輸。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Switch to <b>HTTP/2</b> and load again.'",
+   "zh": "'切換到 <b>HTTP/2</b>，再載入一次。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Everything is requested at once on a single connection. Compare the times in the list.'",
+   "zh": "'所有東西都在一條連線上同時被請求。比較列表中的時間。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Keep HTTP/2, set the network to <b>Lossy</b>, and load.'",
+   "zh": "'維持 HTTP/2，把網路設成<b>會掉封包</b>，然後載入。'"
+  },
+  {
+   "kind": "js",
+   "en": "'One lost packet. Count the red bars.'",
+   "zh": "'遺失一個封包。數數看有幾條紅色長條。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Now try <b>HTTP/3</b> on the same lossy network.'",
+   "zh": "'現在在同樣會掉封包的網路上試試 <b>HTTP/3</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Same lost packet. How many files does it stall now?'",
+   "zh": "'同樣遺失一個封包。現在它卡住了幾個檔案？'"
+  },
+  {
+   "kind": "js",
+   "en": "'$ curl -sI --http2 https://encore.example | head -1'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'HTTP/2 200'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'$ curl -sI --http3 https://encore.example | head -1'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'HTTP/3 200'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\"># nginx 1.25+</span>'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">listen</span> 443 ssl;'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">http2</span> on;'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">listen</span> 443 quic reuseport;'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">add_header</span> Alt-Svc <span class=\"s\">\\'h3=\":443\"; ma=86400\\'</span>;'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Check HTTP/2'",
+   "zh": "'檢查 HTTP/2'"
+  },
+  {
+   "kind": "js",
+   "en": "'Ask for HTTP/2 explicitly and print the status line. Browser devtools show the same thing in the Network tab\\'s “Protocol” column.'",
+   "zh": "'明確要求 HTTP/2 並印出狀態列。瀏覽器開發者工具的 Network 分頁中「Protocol」欄位也會顯示同樣的資訊。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Check HTTP/3'",
+   "zh": "'檢查 HTTP/3'"
+  },
+  {
+   "kind": "js",
+   "en": "'Needs a curl built with HTTP/3 support. If it falls back, the server or the network doesn\\'t offer QUIC.'",
+   "zh": "'需要支援 HTTP/3 的 curl 版本。如果它退回舊協定，代表伺服器或網路沒有提供 QUIC。'"
+  },
+  {
+   "kind": "js",
+   "en": "'TCP listener'",
+   "zh": "'TCP 監聽'"
+  },
+  {
+   "kind": "js",
+   "en": "'HTTP/1.1 and HTTP/2 both run over TCP + TLS on port 443.'",
+   "zh": "'HTTP/1.1 和 HTTP/2 都跑在 443 埠的 TCP＋TLS 上。'"
+  },
+  {
+   "kind": "js",
+   "en": "'One line. Browsers only use HTTP/2 over HTTPS, and negotiate it during the TLS handshake.'",
+   "zh": "'只要一行。瀏覽器只會在 HTTPS 上使用 HTTP/2，並在 TLS 交握時協商。'"
+  },
+  {
+   "kind": "js",
+   "en": "'QUIC listener'",
+   "zh": "'QUIC 監聽'"
+  },
+  {
+   "kind": "js",
+   "en": "'HTTP/3 runs on QUIC over UDP, on the same port number. This is the lab\\'s “HTTP/3”.'",
+   "zh": "'HTTP/3 跑在 UDP 上的 QUIC，使用相同的埠號。這就是實驗室的「HTTP/3」。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Alt-Svc'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Browsers connect with TCP first. This header tells them “HTTP/3 is available here”, so the next connections can use QUIC.'",
+   "zh": "'瀏覽器會先用 TCP 連線。這個標頭告訴它們「這裡有 HTTP/3」，之後的連線就能使用 QUIC。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Encore switches its CDN from HTTP/1.1 to HTTP/2. Which old optimization matters much less now?'",
+   "zh": "'Encore 把 CDN 從 HTTP/1.1 換成 HTTP/2。哪一種舊的最佳化現在重要性低很多？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Compressing images'",
+   "zh": "'壓縮圖片'"
+  },
+  {
+   "kind": "js",
+   "en": "'Still important: smaller files are faster with any protocol.'",
+   "zh": "'仍然很重要：不管哪種協定，檔案越小越快。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Splitting files across several domains so browsers open more connections'",
+   "zh": "'把檔案分散到好幾個網域，讓瀏覽器開更多連線'"
+  },
+  {
+   "kind": "js",
+   "en": "'That trick worked around HTTP/1.1\\'s per-connection queueing. HTTP/2 multiplexes on one connection, so the extra connections just cost handshakes.'",
+   "zh": "'這個技巧是用來繞過 HTTP/1.1 每條連線要排隊的問題。HTTP/2 在一條連線上多工，額外的連線只會多花交握成本。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Using a CDN'",
+   "zh": "'使用 CDN'"
+  },
+  {
+   "kind": "js",
+   "en": "'Being close to fans still saves round trips on every protocol.'",
+   "zh": "'離歌迷近一點，不管哪種協定都能省下來回時間。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Why does HTTP/3 help most on bad mobile networks?'",
+   "zh": "'為什麼 HTTP/3 在很差的行動網路上幫助最大？'"
+  },
+  {
+   "kind": "js",
+   "en": "'It compresses data harder'",
+   "zh": "'它壓縮得更用力'"
+  },
+  {
+   "kind": "js",
+   "en": "'Header compression is similar. The difference is how loss is handled.'",
+   "zh": "'標頭壓縮差不多。差別在於怎麼處理遺失。'"
+  },
+  {
+   "kind": "js",
+   "en": "'A lost packet only delays its own stream instead of every stream on the connection'",
+   "zh": "'遺失的封包只會延遲它自己的串流，而不是連線上的每一個串流'"
+  },
+  {
+   "kind": "js",
+   "en": "'HTTP/2 over TCP suffers head-of-line blocking; QUIC streams are independent. It also reconnects faster when a phone switches networks.'",
+   "zh": "'走 TCP 的 HTTP/2 會受隊頭阻塞所苦；QUIC 的串流彼此獨立。手機切換網路時，它重新連線也更快。'"
+  },
+  {
+   "kind": "js",
+   "en": "'It uses TCP more efficiently'",
+   "zh": "'它更有效率地使用 TCP'"
+  },
+  {
+   "kind": "js",
+   "en": "'HTTP/3 doesn\\'t use TCP at all: it runs on QUIC over UDP.'",
+   "zh": "'HTTP/3 完全不用 TCP：它跑在 UDP 上的 QUIC。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Cai enables HTTP/3, but a few fans\\' office networks block UDP. What happens for them?'",
+   "zh": "'Cai 開啟了 HTTP/3，但有幾位歌迷的公司網路會擋 UDP。他們會怎樣？'"
+  },
+  {
+   "kind": "js",
+   "en": "'The site breaks for them'",
+   "zh": "'網站對他們來說會壞掉'"
+  },
+  {
+   "kind": "js",
+   "en": "'Browsers handle this gracefully.'",
+   "zh": "'瀏覽器會優雅地處理這種情況。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Their browsers keep using HTTP/2 over TCP, as before'",
+   "zh": "'他們的瀏覽器會照舊繼續使用 TCP 上的 HTTP/2'"
+  },
+  {
+   "kind": "js",
+   "en": "'HTTP/3 is advertised (Alt-Svc) and tried; if QUIC can\\'t get through, the browser falls back.'",
+   "zh": "'HTTP/3 會被宣告（Alt-Svc）並嘗試使用；如果 QUIC 過不去，瀏覽器就會退回去。'"
+  },
+  {
+   "kind": "js",
+   "en": "'They get HTTP/1.0'",
+   "zh": "'他們會拿到 HTTP/1.0'"
+  },
+  {
+   "kind": "js",
+   "en": "'They fall back to HTTP/2, not to a much older version.'",
+   "zh": "'他們會退回 HTTP/2，而不是古老得多的版本。'"
+  }
+ ]
+}

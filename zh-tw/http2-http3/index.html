@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW" data-lang="zh-tw" data-slug="http2-http3">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="分別用 HTTP/1.1、HTTP/2 和 HTTP/3 載入 Encore 的演唱會頁面，看看多工與 QUIC 怎麼改變瀑布圖。">
+<title>HTTP/2 與 HTTP/3 · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/explainer.css">
+</head>
+<body>
+<!-- Plan. Stuck point: "HTTP/2 is faster" without knowing why; HTTP/3 sounds like the same thing again.
+     Lab: a page with 24 resources; waterfall for HTTP/1.1 (6 connections, one request at a time), HTTP/2 (one connection, multiplexed), HTTP/3 (QUIC over UDP).
+     RTT slider and a lossy-network toggle. One difference: HTTP/2 fixed request queueing; HTTP/3 also fixed TCP's head-of-line blocking and handshake cost. -->
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="章節"><a href="#lab">實驗室</a><a href="#real">設定</a><a href="#recap">重點整理</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>第 23 頁 · 階段 6 · 與外界溝通</span><span class="hot">99</span></div>
+  <div class="eyebrow">HTTP/2, HTTP/3, QUIC</div>
+  <h1>同一個頁面、同一台伺服器。<em>只換了協定，就快了一倍。</em></h1>
+  <div class="scenario"><b>Encore</b>演唱會頁面是一個 HTML 檔案，加上 23 個圖片、腳本和樣式表。用手機的歌迷離 Encore 的伺服器很遠，所以每一次來回都很昂貴。Cai 想知道換協定到底會改變什麼。</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">打開實驗室 ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>實驗室 · 載入演唱會頁面</span><span class="hot" id="tag">http/1.1</span></div>
+  <h2>請求瀑布圖</h2>
+  <p>每一列是一個檔案；長條顯示它何時被請求、何時完成。時間是模擬的，不是效能基準。</p>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">協定</span><div id="protoSeg"></div></div>
+      <div class="ctl"><label for="rtt">到伺服器的來回時間：<b id="rttV">100 ms</b></label><input type="range" id="rtt" min="0" max="2" step="1" value="1"></div>
+      <div class="ctl"><span class="lab-k">網路</span><div id="lossSeg"></div></div>
+      <div class="ctl"><span class="lab-k">&nbsp;</span><div><button class="btn primary" id="load" type="button">載入頁面</button></div></div>
+    </div>
+    <div id="wf" style="display:grid;gap:2px" aria-label="請求瀑布圖"></div>
+    <div class="legend"><span><i style="background:var(--muted)"></i>連線中（交握）</span><span><i style="background:var(--accent)"></i>請求 → 回應</span><span><i style="background:var(--wait)"></i>在佇列中等待</span><span><i style="background:var(--bad)"></i>被遺失的封包卡住</span></div>
+    <div class="meters" style="margin:0">
+      <div class="meter"><div class="k">頁面載入完成</div><div class="v" id="mLoad">–</div></div>
+      <div class="meter"><div class="k">連線數</div><div class="v" id="mConn">–</div></div>
+      <div class="meter"><div class="k">收到第一個位元組前的來回次數</div><div class="v" id="mSetup">–</div></div>
+    </div>
+    <ul class="log" id="runs" aria-label="執行紀錄"><li class="mut">每次載入都會列在這裡，方便比較。</li></ul>
+    <div class="status" id="status" role="status">選一個協定，然後載入頁面。</div>
+  </div>
+  <h3>試試看</h3>
+  <ol class="missions" id="missions"></ol>
+  <div class="cards">
+    <div class="card"><div class="sub">1997</div><div class="t">HTTP/1.1</div><p>每條連線一次只能處理一個請求。瀏覽器對每個網站大約開 6 條連線，其他的都要排隊。</p></div>
+    <div class="card"><div class="sub">2015</div><div class="t">HTTP/2</div><p>一條 TCP 連線同時處理很多請求（多工，multiplexing），並壓縮標頭。但 TCP 仍然依序傳遞位元組，所以遺失一個封包就會卡住所有請求。</p></div>
+    <div class="card"><div class="sub">2022</div><div class="t">HTTP/3</div><p>跑在 QUIC 上的 HTTP，而 QUIC 跑在 UDP 上。各個串流彼此獨立，所以遺失只會延遲它自己的串流，而且連線和加密在一次來回內就建立好。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">關鍵差別</div><p><b>HTTP/2</b> 拿掉了佇列：很多請求共用一條連線，而不是等待空閒的連線。<b>HTTP/3</b> 則拿掉了剩下的障礙：TCP 的依序傳遞（隊頭阻塞，見第 22 頁），以及分開進行 TCP 和 TLS 交握所多花的來回。</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>第 2 幕 · 真實世界</span><span class="hot">curl + nginx</span></div>
+  <h2>先檢查，再開啟</h2>
+  <p>你的 App 程式碼完全不用改：協定是由瀏覽器和伺服器協商的。<b>把滑鼠移到某一行上，或點一下。</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="curl 指令與 nginx 設定範例"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 選一行</div><p id="exP">每一行反白後，都會對應到實驗室。</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>重點整理 · 帶走這些</span><span class="hot">♥</span></div>
+  <h2>整頁濃縮在一個畫面</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">同時處理很多個</div><div class="t">多工</div><p>HTTP/2 和 HTTP/3 在一條連線上傳送很多請求。不再排隊，也不再有 6 條連線的限制。</p></div>
+    <div class="card"><div class="sub">彼此獨立</div><div class="t">QUIC 串流</div><p>HTTP/3 的串流不會因為遺失而互相阻塞。在會掉封包的行動網路上效益最大。</p></div>
+    <div class="card"><div class="sub">更快開始</div><div class="t">更少的來回</div><p>QUIC 把連線和加密合併成一次來回（恢復連線時甚至是零次）。伺服器越遠，差別越大。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">取捨</div><p>升級大致上是免費的速度，在 CDN 或網頁伺服器上開啟即可。代價：有些網路會擋 UDP（瀏覽器會退回 HTTP/2）、QUIC 目前比 TCP 更耗 CPU，除錯工具也比較新。HTTP/1 時代的技巧（全部打包成一包、網域分散）現在重要性低很多。</p></div>
+  <h3 style="margin-top:26px">考考自己 <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="頁面"></nav>
+</main>
+
+<script src="../../assets/explainer.js"></script>
+<script src="../../assets/i18n.zh-tw.js"></script>
+<script>
+(() => {
+const { $, el, esc } = X;
+const RTTS = [20, 100, 300];
+const FILES = ['index.html', 'app.css', 'app.js', 'vendor.js', 'fonts.css', 'logo.svg', ...Array.from({ length: 12 }, (_, i) => `poster-${i + 1}.jpg`), 'seatmap.js', 'seatmap.json', 'reviews.json', 'icons.svg', 'analytics.js', 'avatar.png'];
+const XFER = FILES.map((f, i) => (f.endsWith('.jpg') ? 60 : f.endsWith('.js') ? 45 : 20) + (i % 3) * 5);
+
+/* ---------- timing model (pure): one schedule per protocol ---------- */
+function schedule(proto, rtt, lossy) {
+  const rows = [];
+  const setupRtts = proto === 2 ? 1 : 2;                // QUIC: 1 RTT; TCP + TLS 1.3: 2 RTT
+  const setup = setupRtts * rtt;
+  const htmlEnd = setup + rtt + XFER[0];
+  rows.push({ f: FILES[0], conn: [0, setup], wait: null, req: [setup, htmlEnd] });
+  const lostIdx = lossy ? 9 : -1, lossAt = htmlEnd + rtt / 2, stall = Math.round(rtt * 1.5 + 200);
+  if (proto === 0) {                                     // 6 connections, one request at a time each
+    const free = [htmlEnd, htmlEnd + setup, htmlEnd + setup, htmlEnd + setup, htmlEnd + setup, htmlEnd + setup];
+    for (let i = 1; i < FILES.length; i++) {
+      let c = 0; for (let k = 1; k < 6; k++) if (free[k] < free[c]) c = k;
+      const start = free[c];
+      let end = start + rtt + XFER[i];
+      const hit = i === lostIdx;
+      if (hit) end += stall;
+      rows.push({ f: FILES[i], conn: c > 0 && start === htmlEnd + setup ? [htmlEnd, htmlEnd + setup] : null, wait: start > htmlEnd + (c > 0 ? setup : 0) ? [htmlEnd, start] : null, req: [start, end], stalled: hit });
+      free[c] = end;
+    }
+    return { rows, conns: 6, setupRtts, load: Math.max(...rows.map(r => r.req[1])) };
+  }
+  for (let i = 1; i < FILES.length; i++) {               // one connection, everything at once
+    const start = htmlEnd;
+    let end = start + rtt + XFER[i] + Math.floor(i / 6) * 8;  // small cost for sharing the pipe
+    let stalled = false;
+    if (lossy && (proto === 1 ? end > lossAt : i === lostIdx)) { end += stall; stalled = true; } // TCP: every stream in flight waits; QUIC: only the one stream
+    rows.push({ f: FILES[i], conn: null, wait: null, req: [start, end], stalled });
+  }
+  return { rows, conns: 1, setupRtts, load: Math.max(...rows.map(r => r.req[1])) };
+}
+
+/* ---------- UI ---------- */
+let proto = 0, rttI = 1, lossy = false;
+const runs = [];
+const NAMES = ['HTTP/1.1', 'HTTP/2', 'HTTP/3'];
+function draw(sch) {
+  const box = $('#wf'); box.innerHTML = '';
+  const max = Math.max(1, sch ? sch.load : 1);
+  (sch ? sch.rows : []).forEach(r => {
+    const row = el('div'); row.style.cssText = 'display:grid;grid-template-columns:110px 1fr;gap:8px;align-items:center;font-family:var(--mono);font-size:11px';
+    const bar = el('div'); bar.style.cssText = 'position:relative;height:12px;background:var(--panel-2)';
+    const seg = ([a, b], token) => { const s = el('i'); s.style.cssText = `position:absolute;top:0;bottom:0;left:${(a / max) * 100}%;width:${Math.max(0.4, ((b - a) / max) * 100)}%;background:var(${token})`; bar.append(s); };
+    if (r.conn) seg(r.conn, '--muted');
+    if (r.wait) seg(r.wait, '--wait');
+    seg(r.req, r.stalled ? '--bad' : '--accent');
+    row.append(el('span', '', esc(r.f)), bar); box.append(row);
+  });
+}
+function load() {
+  const rtt = RTTS[rttI], sch = schedule(proto, rtt, lossy);
+  draw(sch);
+  $('#mLoad').textContent = X.fmt(sch.load) + ' 毫秒';
+  $('#mConn').textContent = sch.conns;
+  $('#mSetup').textContent = sch.setupRtts + 1;
+  const stalled = sch.rows.filter(r => r.stalled).length;
+  runs.push({ proto, rtt, lossy, load: sch.load, stalled });
+  const ul = $('#runs'); if (runs.length === 1) ul.innerHTML = '';
+  ul.append(el('li', '', esc(`${NAMES[proto].padEnd(8)} · RTT ${String(rtt).padStart(3)} 毫秒 · ${lossy ? '有遺失' : '無遺失'} → ${X.fmt(sch.load).padStart(5)} 毫秒${stalled ? ` · ${stalled} 個檔案被卡住` : ''}`)));
+  const st = $('#status');
+  if (proto === 0) { st.className = 'status wait'; st.textContent = `⚠ HTTP/1.1：同時只能有 6 個請求在進行；其他 ${FILES.length - 7} 個在佇列中等待（黃色）。每條新連線也要付出自己的交握成本。`; }
+  else if (proto === 1 && lossy) { st.className = 'status bad'; st.textContent = `✕ 在會掉封包的網路上使用 HTTP/2：一個遺失的 TCP 封包同時卡住了 ${stalled} 個檔案（紅色），因為 TCP 必須依序送完每個位元組，任何串流才能繼續。`; }
+  else if (proto === 1) { st.className = 'status ok'; st.textContent = '✓ HTTP/2：所有檔案都在同一條連線上同時被請求。沒有佇列。'; }
+  else { st.className = 'status ok'; st.textContent = lossy ? `✓ HTTP/3：同樣遺失的封包只卡住了 ${stalled} 個檔案；其他串流照常進行。而且 QUIC 少一次來回就連上了。` : '✓ HTTP/3：跟 HTTP/2 一樣多工，而且早一次來回就連上了。'; }
+  mis.update(runs);
+}
+X.seg($('#protoSeg'), NAMES, i => { proto = i; $('#tag').textContent = NAMES[i].toLowerCase(); }, 0);
+X.seg($('#lossSeg'), ['無遺失', '會掉封包（遺失一個封包）'], i => { lossy = i === 1; }, 0);
+$('#rtt').addEventListener('input', e => { rttI = +e.target.value; $('#rttV').textContent = RTTS[rttI] + ' 毫秒'; });
+$('#load').addEventListener('click', load);
+const best = (r, p, l) => r.filter(x => x.proto === p && x.lossy === l);
+const mis = X.missions($('#missions'), [
+  { text: '用 <b>HTTP/1.1</b> 載入頁面。', hint: '看看黃色的佇列：同時只能有六個檔案在傳輸。', check: r => best(r, 0, false).length > 0 },
+  { text: '切換到 <b>HTTP/2</b>，再載入一次。', hint: '所有東西都在一條連線上同時被請求。比較列表中的時間。', check: r => best(r, 1, false).some(x => best(r, 0, false).some(y => y.rtt === x.rtt && x.load < y.load)) },
+  { text: '維持 HTTP/2，把網路設成<b>會掉封包</b>，然後載入。', hint: '遺失一個封包。數數看有幾條紅色長條。', check: r => best(r, 1, true).some(x => x.stalled > 3) },
+  { text: '現在在同樣會掉封包的網路上試試 <b>HTTP/3</b>。', hint: '同樣遺失一個封包。現在它卡住了幾個檔案？', check: r => best(r, 2, true).some(x => x.stalled <= 1) },
+]);
+draw(null);
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['$ curl -sI --http2 https://encore.example | head -1', 'curl'],
+  ['HTTP/2 200', 'curl'],
+  ['$ curl -sI --http3 https://encore.example | head -1', 'curl3'],
+  ['HTTP/3 200', 'curl3'],
+  ['', null],
+  ['<span class="c"># nginx 1.25+</span>', null],
+  ['<span class="key">listen</span> 443 ssl;', 'tcp'],
+  ['<span class="key">http2</span> on;', 'h2'],
+  ['<span class="key">listen</span> 443 quic reuseport;', 'quic'],
+  ['<span class="key">add_header</span> Alt-Svc <span class="s">\'h3=":443"; ma=86400\'</span>;', 'altsvc'],
+], {
+  curl: ['檢查 HTTP/2', '明確要求 HTTP/2 並印出狀態列。瀏覽器開發者工具的 Network 分頁中「Protocol」欄位也會顯示同樣的資訊。'],
+  curl3: ['檢查 HTTP/3', '需要支援 HTTP/3 的 curl 版本。如果它退回舊協定，代表伺服器或網路沒有提供 QUIC。'],
+  tcp: ['TCP 監聽', 'HTTP/1.1 和 HTTP/2 都跑在 443 埠的 TCP＋TLS 上。'],
+  h2: ['HTTP/2', '只要一行。瀏覽器只會在 HTTPS 上使用 HTTP/2，並在 TLS 交握時協商。'],
+  quic: ['QUIC 監聽', 'HTTP/3 跑在 UDP 上的 QUIC，使用相同的埠號。這就是實驗室的「HTTP/3」。'],
+  altsvc: ['Alt-Svc', '瀏覽器會先用 TCP 連線。這個標頭告訴它們「這裡有 HTTP/3」，之後的連線就能使用 QUIC。'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: 'Encore 把 CDN 從 HTTP/1.1 換成 HTTP/2。哪一種舊的最佳化現在重要性低很多？', opts: [
+    ['壓縮圖片', false, '仍然很重要：不管哪種協定，檔案越小越快。'],
+    ['把檔案分散到好幾個網域，讓瀏覽器開更多連線', true, '這個技巧是用來繞過 HTTP/1.1 每條連線要排隊的問題。HTTP/2 在一條連線上多工，額外的連線只會多花交握成本。'],
+    ['使用 CDN', false, '離歌迷近一點，不管哪種協定都能省下來回時間。'],
+  ] },
+  { q: '為什麼 HTTP/3 在很差的行動網路上幫助最大？', opts: [
+    ['它壓縮得更用力', false, '標頭壓縮差不多。差別在於怎麼處理遺失。'],
+    ['遺失的封包只會延遲它自己的串流，而不是連線上的每一個串流', true, '走 TCP 的 HTTP/2 會受隊頭阻塞所苦；QUIC 的串流彼此獨立。手機切換網路時，它重新連線也更快。'],
+    ['它更有效率地使用 TCP', false, 'HTTP/3 完全不用 TCP：它跑在 UDP 上的 QUIC。'],
+  ] },
+  { q: 'Cai 開啟了 HTTP/3，但有幾位歌迷的公司網路會擋 UDP。他們會怎樣？', opts: [
+    ['網站對他們來說會壞掉', false, '瀏覽器會優雅地處理這種情況。'],
+    ['他們的瀏覽器會照舊繼續使用 TCP 上的 HTTP/2', true, 'HTTP/3 會被宣告（Alt-Svc）並嘗試使用；如果 QUIC 過不去，瀏覽器就會退回去。'],
+    ['他們會拿到 HTTP/1.0', false, '他們會退回 HTTP/2，而不是古老得多的版本。'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'http2-http3');
+})();
+</script>
+</body>
+</html>
