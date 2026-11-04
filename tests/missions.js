@@ -134,6 +134,15 @@ const FLOWS = {
     ['fill', ['#grep', 'sk_'], 200],
     ['click', '#fDelete', 100], ['click', '#fRotate', 100], ['click', '#fMove', 200],
   ],
+  'incident-simulator': [
+    ['click', '#phases > div:nth-child(1) button:nth-child(1)', 200],
+    ['click', '#phases > div:nth-child(2) button:nth-child(2)', 100], ['click', '#phases > div:nth-child(2) button:nth-child(1)', 200],
+    ['click', '#phases > div:nth-child(3) button:nth-child(1)', 200],
+    ['click', '#phases > div:nth-child(4) button:nth-child(2)', 200],
+    ['click', '#phases > div:nth-child(5) > div > div:nth-of-type(1) button:nth-child(2)', 100],
+    ['click', '#phases > div:nth-child(5) > div > div:nth-of-type(2) button:nth-child(1)', 100],
+    ['click', '#phases > div:nth-child(5) > div > div:nth-of-type(2) button:nth-child(2)', 300],
+  ],
 };
 
 (async () => {

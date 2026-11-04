@@ -1,0 +1,865 @@
+{
+ "page": "incident-simulator",
+ "segments": [
+  {
+   "kind": "attr",
+   "en": "width=device-width, initial-scale=1, viewport-fit=cover",
+   "zh": "="
+  },
+  {
+   "kind": "attr",
+   "en": "Run a production incident from alert to postmortem: find the cause, stop the damage, restore from backup, and write it up blamelessly.",
+   "zh": "從告警到事後檢討，親手處理一次線上事故：找出原因、止血、從備份還原，並以不究責的方式寫下來。"
+  },
+  {
+   "kind": "attr",
+   "en": "Sections",
+   "zh": "章節"
+  },
+  {
+   "kind": "attr",
+   "en": "Incident timeline",
+   "zh": "事故時間軸"
+  },
+  {
+   "kind": "attr",
+   "en": "Example postmortem and backup configuration",
+   "zh": "事後檢討與備份設定範例"
+  },
+  {
+   "kind": "attr",
+   "en": "Pages",
+   "zh": "頁面"
+  },
+  {
+   "kind": "html",
+   "en": "Incident Simulator · System Design Lab",
+   "zh": "事故模擬器 · System Design Lab"
+  },
+  {
+   "kind": "html",
+   "en": "system<b>.design.lab</b>",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "The incident",
+   "zh": "事故"
+  },
+  {
+   "kind": "html",
+   "en": "The postmortem",
+   "zh": "事後檢討"
+  },
+  {
+   "kind": "html",
+   "en": "Recap",
+   "zh": "重點整理"
+  },
+  {
+   "kind": "html",
+   "en": "page 20 · stage 5 · ship and operate it",
+   "zh": "第 20 頁 · 階段 5 · 上線與維運"
+  },
+  {
+   "kind": "html",
+   "en": "Production incidents, disaster recovery, backups, postmortems",
+   "zh": "線上事故、災難復原、備份、事後檢討"
+  },
+  {
+   "kind": "html",
+   "en": "21:03. Dee's phone buzzes. <em>“Checkout errors: 38%.”</em>",
+   "zh": "21:03。Dee 的手機震動了。<em>「結帳錯誤率：38%。」</em>"
+  },
+  {
+   "kind": "html",
+   "en": "<b>Encore</b>It's the evening before a big on-sale. Fans are reporting that their orders have disappeared from “My tickets”, and checkout is failing for over a third of them. You're on call. Every choice below costs time, and while you think, the damage continues.",
+   "zh": "<b>Encore</b>這是大型開賣的前一晚。歌迷回報他們的訂單從「我的票券」裡消失了，而且超過三分之一的人結帳失敗。你在值班。下面的每個選擇都要花時間，而你在思考的同時，損害還在持續。"
+  },
+  {
+   "kind": "html",
+   "en": "Take the page ↓",
+   "zh": "接下呼叫 ↓"
+  },
+  {
+   "kind": "html",
+   "en": "lab · run the incident",
+   "zh": "實驗室 · 處理這次事故"
+  },
+  {
+   "kind": "html",
+   "en": "phase 1 of 5",
+   "zh": "第 1 / 5 階段"
+  },
+  {
+   "kind": "html",
+   "en": "Incident #142",
+   "zh": "事故 #142"
+  },
+  {
+   "kind": "html",
+   "en": "Clock",
+   "zh": "時鐘"
+  },
+  {
+   "kind": "html",
+   "en": "0 min since the alert",
+   "zh": "告警後 0 分鐘"
+  },
+  {
+   "kind": "html",
+   "en": "Orders deleted",
+   "zh": "被刪除的訂單"
+  },
+  {
+   "kind": "html",
+   "en": "40 per minute while it runs",
+   "zh": "執行期間每分鐘 40 筆"
+  },
+  {
+   "kind": "html",
+   "en": "Orders lost for good",
+   "zh": "永久遺失的訂單"
+  },
+  {
+   "kind": "html",
+   "en": "after recovery",
+   "zh": "復原之後"
+  },
+  {
+   "kind": "html",
+   "en": "The incident timeline fills in as you act.",
+   "zh": "事故時間軸會隨著你的行動逐步填滿。"
+  },
+  {
+   "kind": "html",
+   "en": "↺ Start the incident over",
+   "zh": "↺ 重新開始這次事故"
+  },
+  {
+   "kind": "html",
+   "en": "Try this",
+   "zh": "試試看"
+  },
+  {
+   "kind": "html",
+   "en": "Backups and RPO",
+   "zh": "備份與 RPO"
+  },
+  {
+   "kind": "html",
+   "en": "<b>RPO</b> (recovery point objective) is how much data you can afford to lose: the time between the last good copy and the disaster. Nightly backups mean up to 24 h of loss. Continuous archiving of the database log allows recovery to any second.",
+   "zh": "<b>RPO</b>（復原點目標）是你能承受遺失多少資料：也就是最後一份完好副本到災難發生之間的時間。每晚備份代表最多可能遺失 24 小時。持續封存資料庫日誌，則能復原到任何一秒。"
+  },
+  {
+   "kind": "html",
+   "en": "Disaster recovery and RTO",
+   "zh": "災難復原與 RTO"
+  },
+  {
+   "kind": "html",
+   "en": "<b>RTO</b> (recovery time objective) is how long getting back can take. A backup you've never restored has an unknown RTO, and sometimes it doesn't work at all. Practice restores.",
+   "zh": "<b>RTO</b>（復原時間目標）是恢復需要多久。從沒還原過的備份，RTO 是未知數，有時候甚至根本不能用。要練習還原。"
+  },
+  {
+   "kind": "html",
+   "en": "The one difference",
+   "zh": "關鍵差別"
+  },
+  {
+   "kind": "html",
+   "en": "A <b>blameful</b> postmortem asks “who messed up?”, and people learn to hide mistakes. A <b>blameless</b> postmortem asks “what let a normal mistake reach production, and what will catch it next time?”, and the system actually gets safer.",
+   "zh": "<b>究責式</b>的事後檢討問的是「誰搞砸了？」，結果大家學會隱藏錯誤。<b>不究責（blameless）</b>的事後檢討問的是「是什麼讓一個正常的錯誤進到正式環境？下次要靠什麼抓到它？」，系統才會真的變得更安全。"
+  },
+  {
+   "kind": "html",
+   "en": "act 2 · the real thing",
+   "zh": "第 2 幕 · 真實世界"
+  },
+  {
+   "kind": "html",
+   "en": "postmortem",
+   "zh": "事後檢討"
+  },
+  {
+   "kind": "html",
+   "en": "What the write-up and the backups look like",
+   "zh": "事後檢討報告和備份長什麼樣子"
+  },
+  {
+   "kind": "html",
+   "en": "A short postmortem in a common format, plus the Postgres setting that made point-in-time recovery possible. <b>Hover or tap a line.</b>",
+   "zh": "一份常見格式的簡短事後檢討，加上讓時間點復原成為可能的 Postgres 設定。<b>把滑鼠移到某一行上，或點一下。</b>"
+  },
+  {
+   "kind": "html",
+   "en": "👆 pick a line",
+   "zh": "👆 選一行"
+  },
+  {
+   "kind": "html",
+   "en": "Each highlighted line maps to a phase of the incident.",
+   "zh": "每一行反白後，都會對應到事故的某個階段。"
+  },
+  {
+   "kind": "html",
+   "en": "recap · keep this",
+   "zh": "重點整理 · 帶走這些"
+  },
+  {
+   "kind": "html",
+   "en": "The whole page on one screen",
+   "zh": "整頁濃縮在一個畫面"
+  },
+  {
+   "kind": "html",
+   "en": "During",
+   "zh": "事故期間"
+  },
+  {
+   "kind": "html",
+   "en": "Incident response",
+   "zh": "事故應變"
+  },
+  {
+   "kind": "html",
+   "en": "Declare it, assign roles, find what changed, stop the damage first, then repair. Write the timeline as you go.",
+   "zh": "宣告事故、分配角色、找出變更了什麼、先止血再修復。一邊處理一邊寫時間軸。"
+  },
+  {
+   "kind": "html",
+   "en": "Recover",
+   "zh": "復原"
+  },
+  {
+   "kind": "html",
+   "en": "Backups + DR",
+   "zh": "備份＋災難復原"
+  },
+  {
+   "kind": "html",
+   "en": "Know your RPO and RTO. Archive the database log for point-in-time recovery, and test restores regularly.",
+   "zh": "了解你的 RPO 和 RTO。封存資料庫日誌以便時間點復原，並定期測試還原。"
+  },
+  {
+   "kind": "html",
+   "en": "After",
+   "zh": "事後"
+  },
+  {
+   "kind": "html",
+   "en": "Postmortem",
+   "zh": "事後檢討（Postmortem）"
+  },
+  {
+   "kind": "html",
+   "en": "Blameless: impact, timeline, root cause in the system, what went well, and action items with owners and dates.",
+   "zh": "不究責：影響、時間軸、系統中的根本原因、做得好的地方，以及有負責人和期限的行動項目。"
+  },
+  {
+   "kind": "html",
+   "en": "The tradeoff",
+   "zh": "取捨"
+  },
+  {
+   "kind": "html",
+   "en": "Better RPO and RTO cost money: log archiving, standby databases, practice drills. Decide what each kind of data is worth losing, and test that you can actually meet it. Every page in this course reduces how often incidents happen; this one is about how much they hurt when they do.",
+   "zh": "更好的 RPO 和 RTO 都要花錢：日誌封存、備援資料庫、演練。決定每一種資料值得容忍遺失多少，並測試你真的做得到。這門課的每一頁都在降低事故發生的頻率；這一頁則是關於事故發生時有多痛。"
+  },
+  {
+   "kind": "html",
+   "en": "Check it",
+   "zh": "考考自己"
+  },
+  {
+   "kind": "js",
+   "en": "'1 · Respond'",
+   "zh": "'1 · 應變'"
+  },
+  {
+   "kind": "js",
+   "en": "'The alert just fired. What do you do first?'",
+   "zh": "'告警剛響。你第一件事做什麼？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Acknowledge, open #incident-142, and ask Ana to help investigate'",
+   "zh": "'確認告警、開啟 #incident-142，並請 Ana 協助調查'"
+  },
+  {
+   "kind": "js",
+   "en": "'Declared. Ana joins as a second pair of eyes, Dee coordinates and keeps the timeline. Support gets a status update.'",
+   "zh": "'事故已宣告。Ana 加入成為第二雙眼睛，Dee 負責協調並維護時間軸。客服收到了狀態更新。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Restart every server, just in case'",
+   "zh": "'保險起見，重新啟動所有伺服器'"
+  },
+  {
+   "kind": "js",
+   "en": "'Six minutes of restarts. Errors drop for a moment, then come right back. Nothing was learned, and orders kept disappearing.'",
+   "zh": "'重新啟動花了六分鐘。錯誤短暫下降，接著又回來了。什麼都沒學到，訂單還在繼續消失。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Wait 10 minutes to see if it fixes itself'",
+   "zh": "'等 10 分鐘，看它會不會自己好'"
+  },
+  {
+   "kind": "js",
+   "en": "'It doesn\\'t. Ten more minutes of deleted orders.'",
+   "zh": "'它不會。又多了十分鐘被刪除的訂單。'"
+  },
+  {
+   "kind": "js",
+   "en": "'2 · Find the cause'",
+   "zh": "'2 · 找出原因'"
+  },
+  {
+   "kind": "js",
+   "en": "'Where do you look?'",
+   "zh": "'你要從哪裡查起？'"
+  },
+  {
+   "kind": "js",
+   "en": "'What changed recently? Check deploys and scheduled jobs'",
+   "zh": "'最近改了什麼？檢查部署和排程工作'"
+  },
+  {
+   "kind": "js",
+   "en": "'Found it: at 20:58 a new job, cleanup_old_orders, started running every minute. Its query deletes orders older than 30 minutes. It was meant to be 30 days.'",
+   "zh": "'找到了：20:58 有一個新工作 cleanup_old_orders 開始每分鐘執行一次。它的查詢會刪除超過 30 分鐘的訂單。原本應該是 30 天。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Check CPU and memory dashboards'",
+   "zh": "'檢查 CPU 和記憶體儀表板'"
+  },
+  {
+   "kind": "js",
+   "en": "'Everything looks normal. The servers are healthy; something is wrong with the data.'",
+   "zh": "'一切看起來都很正常。伺服器很健康；出問題的是資料。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Search the database logs for DELETE'",
+   "zh": "'在資料庫日誌裡搜尋 DELETE'"
+  },
+  {
+   "kind": "js",
+   "en": "'Found it: DELETE FROM orders WHERE created_at < now() - interval \\'30 minutes\\', every minute since 20:58, from the cleanup job.'",
+   "zh": "'找到了：DELETE FROM orders WHERE created_at < now() - interval \\'30 minutes\\'，從 20:58 開始每分鐘執行一次，來自那個清理工作。'"
+  },
+  {
+   "kind": "js",
+   "en": "'3 · Stop the bleeding'",
+   "zh": "'3 · 止血'"
+  },
+  {
+   "kind": "js",
+   "en": "'The job is still deleting 40 orders a minute. What now?'",
+   "zh": "'那個工作還在每分鐘刪除 40 筆訂單。現在怎麼辦？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Disable the cleanup job right now'",
+   "zh": "'立刻停用清理工作'"
+  },
+  {
+   "kind": "js",
+   "en": "'Deletion stops immediately. The damage stops growing. Now you can repair calmly.'",
+   "zh": "'刪除立刻停止，損害不再擴大。現在你可以冷靜地修復了。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Restore the database first, then deal with the job'",
+   "zh": "'先還原資料庫，再處理那個工作'"
+  },
+  {
+   "kind": "js",
+   "en": "'You start a restore while the job keeps running. It deletes the restored orders again. Disable the job first.'",
+   "zh": "'你在工作還在跑的時候開始還原。它又把還原回來的訂單刪掉了。先停用工作。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Fix the typo, open a pull request and wait for review'",
+   "zh": "'修正錯字、開一個 pull request，等待審查'"
+  },
+  {
+   "kind": "js",
+   "en": "'Fifteen minutes for review and deploy, with 40 orders a minute disappearing. Stop first; fix properly later.'",
+   "zh": "'審查加部署要十五分鐘，而每分鐘有 40 筆訂單在消失。先止血，之後再好好修。'"
+  },
+  {
+   "kind": "js",
+   "en": "'4 · Recover the data'",
+   "zh": "'4 · 復原資料'"
+  },
+  {
+   "kind": "js",
+   "en": "'The deleted orders need to come back. You have:'",
+   "zh": "'被刪除的訂單必須找回來。你手上有：'"
+  },
+  {
+   "kind": "js",
+   "en": "'Last night\\'s full backup (taken at 02:00)'",
+   "zh": "'昨晚的完整備份（02:00 製作）'"
+  },
+  {
+   "kind": "js",
+   "en": "'Restored, but everything since 02:00 is gone: every order from today, not just the deleted ones. RPO: 19 hours.'",
+   "zh": "'還原了，但 02:00 之後的一切都不見了：今天的每一筆訂單，而不只是被刪掉的那些。RPO：19 小時。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Point-in-time recovery to 20:57:59 into a side copy, then copy the deleted rows back'",
+   "zh": "'時間點復原到 20:57:59 的另一份副本，再把被刪除的資料列複製回來'"
+  },
+  {
+   "kind": "js",
+   "en": "'The database\\'s log archive lets you rebuild the exact state one second before the job started. Every deleted order is copied back, and today\\'s other orders are untouched.'",
+   "zh": "'資料庫的日誌封存讓你能重建出工作開始前一秒的精確狀態。每一筆被刪除的訂單都複製回來了，今天的其他訂單完全不受影響。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Tell fans to buy again'",
+   "zh": "'請歌迷重新購買'"
+  },
+  {
+   "kind": "js",
+   "en": "'Fans lose their seats, and some were charged. Support is overwhelmed. Data that could have been recovered is gone.'",
+   "zh": "'歌迷失去了座位，有些人還被扣了款。客服被淹沒了。本來可以找回的資料就這樣消失了。'"
+  },
+  {
+   "kind": "js",
+   "en": "'5 · Write the postmortem'",
+   "zh": "'5 · 撰寫事後檢討'"
+  },
+  {
+   "kind": "js",
+   "en": "'Pick a root cause statement, then the action items.'",
+   "zh": "'選一個根本原因的陳述，再選行動項目。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Ben wrote a bad query'",
+   "zh": "'Ben 寫了一條錯誤的查詢'"
+  },
+  {
+   "kind": "js",
+   "en": "'True, and useless. Ben feels terrible, nobody else learns anything, and next time someone hides their mistake.'",
+   "zh": "'沒錯，但毫無用處。Ben 很難過、其他人什麼都沒學到，下次有人犯錯時就會把它藏起來。'"
+  },
+  {
+   "kind": "js",
+   "en": "'A destructive job reached production with a typo in its time window, and nothing (review, a row-count check, staging data) caught it'",
+   "zh": "'一個具破壞性的工作帶著時間範圍的錯字進到正式環境，而沒有任何機制（審查、列數檢查、預備環境的資料）抓到它'"
+  },
+  {
+   "kind": "js",
+   "en": "'Blameless: the mistake was human and normal; the gap was in the system.'",
+   "zh": "'不究責：這個錯誤是人都會犯的、很正常；漏洞在系統裡。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Add a guard to destructive jobs: dry-run first, abort if more than 1% of rows would be deleted'",
+   "zh": "'替破壞性工作加上防護：先試跑，若會刪除超過 1% 的資料列就中止'"
+  },
+  {
+   "kind": "js",
+   "en": "'Practice a point-in-time restore every month'",
+   "zh": "'每個月演練一次時間點還原'"
+  },
+  {
+   "kind": "js",
+   "en": "'Alert on sudden drops in the orders table row count'",
+   "zh": "'訂單資料表列數突然下降時發出告警'"
+  },
+  {
+   "kind": "js",
+   "en": "'Remind everyone to be more careful'",
+   "zh": "'提醒大家要更小心'"
+  },
+  {
+   "kind": "js",
+   "en": "`${String(Math.floor(t / 60) % 24).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "`${S.minutes} min since the alert`",
+   "zh": "`告警後 ${S.minutes} 分鐘`"
+  },
+  {
+   "kind": "js",
+   "en": "'job disabled: no longer growing'",
+   "zh": "'工作已停用：不再增加'"
+  },
+  {
+   "kind": "js",
+   "en": "'40 per minute while it runs'",
+   "zh": "'執行期間每分鐘 40 筆'"
+  },
+  {
+   "kind": "js",
+   "en": "`phase ${S.phase + 1} of 5`",
+   "zh": "`第 ${S.phase + 1} / 5 階段`"
+  },
+  {
+   "kind": "js",
+   "en": "'grid-template-columns:1fr;margin:0'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "';opacity:.45'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "`${esc(ph.title)} ${past ? '<span class=\"pill ok\">done</span>' : active ? '<span class=\"pill wait\">now</span>' : ''}`",
+   "zh": "`${esc(ph.title)} ${past ? '<span class=\"pill ok\">完成</span>' : active ? '<span class=\"pill wait\">進行中</span>' : ''}`"
+  },
+  {
+   "kind": "js",
+   "en": "`${esc(label)} <span class=\"muted\">(${mins} min)</span>`",
+   "zh": "`${esc(label)} <span class=\"muted\">（${mins} 分鐘）</span>`"
+  },
+  {
+   "kind": "js",
+   "en": "'display:grid;gap:6px'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Root cause: '",
+   "zh": "'根本原因：'"
+  },
+  {
+   "kind": "js",
+   "en": "'Root cause'",
+   "zh": "'根本原因'"
+  },
+  {
+   "kind": "js",
+   "en": "'display:grid;gap:6px;margin-top:8px'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Action items (pick all that will actually help)'",
+   "zh": "'行動項目（選出所有真正有幫助的）'"
+  },
+  {
+   "kind": "js",
+   "en": "'✓ Postmortem done: blameless root cause, and action items that change the system. Incident closed.'",
+   "zh": "'✓ 事後檢討完成：不究責的根本原因，以及能改變系統的行動項目。事故結案。'"
+  },
+  {
+   "kind": "js",
+   "en": "'✕ That root cause blames a person. Ask what let the mistake through.'",
+   "zh": "'✕ 這個根本原因是在怪罪某個人。問問看是什麼讓這個錯誤溜了過去。'"
+  },
+  {
+   "kind": "js",
+   "en": "'✕ “Be more careful” isn\\'t an action item: nobody can do it, and nobody can check it.'",
+   "zh": "'✕「更小心一點」不是行動項目：沒有人做得到，也沒有人能檢查。'"
+  },
+  {
+   "kind": "js",
+   "en": "`Pick the systemic root cause and at least 2 action items (${good} so far).`",
+   "zh": "`選出系統性的根本原因，以及至少 2 個行動項目（目前 ${good} 個）。`"
+  },
+  {
+   "kind": "js",
+   "en": "'The incident timeline fills in as you act.'",
+   "zh": "'事故時間軸會隨著你的行動逐步填滿。'"
+  },
+  {
+   "kind": "js",
+   "en": "'21:03  ALERT  checkout error rate 38%'",
+   "zh": "'21:03  告警  結帳錯誤率 38%'"
+  },
+  {
+   "kind": "js",
+   "en": "`${t}  ${label}\\n       → ${text}`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<b>Respond</b>: take the alert and organize.'",
+   "zh": "'<b>應變</b>：接下告警並組織人手。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Restarting or waiting costs minutes and teaches you nothing.'",
+   "zh": "'重新啟動或乾等只會浪費時間，什麼都學不到。'"
+  },
+  {
+   "kind": "js",
+   "en": "'<b>Find the cause</b>: what changed?'",
+   "zh": "'<b>找出原因</b>：改了什麼？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Most incidents start with a change: a deploy, a config, a job.'",
+   "zh": "'大多數事故都始於一次變更：部署、設定、排程工作。'"
+  },
+  {
+   "kind": "js",
+   "en": "'<b>Stop the bleeding</b> before repairing anything.'",
+   "zh": "'修復任何東西之前，先<b>止血</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Every minute the job runs, 40 more orders vanish.'",
+   "zh": "'工作每多跑一分鐘，就多消失 40 筆訂單。'"
+  },
+  {
+   "kind": "js",
+   "en": "'<b>Recover</b> the data with the smallest loss.'",
+   "zh": "'以最小的損失<b>復原</b>資料。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Which option gets back to the moment just before the damage?'",
+   "zh": "'哪個選項能回到損害發生前的那一刻？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Write a <b>blameless postmortem</b>.'",
+   "zh": "'寫一份<b>不究責的事後檢討</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'A root cause in the system, plus action items someone can actually do.'",
+   "zh": "'系統中的根本原因，加上有人真的能做的行動項目。'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\"># Postmortem: deleted orders (incident #142)</span>'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">Impact:</span> 38% of checkouts failed for 34 min; 1,240 orders deleted, all restored'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">Timeline:</span> 20:58 job deployed · 21:03 alert · 21:08 cause · 21:09 job off · 21:34 restored'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">Root cause:</span> a cleanup job used interval \\'30 minutes\\' instead of \\'30 days\\';'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  no row-count guard, and staging data was too small to notice'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">What went well:</span> the alert fired within 5 min; point-in-time recovery worked'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">Action items:</span> guard destructive jobs (Ben, Nov 20) · monthly restore drill (Dee, Dec 1)'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\"># postgresql.conf: archive the write-ahead log for point-in-time recovery</span>'",
+   "zh": "'<span class=\"c\"># postgresql.conf：封存預寫式日誌，以便時間點復原</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">archive_mode</span> = on'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">archive_command</span> = <span class=\"s\">\\'wal-g wal-push %p\\'</span>'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\"># restore: recovery_target_time = \\'… 20:57:59\\'</span>'",
+   "zh": "'<span class=\"c\"># 還原：recovery_target_time = \\'… 20:57:59\\'</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'Impact'",
+   "zh": "'影響'"
+  },
+  {
+   "kind": "js",
+   "en": "'Who was affected, how badly, for how long. Numbers, not adjectives.'",
+   "zh": "'誰受到影響、有多嚴重、持續多久。用數字，不用形容詞。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Timeline'",
+   "zh": "'時間軸'"
+  },
+  {
+   "kind": "js",
+   "en": "'Written during the incident, in the channel. That\\'s why the lab keeps one. Minutes matter: “21:08 cause found” shows what went fast and what didn\\'t.'",
+   "zh": "'在事故期間就寫在頻道裡。這就是實驗室會保留時間軸的原因。每一分鐘都重要：「21:08 找到原因」能看出哪些環節很快、哪些不是。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Describes the system, not the person. The typo was normal; the missing guard and unrealistic staging data were the real gaps.'",
+   "zh": "'描述的是系統，而不是人。錯字很正常；缺少防護和不真實的預備環境資料，才是真正的漏洞。'"
+  },
+  {
+   "kind": "js",
+   "en": "'What went well'",
+   "zh": "'做得好的地方'"
+  },
+  {
+   "kind": "js",
+   "en": "'Name what worked, so it gets kept. The alert and the restore saved the evening.'",
+   "zh": "'說出哪些有效，才會被保留下來。告警和還原救了這個晚上。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Action items'",
+   "zh": "'行動項目'"
+  },
+  {
+   "kind": "js",
+   "en": "'Specific, owned and dated. “Be more careful” fails all three tests.'",
+   "zh": "'具體、有負責人、有期限。「更小心一點」三項都不及格。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Log archiving'",
+   "zh": "'日誌封存'"
+  },
+  {
+   "kind": "js",
+   "en": "'Every change to the database is copied to storage continuously. Together with a base backup, you can rebuild the database at any moment. That\\'s what made “20:57:59” possible.'",
+   "zh": "'資料庫的每一筆變更都會持續被複製到儲存空間。搭配一份基礎備份，你就能重建任何時刻的資料庫。這就是「20:57:59」能做到的原因。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Recovery target'",
+   "zh": "'復原目標'"
+  },
+  {
+   "kind": "js",
+   "en": "'Restore into a separate copy, stop one second before the damage, and copy the lost rows back. Nightly backups alone could only take you back to 02:00.'",
+   "zh": "'還原到一份獨立的副本，停在損害發生前一秒，再把遺失的資料列複製回來。光靠每晚備份，只能回到 02:00。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Mid-incident, a job is corrupting data and Ana has a fix ready for review. What comes first?'",
+   "zh": "'事故處理中，一個工作正在破壞資料，Ana 已經準備好一個修正等待審查。什麼要先做？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Merge the fix as soon as it\\'s reviewed'",
+   "zh": "'一審查完就合併修正'"
+  },
+  {
+   "kind": "js",
+   "en": "'Reviewing and deploying takes time, and the damage grows meanwhile.'",
+   "zh": "'審查和部署都要時間，損害在這段期間持續擴大。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Stop the damage now (disable the job, roll back, or flip a flag), then fix properly'",
+   "zh": "'現在就止住損害（停用工作、回滾，或切換一個旗標），之後再好好修'"
+  },
+  {
+   "kind": "js",
+   "en": "'Mitigate first, repair second. A feature flag or kill switch is the fastest way to stop the bleeding.'",
+   "zh": "'先緩解，再修復。功能旗標或緊急開關是止血最快的方法。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Write the postmortem while it\\'s fresh'",
+   "zh": "'趁記憶猶新寫事後檢討'"
+  },
+  {
+   "kind": "js",
+   "en": "'Keep notes during the incident, but write it up after the damage has stopped.'",
+   "zh": "'事故期間要做筆記，但等損害停止後再寫成報告。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Encore takes a full database backup every night at 02:00 and never archives the log. What is its RPO?'",
+   "zh": "'Encore 每晚 02:00 做一次完整的資料庫備份，從不封存日誌。它的 RPO 是多少？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Zero'",
+   "zh": "'零'"
+  },
+  {
+   "kind": "js",
+   "en": "'Nothing protects changes made after 02:00.'",
+   "zh": "'02:00 之後的變更沒有任何保護。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Up to 24 hours of data loss'",
+   "zh": "'最多遺失 24 小時的資料'"
+  },
+  {
+   "kind": "js",
+   "en": "'Anything since the last backup is at risk. Log archiving brings that down to seconds.'",
+   "zh": "'上次備份之後的一切都有風險。日誌封存能把它降到幾秒鐘。'"
+  },
+  {
+   "kind": "js",
+   "en": "'It depends on how fast the restore runs'",
+   "zh": "'取決於還原跑得多快'"
+  },
+  {
+   "kind": "js",
+   "en": "'That\\'s RTO, the time to recover. RPO is how much data you lose.'",
+   "zh": "'那是 RTO，也就是復原所需的時間。RPO 是你會遺失多少資料。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Why are postmortems written blamelessly?'",
+   "zh": "'為什麼事後檢討要以不究責的方式撰寫？'"
+  },
+  {
+   "kind": "js",
+   "en": "'To protect people from consequences, no matter what'",
+   "zh": "'為了保護大家，不管發生什麼都不用承擔後果'"
+  },
+  {
+   "kind": "js",
+   "en": "'It\\'s about learning, not immunity. Deliberate harm is a different conversation.'",
+   "zh": "'重點在學習，不是豁免。蓄意造成傷害是另一回事。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Because people only share what really happened when they won\\'t be punished for normal mistakes, and the fixes belong in the system'",
+   "zh": "'因為只有在不會因正常錯誤受罰時，大家才會說出真正發生了什麼，而修正應該放在系統裡'"
+  },
+  {
+   "kind": "js",
+   "en": "'If the mistake was easy to make, the next person will make it too. Change the system so the mistake gets caught.'",
+   "zh": "'如果這個錯誤很容易犯，下一個人也會犯。改變系統，讓這個錯誤會被抓到。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Because nobody is ever at fault'",
+   "zh": "'因為從來沒有人有錯'"
+  },
+  {
+   "kind": "js",
+   "en": "'People make mistakes all the time. Blamelessness accepts that and designs for it.'",
+   "zh": "'人隨時都會犯錯。不究責是接受這一點，並據此設計。'"
+  }
+ ]
+}

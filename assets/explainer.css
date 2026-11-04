@@ -362,3 +362,9 @@ h2{font-size:clamp(20px,3vw,26px);line-height:1.25}
 
 /* highlighted line inside dark code boxes (code boxes are dark in both themes) */
 :root{--code-hl:#24365a}
+
+/* sentence-length choices (choose-your-path pages) */
+.choice{font:inherit;font-size:15px;text-align:left;cursor:pointer;background:var(--panel);color:var(--ink);border:1.5px solid var(--line);padding:8px 12px}
+.choice:hover:not(:disabled){border-color:var(--accent)}
+.choice:disabled{cursor:default;opacity:.6}
+.choice[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-3)}

@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="zh-Hans-CN" data-lang="zh-cn" data-slug="incident-simulator">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="从告警到事后检讨，亲手处理一次在线事故：找出原因、止血、从备份还原，并以不究责的方式写下来。">
+<title>事故模拟器 · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/explainer.css">
+</head>
+<body>
+<!-- Plan. Stuck point: incidents feel like chaos; people don't know the order (stop the bleeding before fixing), or what backups actually promise (RPO/RTO).
+     Sandbox: a cleanup job deletes recent orders. Five phases with choices that cost minutes and orders. Ends with a blameless postmortem.
+     One difference: blame a person vs fix the system. -->
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="章节"><a href="#lab">事故</a><a href="#real">事后检讨</a><a href="#recap">重点整理</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>第 20 页 · 阶段 5 · 上线与维运</span><span class="hot">83 · 84 · 109 · 111</span></div>
+  <div class="eyebrow">在线事故、灾难复原、备份、事后检讨</div>
+  <h1>21:03。Dee 的手机震动了。<em>「结帐错误率：38%。」</em></h1>
+  <div class="scenario"><b>Encore</b>这是大型开卖的前一晚。歌迷回报他们的订单从「我的票券」里消失了，而且超过三分之一的人结帐失败。你在值班。下面的每个选择都要花时间，而你在思考的同时，损害还在持续。</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">接下调用 ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>实验室 · 处理这次事故</span><span class="hot" id="tag">第 1 / 5 阶段</span></div>
+  <h2>事故 #142</h2>
+  <div class="meters" style="margin:0 0 12px">
+    <div class="meter"><div class="k">时钟</div><div class="v" id="mClock">21:03</div><div class="d" id="mElapsed">告警后 0 分钟</div></div>
+    <div class="meter"><div class="k">被删除的订单</div><div class="v" id="mDel">0</div><div class="d" id="mDelD">运行期间每分钟 40 笔</div></div>
+    <div class="meter"><div class="k">永久遗失的订单</div><div class="v" id="mLost">–</div><div class="d">复原之后</div></div>
+  </div>
+  <div id="phases" style="display:grid;gap:12px"></div>
+  <ul class="log" id="timeline" aria-label="事故时间轴" style="margin-top:12px"><li class="mut">事故时间轴会随着你的行动逐步填满。</li></ul>
+  <div class="row"><button class="btn sm" id="restart" type="button">↺ 重新开始这次事故</button></div>
+  <h3>试试看</h3>
+  <ol class="missions" id="missions"></ol>
+  <div class="compare">
+    <div><h3>备份与 RPO</h3><p style="margin:0"><b>RPO</b>（复原点目标）是你能承受遗失多少数据：也就是最后一份完好副本到灾难发生之间的时间。每晚备份代表最多可能遗失 24 小时。持续封存数据库日志，则能复原到任何一秒。</p></div>
+    <div><h3>灾难复原与 RTO</h3><p style="margin:0"><b>RTO</b>（复原时间目标）是恢复需要多久。从没还原过的备份，RTO 是未知数，有时候甚至根本不能用。要练习还原。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">关键差别</div><p><b>究责式</b>的事后检讨问的是「谁搞砸了？」，结果大家学会隐藏错误。<b>不究责（blameless）</b>的事后检讨问的是「是什么让一个正常的错误进到正式环境？下次要靠什么抓到它？」，系统才会真的变得更安全。</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>第 2 幕 · 真实世界</span><span class="hot">事后检讨</span></div>
+  <h2>事后检讨报告和备份长什么样子</h2>
+  <p>一份常见格式的简短事后检讨，加上让时间点复原成为可能的 Postgres 设置。<b>把鼠标移到某一行上，或点一下。</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="事后检讨与备份设置范例"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 选一行</div><p id="exP">每一行反白后，都会对应到事故的某个阶段。</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>重点整理 · 带走这些</span><span class="hot">♥</span></div>
+  <h2>整页浓缩在一个画面</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">事故期间</div><div class="t">事故应变</div><p>声明事故、分配角色、找出变更了什么、先止血再修复。一边处理一边写时间轴。</p></div>
+    <div class="card"><div class="sub">复原</div><div class="t">备份＋灾难复原</div><p>了解你的 RPO 和 RTO。封存数据库日志以便时间点复原，并定期测试还原。</p></div>
+    <div class="card"><div class="sub">事后</div><div class="t">事后检讨（Postmortem）</div><p>不究责：影响、时间轴、系统中的根本原因、做得好的地方，以及有负责人和期限的行动项目。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">取舍</div><p>更好的 RPO 和 RTO 都要花钱：日志封存、备援数据库、演练。决定每一种数据值得容忍遗失多少，并测试你真的做得到。这门课的每一页都在降低事故发生的频率；这一页则是关于事故发生时有多痛。</p></div>
+  <h3 style="margin-top:26px">考考自己 <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="页面"></nav>
+</main>
+
+<script src="../../assets/explainer.js"></script>
+<script src="../../assets/i18n.zh-cn.js"></script>
+<script>
+(() => {
+const { $, el, esc } = X;
+const RATE = 40, START = 21 * 60 + 3;
+
+/* ---------- the incident: phases, choices and their effects (pure data) ---------- */
+// Each choice: [label, minutes it takes, result text, effect: 'good' | 'bad' | 'clue', extra]
+const PHASES = [
+  { id: 'respond', title: '1 · 应变', ask: '告警刚响。你第一件事做什么？', choices: [
+    ['确认告警、打开 #incident-142，并请 Ana 协助调查', 2, '事故已声明。Ana 加入成为第二双眼睛，Dee 负责协调并维护时间轴。客服收到了状态更新。', 'good'],
+    ['保险起见，重新启动所有服务器', 6, '重新启动花了六分钟。错误短暂下降，接着又回来了。什么都没学到，订单还在继续消失。', 'bad'],
+    ['等 10 分钟，看它会不会自己好', 10, '它不会。又多了十分钟被删除的订单。', 'bad'],
+  ] },
+  { id: 'cause', title: '2 · 找出原因', ask: '你要从哪里查起？', choices: [
+    ['最近改了什么？检查部署和调度工作', 3, '找到了：20:58 有一个新工作 cleanup_old_orders 开始每分钟运行一次。它的查找会删除超过 30 分钟的订单。原本应该是 30 天。', 'good'],
+    ['检查 CPU 和内存仪表板', 4, '一切看起来都很正常。服务器很健康；出问题的是数据。', 'bad'],
+    ['在数据库日志里搜索 DELETE', 3, '找到了：DELETE FROM orders WHERE created_at < now() - interval \'30 minutes\'，从 20:58 开始每分钟运行一次，来自那个清理工作。', 'good'],
+  ] },
+  { id: 'stop', title: '3 · 止血', ask: '那个工作还在每分钟删除 40 笔订单。现在怎么办？', choices: [
+    ['立刻禁用清理工作', 1, '删除立刻停止，损害不再扩大。现在你可以冷静地修复了。', 'good'],
+    ['先还原数据库，再处理那个工作', 3, '你在工作还在跑的时候开始还原。它又把还原回来的订单删掉了。先禁用工作。', 'bad'],
+    ['修正错字、开一个 pull request，等待审查', 15, '审查加部署要十五分钟，而每分钟有 40 笔订单在消失。先止血，之后再好好修。', 'bad'],
+  ] },
+  { id: 'recover', title: '4 · 复原数据', ask: '被删除的订单必须找回来。你手上有：', choices: [
+    ['昨晚的完整备份（02:00 制作）', 40, '还原了，但 02:00 之后的一切都不见了：今天的每一笔订单，而不只是被删掉的那些。RPO：19 小时。', 'bad', 'nightly'],
+    ['时间点复原到 20:57:59 的另一份副本，再把被删除的数据列拷贝回来', 25, '数据库的日志封存让你能重建出工作开始前一秒的精确状态。每一笔被删除的订单都拷贝回来了，今天的其他订单完全不受影响。', 'good', 'pitr'],
+    ['请歌迷重新购买', 1, '歌迷失去了座位，有些人还被扣了款。客服被淹没了。本来可以找回的数据就这样消失了。', 'bad', 'none'],
+  ] },
+  { id: 'pm', title: '5 · 撰写事后检讨', ask: '选一个根本原因的陈述，再选行动项目。', multi: true, causes: [
+    ['Ben 写了一条错误的查找', false, '没错，但毫无用处。Ben 很难过、其他人什么都没学到，下次有人犯错时就会把它藏起来。'],
+    ['一个具破坏性的工作带着时间范围的错字进到正式环境，而没有任何机制（审查、列数检查、预备环境的数据）抓到它', true, '不究责：这个错误是人都会犯的、很正常；漏洞在系统里。'],
+  ], actions: [
+    ['替破坏性工作加上防护：先试跑，若会删除超过 1% 的数据列就中止', true],
+    ['每个月演练一次时间点还原', true],
+    ['订单数据表列数突然下降时发出告警', true],
+    ['提醒大家要更小心', false],
+  ] },
+];
+
+/* ---------- state ---------- */
+let S;
+function init() { return { phase: 0, minutes: 0, jobStopped: false, deletedBeforeStop: 0, lost: null, log: [], pm: { cause: null, actions: new Set() }, done: {}, picked: {} }; }
+const deleted = s => (s.jobStopped ? s.deletedBeforeStop : (s.minutes + 0) * RATE);
+const clock = m => { const t = START + m; return `${String(Math.floor(t / 60) % 24).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`; };
+function choose(pi, ci) {
+  const ph = PHASES[pi], [label, mins, text, effect, extra] = ph.choices[ci];
+  S.minutes += mins;
+  S.log.push([clock(S.minutes), label, text, effect]);
+  (S.picked[pi] = S.picked[pi] || new Set()).add(ci);
+  if (effect === 'good') {
+    if (ph.id === 'stop') { S.jobStopped = true; S.deletedBeforeStop = S.minutes * RATE; }
+    if (ph.id === 'recover') S.lost = 0;
+    S.done[ph.id] = true; S.phase = pi + 1;
+  } else if (ph.id === 'recover') {
+    S.lost = extra === 'nightly' ? deleted(S) + 19 * 60 * 12 : deleted(S);
+    S.done.recoverBad = true;
+  }
+  render();
+}
+function render() {
+  const del = deleted(S);
+  $('#mClock').textContent = clock(S.minutes);
+  $('#mElapsed').textContent = `告警后 ${S.minutes} 分钟`;
+  $('#mDel').textContent = X.fmt(del);
+  $('#mDel').parentElement.className = 'meter' + (S.jobStopped ? ' ok' : del ? ' bad' : '');
+  $('#mDelD').textContent = S.jobStopped ? '工作已禁用：不再增加' : '运行期间每分钟 40 笔';
+  $('#mLost').textContent = S.lost == null ? '–' : X.fmt(S.lost);
+  $('#mLost').parentElement.className = 'meter' + (S.lost == null ? '' : S.lost ? ' bad' : ' ok');
+  $('#tag').textContent = S.phase >= PHASES.length ? 'resolved' : `第 ${S.phase + 1} / 5 阶段`;
+  const box = $('#phases'); box.innerHTML = '';
+  PHASES.forEach((ph, pi) => {
+    const active = pi === S.phase, past = pi < S.phase;
+    const d = el('div', 'compare');
+    d.style.cssText = 'grid-template-columns:1fr;margin:0' + (pi > S.phase ? ';opacity:.45' : '');
+    const inner = el('div');
+    inner.append(el('h3', '', `${esc(ph.title)} ${past ? '<span class="pill ok">完成</span>' : active ? '<span class="pill wait">进行中</span>' : ''}`));
+    inner.append(el('p', '', esc(ph.ask)));
+    if (!ph.multi) {
+      const opts = el('div', 'opts'); opts.style.display = 'grid'; opts.style.gap = '6px';
+      ph.choices.forEach(([label, mins], ci) => {
+        const b = el('button', 'choice', `${esc(label)} <span class="muted">（${mins} 分钟）</span>`);
+        b.type = 'button'; b.disabled = !active;
+        if (S.picked[pi] && S.picked[pi].has(ci)) b.setAttribute('aria-pressed', 'true');
+        b.addEventListener('click', () => choose(pi, ci));
+        opts.append(b);
+      });
+      inner.append(opts);
+    } else {
+      const c = el('div', 'opts'); c.style.cssText = 'display:grid;gap:6px';
+      ph.causes.forEach(([label, ok, why], ci) => {
+        const b = el('button', 'choice', esc(label)); b.type = 'button'; b.disabled = !active;
+        if (S.pm.cause === ci) b.setAttribute('aria-pressed', 'true');
+        b.addEventListener('click', () => { S.pm.cause = ci; S.log.push([clock(S.minutes), '根本原因：' + label, why, ok ? 'good' : 'bad']); checkPM(); render(); });
+        c.append(b);
+      });
+      inner.append(el('p', 'muted', '根本原因'), c);
+      const a = el('div', 'opts'); a.style.cssText = 'display:grid;gap:6px;margin-top:8px';
+      ph.actions.forEach(([label], ai) => {
+        const b = el('button', 'choice', (S.pm.actions.has(ai) ? '☑ ' : '☐ ') + esc(label)); b.type = 'button'; b.disabled = !active;
+        b.setAttribute('aria-pressed', S.pm.actions.has(ai) ? 'true' : 'false');
+        b.addEventListener('click', () => { S.pm.actions.has(ai) ? S.pm.actions.delete(ai) : S.pm.actions.add(ai); checkPM(); render(); });
+        a.append(b);
+      });
+      inner.append(el('p', 'muted', '行动项目（选出所有真正有帮助的）'), a);
+      if (active || past) {
+        const st = el('div', 'status');
+        const good = [...S.pm.actions].filter(i => ph.actions[i][1]).length, bad = [...S.pm.actions].some(i => !ph.actions[i][1]);
+        if (S.done.pm) { st.className = 'status ok'; st.textContent = '✓ 事后检讨完成：不究责的根本原因，以及能改变系统的行动项目。事故结案。'; }
+        else if (S.pm.cause === 0) { st.className = 'status bad'; st.textContent = '✕ 这个根本原因是在怪罪某个人。问问看是什么让这个错误溜了过去。'; }
+        else if (bad) { st.className = 'status bad'; st.textContent = '✕「更小心一点」不是行动项目：没有人做得到，也没有人能检查。'; }
+        else { st.className = 'status'; st.textContent = `选出系统性的根本原因，以及至少 2 个行动项目（目前 ${good} 个）。`; }
+        inner.append(st);
+      }
+    }
+    d.append(inner); box.append(d);
+  });
+  const tl = $('#timeline'); tl.innerHTML = '';
+  if (!S.log.length) tl.append(el('li', 'mut', '事故时间轴会随着你的行动逐步填满。'));
+  else { tl.append(el('li', 'mut', '21:03  告警  结帐错误率 38%')); S.log.forEach(([t, label, text, eff]) => tl.append(el('li', eff === 'good' ? 'ok' : 'bad', esc(`${t}  ${label}\n       → ${text}`)))); }
+  tl.scrollTop = tl.scrollHeight;
+  mis.update(S);
+}
+function checkPM() {
+  const ph = PHASES[4];
+  const good = [...S.pm.actions].filter(i => ph.actions[i][1]).length, bad = [...S.pm.actions].some(i => !ph.actions[i][1]);
+  if (S.pm.cause === 1 && good >= 2 && !bad) { S.done.pm = true; S.phase = 5; }
+}
+const mis = X.missions($('#missions'), [
+  { text: '<b>应变</b>：接下告警并组织人手。', hint: '重新启动或干等只会浪费时间，什么都学不到。', check: s => !!s.done.respond },
+  { text: '<b>找出原因</b>：改了什么？', hint: '大多数事故都始于一次变更：部署、设置、调度工作。', check: s => !!s.done.cause },
+  { text: '修复任何东西之前，先<b>止血</b>。', hint: '工作每多跑一分钟，就多消失 40 笔订单。', check: s => !!s.done.stop },
+  { text: '以最小的损失<b>复原</b>数据。', hint: '哪个选项能回到损害发生前的那一刻？', check: s => !!s.done.recover },
+  { text: '写一份<b>不究责的事后检讨</b>。', hint: '系统中的根本原因，加上有人真的能做的行动项目。', check: s => !!s.done.pm },
+]);
+$('#restart').addEventListener('click', () => { S = init(); mis.reset(); render(); });
+S = init(); render();
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="key"># Postmortem: deleted orders (incident #142)</span>', null],
+  ['<span class="key">Impact:</span> 38% of checkouts failed for 34 min; 1,240 orders deleted, all restored', 'impact'],
+  ['<span class="key">Timeline:</span> 20:58 job deployed · 21:03 alert · 21:08 cause · 21:09 job off · 21:34 restored', 'timeline'],
+  ['<span class="key">Root cause:</span> a cleanup job used interval \'30 minutes\' instead of \'30 days\';', 'root'],
+  ['  no row-count guard, and staging data was too small to notice', 'root'],
+  ['<span class="key">What went well:</span> the alert fired within 5 min; point-in-time recovery worked', 'well'],
+  ['<span class="key">Action items:</span> guard destructive jobs (Ben, Nov 20) · monthly restore drill (Dee, Dec 1)', 'actions'],
+  ['', null],
+  ['<span class="c"># postgresql.conf：封存预写式日志，以便时间点复原</span>', null],
+  ['<span class="key">archive_mode</span> = on', 'pitr'],
+  ['<span class="key">archive_command</span> = <span class="s">\'wal-g wal-push %p\'</span>', 'pitr'],
+  ['<span class="c"># 还原：recovery_target_time = \'… 20:57:59\'</span>', 'target'],
+], {
+  impact: ['影响', '谁受到影响、有多严重、持续多久。用数字，不用形容词。'],
+  timeline: ['时间轴', '在事故期间就写在频道里。这就是实验室会保留时间轴的原因。每一分钟都重要：「21:08 找到原因」能看出哪些环节很快、哪些不是。'],
+  root: ['根本原因', '描述的是系统，而不是人。错字很正常；缺少防护和不真实的预备环境数据，才是真正的漏洞。'],
+  well: ['做得好的地方', '说出哪些有效，才会被保留下来。告警和还原救了这个晚上。'],
+  actions: ['行动项目', '具体、有负责人、有期限。「更小心一点」三项都不及格。'],
+  pitr: ['日志封存', '数据库的每一笔变更都会持续被拷贝到保存空间。搭配一份基础备份，你就能重建任何时刻的数据库。这就是「20:57:59」能做到的原因。'],
+  target: ['复原目标', '还原到一份独立的副本，停在损害发生前一秒，再把遗失的数据列拷贝回来。光靠每晚备份，只能回到 02:00。'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: '事故处理中，一个工作正在破坏数据，Ana 已经准备好一个修正等待审查。什么要先做？', opts: [
+    ['一审查完就合并修正', false, '审查和部署都要时间，损害在这段期间持续扩大。'],
+    ['现在就止住损害（禁用工作、回滚，或切换一个旗标），之后再好好修', true, '先缓解，再修复。功能旗标或紧急开关是止血最快的方法。'],
+    ['趁记忆犹新写事后检讨', false, '事故期间要做笔记，但等损害停止后再写成报告。'],
+  ] },
+  { q: 'Encore 每晚 02:00 做一次完整的数据库备份，从不封存日志。它的 RPO 是多少？', opts: [
+    ['零', false, '02:00 之后的变更没有任何保护。'],
+    ['最多遗失 24 小时的数据', true, '上次备份之后的一切都有风险。日志封存能把它降到几秒钟。'],
+    ['取决于还原跑得多快', false, '那是 RTO，也就是复原所需的时间。RPO 是你会遗失多少数据。'],
+  ] },
+  { q: '为什么事后检讨要以不究责的方式撰写？', opts: [
+    ['为了保护大家，不管发生什么都不用承担后果', false, '重点在学习，不是豁免。蓄意造成伤害是另一回事。'],
+    ['因为只有在不会因正常错误受罚时，大家才会说出真正发生了什么，而修正应该放在系统里', true, '如果这个错误很容易犯，下一个人也会犯。改变系统，让这个错误会被抓到。'],
+    ['因为从来没有人有错', false, '人随时都会犯错。不究责是接受这一点，并据此设计。'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'incident-simulator');
+})();
+</script>
+</body>
+</html>

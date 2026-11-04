@@ -262,7 +262,7 @@
     [17, 5, 'ci-cd', 'CI/CD and safe deployments', [6, 51, 52, 53, 54, 55], 'partial'],
     [18, 5, 'observability', 'Observability', [58, 59, 60, 61, 62, 66], 'built'],
     [19, 5, 'tls-secrets', 'TLS and secrets', [67, 71, 73], 'built'],
-    [20, 5, 'incident-simulator', 'Final incident simulator', [83, 84, 109, 111], 'planned'],
+    [20, 5, 'incident-simulator', 'Final incident simulator', [83, 84, 109, 111], 'built'],
     [21, 6, 'dns', 'DNS', [97], 'planned'],
     [22, 6, 'tcp-vs-udp', 'TCP vs UDP', [98], 'planned'],
     [23, 6, 'http2-http3', 'HTTP/2 and HTTP/3', [99], 'planned'],

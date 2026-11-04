@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW" data-lang="zh-tw" data-slug="incident-simulator">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="從告警到事後檢討，親手處理一次線上事故：找出原因、止血、從備份還原，並以不究責的方式寫下來。">
+<title>事故模擬器 · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/explainer.css">
+</head>
+<body>
+<!-- Plan. Stuck point: incidents feel like chaos; people don't know the order (stop the bleeding before fixing), or what backups actually promise (RPO/RTO).
+     Sandbox: a cleanup job deletes recent orders. Five phases with choices that cost minutes and orders. Ends with a blameless postmortem.
+     One difference: blame a person vs fix the system. -->
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="章節"><a href="#lab">事故</a><a href="#real">事後檢討</a><a href="#recap">重點整理</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>第 20 頁 · 階段 5 · 上線與維運</span><span class="hot">83 · 84 · 109 · 111</span></div>
+  <div class="eyebrow">線上事故、災難復原、備份、事後檢討</div>
+  <h1>21:03。Dee 的手機震動了。<em>「結帳錯誤率：38%。」</em></h1>
+  <div class="scenario"><b>Encore</b>這是大型開賣的前一晚。歌迷回報他們的訂單從「我的票券」裡消失了，而且超過三分之一的人結帳失敗。你在值班。下面的每個選擇都要花時間，而你在思考的同時，損害還在持續。</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">接下呼叫 ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>實驗室 · 處理這次事故</span><span class="hot" id="tag">第 1 / 5 階段</span></div>
+  <h2>事故 #142</h2>
+  <div class="meters" style="margin:0 0 12px">
+    <div class="meter"><div class="k">時鐘</div><div class="v" id="mClock">21:03</div><div class="d" id="mElapsed">告警後 0 分鐘</div></div>
+    <div class="meter"><div class="k">被刪除的訂單</div><div class="v" id="mDel">0</div><div class="d" id="mDelD">執行期間每分鐘 40 筆</div></div>
+    <div class="meter"><div class="k">永久遺失的訂單</div><div class="v" id="mLost">–</div><div class="d">復原之後</div></div>
+  </div>
+  <div id="phases" style="display:grid;gap:12px"></div>
+  <ul class="log" id="timeline" aria-label="事故時間軸" style="margin-top:12px"><li class="mut">事故時間軸會隨著你的行動逐步填滿。</li></ul>
+  <div class="row"><button class="btn sm" id="restart" type="button">↺ 重新開始這次事故</button></div>
+  <h3>試試看</h3>
+  <ol class="missions" id="missions"></ol>
+  <div class="compare">
+    <div><h3>備份與 RPO</h3><p style="margin:0"><b>RPO</b>（復原點目標）是你能承受遺失多少資料：也就是最後一份完好副本到災難發生之間的時間。每晚備份代表最多可能遺失 24 小時。持續封存資料庫日誌，則能復原到任何一秒。</p></div>
+    <div><h3>災難復原與 RTO</h3><p style="margin:0"><b>RTO</b>（復原時間目標）是恢復需要多久。從沒還原過的備份，RTO 是未知數，有時候甚至根本不能用。要練習還原。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">關鍵差別</div><p><b>究責式</b>的事後檢討問的是「誰搞砸了？」，結果大家學會隱藏錯誤。<b>不究責（blameless）</b>的事後檢討問的是「是什麼讓一個正常的錯誤進到正式環境？下次要靠什麼抓到它？」，系統才會真的變得更安全。</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>第 2 幕 · 真實世界</span><span class="hot">事後檢討</span></div>
+  <h2>事後檢討報告和備份長什麼樣子</h2>
+  <p>一份常見格式的簡短事後檢討，加上讓時間點復原成為可能的 Postgres 設定。<b>把滑鼠移到某一行上，或點一下。</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="事後檢討與備份設定範例"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 選一行</div><p id="exP">每一行反白後，都會對應到事故的某個階段。</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>重點整理 · 帶走這些</span><span class="hot">♥</span></div>
+  <h2>整頁濃縮在一個畫面</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">事故期間</div><div class="t">事故應變</div><p>宣告事故、分配角色、找出變更了什麼、先止血再修復。一邊處理一邊寫時間軸。</p></div>
+    <div class="card"><div class="sub">復原</div><div class="t">備份＋災難復原</div><p>了解你的 RPO 和 RTO。封存資料庫日誌以便時間點復原，並定期測試還原。</p></div>
+    <div class="card"><div class="sub">事後</div><div class="t">事後檢討（Postmortem）</div><p>不究責：影響、時間軸、系統中的根本原因、做得好的地方，以及有負責人和期限的行動項目。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">取捨</div><p>更好的 RPO 和 RTO 都要花錢：日誌封存、備援資料庫、演練。決定每一種資料值得容忍遺失多少，並測試你真的做得到。這門課的每一頁都在降低事故發生的頻率；這一頁則是關於事故發生時有多痛。</p></div>
+  <h3 style="margin-top:26px">考考自己 <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="頁面"></nav>
+</main>
+
+<script src="../../assets/explainer.js"></script>
+<script src="../../assets/i18n.zh-tw.js"></script>
+<script>
+(() => {
+const { $, el, esc } = X;
+const RATE = 40, START = 21 * 60 + 3;
+
+/* ---------- the incident: phases, choices and their effects (pure data) ---------- */
+// Each choice: [label, minutes it takes, result text, effect: 'good' | 'bad' | 'clue', extra]
+const PHASES = [
+  { id: 'respond', title: '1 · 應變', ask: '告警剛響。你第一件事做什麼？', choices: [
+    ['確認告警、開啟 #incident-142，並請 Ana 協助調查', 2, '事故已宣告。Ana 加入成為第二雙眼睛，Dee 負責協調並維護時間軸。客服收到了狀態更新。', 'good'],
+    ['保險起見，重新啟動所有伺服器', 6, '重新啟動花了六分鐘。錯誤短暫下降，接著又回來了。什麼都沒學到，訂單還在繼續消失。', 'bad'],
+    ['等 10 分鐘，看它會不會自己好', 10, '它不會。又多了十分鐘被刪除的訂單。', 'bad'],
+  ] },
+  { id: 'cause', title: '2 · 找出原因', ask: '你要從哪裡查起？', choices: [
+    ['最近改了什麼？檢查部署和排程工作', 3, '找到了：20:58 有一個新工作 cleanup_old_orders 開始每分鐘執行一次。它的查詢會刪除超過 30 分鐘的訂單。原本應該是 30 天。', 'good'],
+    ['檢查 CPU 和記憶體儀表板', 4, '一切看起來都很正常。伺服器很健康；出問題的是資料。', 'bad'],
+    ['在資料庫日誌裡搜尋 DELETE', 3, '找到了：DELETE FROM orders WHERE created_at < now() - interval \'30 minutes\'，從 20:58 開始每分鐘執行一次，來自那個清理工作。', 'good'],
+  ] },
+  { id: 'stop', title: '3 · 止血', ask: '那個工作還在每分鐘刪除 40 筆訂單。現在怎麼辦？', choices: [
+    ['立刻停用清理工作', 1, '刪除立刻停止，損害不再擴大。現在你可以冷靜地修復了。', 'good'],
+    ['先還原資料庫，再處理那個工作', 3, '你在工作還在跑的時候開始還原。它又把還原回來的訂單刪掉了。先停用工作。', 'bad'],
+    ['修正錯字、開一個 pull request，等待審查', 15, '審查加部署要十五分鐘，而每分鐘有 40 筆訂單在消失。先止血，之後再好好修。', 'bad'],
+  ] },
+  { id: 'recover', title: '4 · 復原資料', ask: '被刪除的訂單必須找回來。你手上有：', choices: [
+    ['昨晚的完整備份（02:00 製作）', 40, '還原了，但 02:00 之後的一切都不見了：今天的每一筆訂單，而不只是被刪掉的那些。RPO：19 小時。', 'bad', 'nightly'],
+    ['時間點復原到 20:57:59 的另一份副本，再把被刪除的資料列複製回來', 25, '資料庫的日誌封存讓你能重建出工作開始前一秒的精確狀態。每一筆被刪除的訂單都複製回來了，今天的其他訂單完全不受影響。', 'good', 'pitr'],
+    ['請歌迷重新購買', 1, '歌迷失去了座位，有些人還被扣了款。客服被淹沒了。本來可以找回的資料就這樣消失了。', 'bad', 'none'],
+  ] },
+  { id: 'pm', title: '5 · 撰寫事後檢討', ask: '選一個根本原因的陳述，再選行動項目。', multi: true, causes: [
+    ['Ben 寫了一條錯誤的查詢', false, '沒錯，但毫無用處。Ben 很難過、其他人什麼都沒學到，下次有人犯錯時就會把它藏起來。'],
+    ['一個具破壞性的工作帶著時間範圍的錯字進到正式環境，而沒有任何機制（審查、列數檢查、預備環境的資料）抓到它', true, '不究責：這個錯誤是人都會犯的、很正常；漏洞在系統裡。'],
+  ], actions: [
+    ['替破壞性工作加上防護：先試跑，若會刪除超過 1% 的資料列就中止', true],
+    ['每個月演練一次時間點還原', true],
+    ['訂單資料表列數突然下降時發出告警', true],
+    ['提醒大家要更小心', false],
+  ] },
+];
+
+/* ---------- state ---------- */
+let S;
+function init() { return { phase: 0, minutes: 0, jobStopped: false, deletedBeforeStop: 0, lost: null, log: [], pm: { cause: null, actions: new Set() }, done: {}, picked: {} }; }
+const deleted = s => (s.jobStopped ? s.deletedBeforeStop : (s.minutes + 0) * RATE);
+const clock = m => { const t = START + m; return `${String(Math.floor(t / 60) % 24).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`; };
+function choose(pi, ci) {
+  const ph = PHASES[pi], [label, mins, text, effect, extra] = ph.choices[ci];
+  S.minutes += mins;
+  S.log.push([clock(S.minutes), label, text, effect]);
+  (S.picked[pi] = S.picked[pi] || new Set()).add(ci);
+  if (effect === 'good') {
+    if (ph.id === 'stop') { S.jobStopped = true; S.deletedBeforeStop = S.minutes * RATE; }
+    if (ph.id === 'recover') S.lost = 0;
+    S.done[ph.id] = true; S.phase = pi + 1;
+  } else if (ph.id === 'recover') {
+    S.lost = extra === 'nightly' ? deleted(S) + 19 * 60 * 12 : deleted(S);
+    S.done.recoverBad = true;
+  }
+  render();
+}
+function render() {
+  const del = deleted(S);
+  $('#mClock').textContent = clock(S.minutes);
+  $('#mElapsed').textContent = `告警後 ${S.minutes} 分鐘`;
+  $('#mDel').textContent = X.fmt(del);
+  $('#mDel').parentElement.className = 'meter' + (S.jobStopped ? ' ok' : del ? ' bad' : '');
+  $('#mDelD').textContent = S.jobStopped ? '工作已停用：不再增加' : '執行期間每分鐘 40 筆';
+  $('#mLost').textContent = S.lost == null ? '–' : X.fmt(S.lost);
+  $('#mLost').parentElement.className = 'meter' + (S.lost == null ? '' : S.lost ? ' bad' : ' ok');
+  $('#tag').textContent = S.phase >= PHASES.length ? 'resolved' : `第 ${S.phase + 1} / 5 階段`;
+  const box = $('#phases'); box.innerHTML = '';
+  PHASES.forEach((ph, pi) => {
+    const active = pi === S.phase, past = pi < S.phase;
+    const d = el('div', 'compare');
+    d.style.cssText = 'grid-template-columns:1fr;margin:0' + (pi > S.phase ? ';opacity:.45' : '');
+    const inner = el('div');
+    inner.append(el('h3', '', `${esc(ph.title)} ${past ? '<span class="pill ok">完成</span>' : active ? '<span class="pill wait">進行中</span>' : ''}`));
+    inner.append(el('p', '', esc(ph.ask)));
+    if (!ph.multi) {
+      const opts = el('div', 'opts'); opts.style.display = 'grid'; opts.style.gap = '6px';
+      ph.choices.forEach(([label, mins], ci) => {
+        const b = el('button', 'choice', `${esc(label)} <span class="muted">（${mins} 分鐘）</span>`);
+        b.type = 'button'; b.disabled = !active;
+        if (S.picked[pi] && S.picked[pi].has(ci)) b.setAttribute('aria-pressed', 'true');
+        b.addEventListener('click', () => choose(pi, ci));
+        opts.append(b);
+      });
+      inner.append(opts);
+    } else {
+      const c = el('div', 'opts'); c.style.cssText = 'display:grid;gap:6px';
+      ph.causes.forEach(([label, ok, why], ci) => {
+        const b = el('button', 'choice', esc(label)); b.type = 'button'; b.disabled = !active;
+        if (S.pm.cause === ci) b.setAttribute('aria-pressed', 'true');
+        b.addEventListener('click', () => { S.pm.cause = ci; S.log.push([clock(S.minutes), '根本原因：' + label, why, ok ? 'good' : 'bad']); checkPM(); render(); });
+        c.append(b);
+      });
+      inner.append(el('p', 'muted', '根本原因'), c);
+      const a = el('div', 'opts'); a.style.cssText = 'display:grid;gap:6px;margin-top:8px';
+      ph.actions.forEach(([label], ai) => {
+        const b = el('button', 'choice', (S.pm.actions.has(ai) ? '☑ ' : '☐ ') + esc(label)); b.type = 'button'; b.disabled = !active;
+        b.setAttribute('aria-pressed', S.pm.actions.has(ai) ? 'true' : 'false');
+        b.addEventListener('click', () => { S.pm.actions.has(ai) ? S.pm.actions.delete(ai) : S.pm.actions.add(ai); checkPM(); render(); });
+        a.append(b);
+      });
+      inner.append(el('p', 'muted', '行動項目（選出所有真正有幫助的）'), a);
+      if (active || past) {
+        const st = el('div', 'status');
+        const good = [...S.pm.actions].filter(i => ph.actions[i][1]).length, bad = [...S.pm.actions].some(i => !ph.actions[i][1]);
+        if (S.done.pm) { st.className = 'status ok'; st.textContent = '✓ 事後檢討完成：不究責的根本原因，以及能改變系統的行動項目。事故結案。'; }
+        else if (S.pm.cause === 0) { st.className = 'status bad'; st.textContent = '✕ 這個根本原因是在怪罪某個人。問問看是什麼讓這個錯誤溜了過去。'; }
+        else if (bad) { st.className = 'status bad'; st.textContent = '✕「更小心一點」不是行動項目：沒有人做得到，也沒有人能檢查。'; }
+        else { st.className = 'status'; st.textContent = `選出系統性的根本原因，以及至少 2 個行動項目（目前 ${good} 個）。`; }
+        inner.append(st);
+      }
+    }
+    d.append(inner); box.append(d);
+  });
+  const tl = $('#timeline'); tl.innerHTML = '';
+  if (!S.log.length) tl.append(el('li', 'mut', '事故時間軸會隨著你的行動逐步填滿。'));
+  else { tl.append(el('li', 'mut', '21:03  告警  結帳錯誤率 38%')); S.log.forEach(([t, label, text, eff]) => tl.append(el('li', eff === 'good' ? 'ok' : 'bad', esc(`${t}  ${label}\n       → ${text}`)))); }
+  tl.scrollTop = tl.scrollHeight;
+  mis.update(S);
+}
+function checkPM() {
+  const ph = PHASES[4];
+  const good = [...S.pm.actions].filter(i => ph.actions[i][1]).length, bad = [...S.pm.actions].some(i => !ph.actions[i][1]);
+  if (S.pm.cause === 1 && good >= 2 && !bad) { S.done.pm = true; S.phase = 5; }
+}
+const mis = X.missions($('#missions'), [
+  { text: '<b>應變</b>：接下告警並組織人手。', hint: '重新啟動或乾等只會浪費時間，什麼都學不到。', check: s => !!s.done.respond },
+  { text: '<b>找出原因</b>：改了什麼？', hint: '大多數事故都始於一次變更：部署、設定、排程工作。', check: s => !!s.done.cause },
+  { text: '修復任何東西之前，先<b>止血</b>。', hint: '工作每多跑一分鐘，就多消失 40 筆訂單。', check: s => !!s.done.stop },
+  { text: '以最小的損失<b>復原</b>資料。', hint: '哪個選項能回到損害發生前的那一刻？', check: s => !!s.done.recover },
+  { text: '寫一份<b>不究責的事後檢討</b>。', hint: '系統中的根本原因，加上有人真的能做的行動項目。', check: s => !!s.done.pm },
+]);
+$('#restart').addEventListener('click', () => { S = init(); mis.reset(); render(); });
+S = init(); render();
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="key"># Postmortem: deleted orders (incident #142)</span>', null],
+  ['<span class="key">Impact:</span> 38% of checkouts failed for 34 min; 1,240 orders deleted, all restored', 'impact'],
+  ['<span class="key">Timeline:</span> 20:58 job deployed · 21:03 alert · 21:08 cause · 21:09 job off · 21:34 restored', 'timeline'],
+  ['<span class="key">Root cause:</span> a cleanup job used interval \'30 minutes\' instead of \'30 days\';', 'root'],
+  ['  no row-count guard, and staging data was too small to notice', 'root'],
+  ['<span class="key">What went well:</span> the alert fired within 5 min; point-in-time recovery worked', 'well'],
+  ['<span class="key">Action items:</span> guard destructive jobs (Ben, Nov 20) · monthly restore drill (Dee, Dec 1)', 'actions'],
+  ['', null],
+  ['<span class="c"># postgresql.conf：封存預寫式日誌，以便時間點復原</span>', null],
+  ['<span class="key">archive_mode</span> = on', 'pitr'],
+  ['<span class="key">archive_command</span> = <span class="s">\'wal-g wal-push %p\'</span>', 'pitr'],
+  ['<span class="c"># 還原：recovery_target_time = \'… 20:57:59\'</span>', 'target'],
+], {
+  impact: ['影響', '誰受到影響、有多嚴重、持續多久。用數字，不用形容詞。'],
+  timeline: ['時間軸', '在事故期間就寫在頻道裡。這就是實驗室會保留時間軸的原因。每一分鐘都重要：「21:08 找到原因」能看出哪些環節很快、哪些不是。'],
+  root: ['根本原因', '描述的是系統，而不是人。錯字很正常；缺少防護和不真實的預備環境資料，才是真正的漏洞。'],
+  well: ['做得好的地方', '說出哪些有效，才會被保留下來。告警和還原救了這個晚上。'],
+  actions: ['行動項目', '具體、有負責人、有期限。「更小心一點」三項都不及格。'],
+  pitr: ['日誌封存', '資料庫的每一筆變更都會持續被複製到儲存空間。搭配一份基礎備份，你就能重建任何時刻的資料庫。這就是「20:57:59」能做到的原因。'],
+  target: ['復原目標', '還原到一份獨立的副本，停在損害發生前一秒，再把遺失的資料列複製回來。光靠每晚備份，只能回到 02:00。'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: '事故處理中，一個工作正在破壞資料，Ana 已經準備好一個修正等待審查。什麼要先做？', opts: [
+    ['一審查完就合併修正', false, '審查和部署都要時間，損害在這段期間持續擴大。'],
+    ['現在就止住損害（停用工作、回滾，或切換一個旗標），之後再好好修', true, '先緩解，再修復。功能旗標或緊急開關是止血最快的方法。'],
+    ['趁記憶猶新寫事後檢討', false, '事故期間要做筆記，但等損害停止後再寫成報告。'],
+  ] },
+  { q: 'Encore 每晚 02:00 做一次完整的資料庫備份，從不封存日誌。它的 RPO 是多少？', opts: [
+    ['零', false, '02:00 之後的變更沒有任何保護。'],
+    ['最多遺失 24 小時的資料', true, '上次備份之後的一切都有風險。日誌封存能把它降到幾秒鐘。'],
+    ['取決於還原跑得多快', false, '那是 RTO，也就是復原所需的時間。RPO 是你會遺失多少資料。'],
+  ] },
+  { q: '為什麼事後檢討要以不究責的方式撰寫？', opts: [
+    ['為了保護大家，不管發生什麼都不用承擔後果', false, '重點在學習，不是豁免。蓄意造成傷害是另一回事。'],
+    ['因為只有在不會因正常錯誤受罰時，大家才會說出真正發生了什麼，而修正應該放在系統裡', true, '如果這個錯誤很容易犯，下一個人也會犯。改變系統，讓這個錯誤會被抓到。'],
+    ['因為從來沒有人有錯', false, '人隨時都會犯錯。不究責是接受這一點，並據此設計。'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'incident-simulator');
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Run a production incident from alert to postmortem: find the cause, stop the damage, restore from backup, and write it up blamelessly.">
+<title>Incident Simulator · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/explainer.css">
+</head>
+<body>
+<!-- Plan. Stuck point: incidents feel like chaos; people don't know the order (stop the bleeding before fixing), or what backups actually promise (RPO/RTO).
+     Sandbox: a cleanup job deletes recent orders. Five phases with choices that cost minutes and orders. Ends with a blameless postmortem.
+     One difference: blame a person vs fix the system. -->
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="Sections"><a href="#lab">The incident</a><a href="#real">The postmortem</a><a href="#recap">Recap</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>page 20 · stage 5 · ship and operate it</span><span class="hot">83 · 84 · 109 · 111</span></div>
+  <div class="eyebrow">Production incidents, disaster recovery, backups, postmortems</div>
+  <h1>21:03. Dee's phone buzzes. <em>“Checkout errors: 38%.”</em></h1>
+  <div class="scenario"><b>Encore</b>It's the evening before a big on-sale. Fans are reporting that their orders have disappeared from “My tickets”, and checkout is failing for over a third of them. You're on call. Every choice below costs time, and while you think, the damage continues.</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">Take the page ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>lab · run the incident</span><span class="hot" id="tag">phase 1 of 5</span></div>
+  <h2>Incident #142</h2>
+  <div class="meters" style="margin:0 0 12px">
+    <div class="meter"><div class="k">Clock</div><div class="v" id="mClock">21:03</div><div class="d" id="mElapsed">0 min since the alert</div></div>
+    <div class="meter"><div class="k">Orders deleted</div><div class="v" id="mDel">0</div><div class="d" id="mDelD">40 per minute while it runs</div></div>
+    <div class="meter"><div class="k">Orders lost for good</div><div class="v" id="mLost">–</div><div class="d">after recovery</div></div>
+  </div>
+  <div id="phases" style="display:grid;gap:12px"></div>
+  <ul class="log" id="timeline" aria-label="Incident timeline" style="margin-top:12px"><li class="mut">The incident timeline fills in as you act.</li></ul>
+  <div class="row"><button class="btn sm" id="restart" type="button">↺ Start the incident over</button></div>
+  <h3>Try this</h3>
+  <ol class="missions" id="missions"></ol>
+  <div class="compare">
+    <div><h3>Backups and RPO</h3><p style="margin:0"><b>RPO</b> (recovery point objective) is how much data you can afford to lose: the time between the last good copy and the disaster. Nightly backups mean up to 24 h of loss. Continuous archiving of the database log allows recovery to any second.</p></div>
+    <div><h3>Disaster recovery and RTO</h3><p style="margin:0"><b>RTO</b> (recovery time objective) is how long getting back can take. A backup you've never restored has an unknown RTO, and sometimes it doesn't work at all. Practice restores.</p></div>
+  </div>
+  <div class="takeaway"><div class="t">The one difference</div><p>A <b>blameful</b> postmortem asks “who messed up?”, and people learn to hide mistakes. A <b>blameless</b> postmortem asks “what let a normal mistake reach production, and what will catch it next time?”, and the system actually gets safer.</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>act 2 · the real thing</span><span class="hot">postmortem</span></div>
+  <h2>What the write-up and the backups look like</h2>
+  <p>A short postmortem in a common format, plus the Postgres setting that made point-in-time recovery possible. <b>Hover or tap a line.</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="Example postmortem and backup configuration"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 pick a line</div><p id="exP">Each highlighted line maps to a phase of the incident.</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>recap · keep this</span><span class="hot">♥</span></div>
+  <h2>The whole page on one screen</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">During</div><div class="t">Incident response</div><p>Declare it, assign roles, find what changed, stop the damage first, then repair. Write the timeline as you go.</p></div>
+    <div class="card"><div class="sub">Recover</div><div class="t">Backups + DR</div><p>Know your RPO and RTO. Archive the database log for point-in-time recovery, and test restores regularly.</p></div>
+    <div class="card"><div class="sub">After</div><div class="t">Postmortem</div><p>Blameless: impact, timeline, root cause in the system, what went well, and action items with owners and dates.</p></div>
+  </div>
+  <div class="takeaway"><div class="t">The tradeoff</div><p>Better RPO and RTO cost money: log archiving, standby databases, practice drills. Decide what each kind of data is worth losing, and test that you can actually meet it. Every page in this course reduces how often incidents happen; this one is about how much they hurt when they do.</p></div>
+  <h3 style="margin-top:26px">Check it <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="Pages"></nav>
+</main>
+
+<script src="../assets/explainer.js"></script>
+<script>
+(() => {
+const { $, el, esc } = X;
+const RATE = 40, START = 21 * 60 + 3;
+
+/* ---------- the incident: phases, choices and their effects (pure data) ---------- */
+// Each choice: [label, minutes it takes, result text, effect: 'good' | 'bad' | 'clue', extra]
+const PHASES = [
+  { id: 'respond', title: '1 · Respond', ask: 'The alert just fired. What do you do first?', choices: [
+    ['Acknowledge, open #incident-142, and ask Ana to help investigate', 2, 'Declared. Ana joins as a second pair of eyes, Dee coordinates and keeps the timeline. Support gets a status update.', 'good'],
+    ['Restart every server, just in case', 6, 'Six minutes of restarts. Errors drop for a moment, then come right back. Nothing was learned, and orders kept disappearing.', 'bad'],
+    ['Wait 10 minutes to see if it fixes itself', 10, 'It doesn\'t. Ten more minutes of deleted orders.', 'bad'],
+  ] },
+  { id: 'cause', title: '2 · Find the cause', ask: 'Where do you look?', choices: [
+    ['What changed recently? Check deploys and scheduled jobs', 3, 'Found it: at 20:58 a new job, cleanup_old_orders, started running every minute. Its query deletes orders older than 30 minutes. It was meant to be 30 days.', 'good'],
+    ['Check CPU and memory dashboards', 4, 'Everything looks normal. The servers are healthy; something is wrong with the data.', 'bad'],
+    ['Search the database logs for DELETE', 3, 'Found it: DELETE FROM orders WHERE created_at < now() - interval \'30 minutes\', every minute since 20:58, from the cleanup job.', 'good'],
+  ] },
+  { id: 'stop', title: '3 · Stop the bleeding', ask: 'The job is still deleting 40 orders a minute. What now?', choices: [
+    ['Disable the cleanup job right now', 1, 'Deletion stops immediately. The damage stops growing. Now you can repair calmly.', 'good'],
+    ['Restore the database first, then deal with the job', 3, 'You start a restore while the job keeps running. It deletes the restored orders again. Disable the job first.', 'bad'],
+    ['Fix the typo, open a pull request and wait for review', 15, 'Fifteen minutes for review and deploy, with 40 orders a minute disappearing. Stop first; fix properly later.', 'bad'],
+  ] },
+  { id: 'recover', title: '4 · Recover the data', ask: 'The deleted orders need to come back. You have:', choices: [
+    ['Last night\'s full backup (taken at 02:00)', 40, 'Restored, but everything since 02:00 is gone: every order from today, not just the deleted ones. RPO: 19 hours.', 'bad', 'nightly'],
+    ['Point-in-time recovery to 20:57:59 into a side copy, then copy the deleted rows back', 25, 'The database\'s log archive lets you rebuild the exact state one second before the job started. Every deleted order is copied back, and today\'s other orders are untouched.', 'good', 'pitr'],
+    ['Tell fans to buy again', 1, 'Fans lose their seats, and some were charged. Support is overwhelmed. Data that could have been recovered is gone.', 'bad', 'none'],
+  ] },
+  { id: 'pm', title: '5 · Write the postmortem', ask: 'Pick a root cause statement, then the action items.', multi: true, causes: [
+    ['Ben wrote a bad query', false, 'True, and useless. Ben feels terrible, nobody else learns anything, and next time someone hides their mistake.'],
+    ['A destructive job reached production with a typo in its time window, and nothing (review, a row-count check, staging data) caught it', true, 'Blameless: the mistake was human and normal; the gap was in the system.'],
+  ], actions: [
+    ['Add a guard to destructive jobs: dry-run first, abort if more than 1% of rows would be deleted', true],
+    ['Practice a point-in-time restore every month', true],
+    ['Alert on sudden drops in the orders table row count', true],
+    ['Remind everyone to be more careful', false],
+  ] },
+];
+
+/* ---------- state ---------- */
+let S;
+function init() { return { phase: 0, minutes: 0, jobStopped: false, deletedBeforeStop: 0, lost: null, log: [], pm: { cause: null, actions: new Set() }, done: {}, picked: {} }; }
+const deleted = s => (s.jobStopped ? s.deletedBeforeStop : (s.minutes + 0) * RATE);
+const clock = m => { const t = START + m; return `${String(Math.floor(t / 60) % 24).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`; };
+function choose(pi, ci) {
+  const ph = PHASES[pi], [label, mins, text, effect, extra] = ph.choices[ci];
+  S.minutes += mins;
+  S.log.push([clock(S.minutes), label, text, effect]);
+  (S.picked[pi] = S.picked[pi] || new Set()).add(ci);
+  if (effect === 'good') {
+    if (ph.id === 'stop') { S.jobStopped = true; S.deletedBeforeStop = S.minutes * RATE; }
+    if (ph.id === 'recover') S.lost = 0;
+    S.done[ph.id] = true; S.phase = pi + 1;
+  } else if (ph.id === 'recover') {
+    S.lost = extra === 'nightly' ? deleted(S) + 19 * 60 * 12 : deleted(S);
+    S.done.recoverBad = true;
+  }
+  render();
+}
+function render() {
+  const del = deleted(S);
+  $('#mClock').textContent = clock(S.minutes);
+  $('#mElapsed').textContent = `${S.minutes} min since the alert`;
+  $('#mDel').textContent = X.fmt(del);
+  $('#mDel').parentElement.className = 'meter' + (S.jobStopped ? ' ok' : del ? ' bad' : '');
+  $('#mDelD').textContent = S.jobStopped ? 'job disabled: no longer growing' : '40 per minute while it runs';
+  $('#mLost').textContent = S.lost == null ? '–' : X.fmt(S.lost);
+  $('#mLost').parentElement.className = 'meter' + (S.lost == null ? '' : S.lost ? ' bad' : ' ok');
+  $('#tag').textContent = S.phase >= PHASES.length ? 'resolved' : `phase ${S.phase + 1} of 5`;
+  const box = $('#phases'); box.innerHTML = '';
+  PHASES.forEach((ph, pi) => {
+    const active = pi === S.phase, past = pi < S.phase;
+    const d = el('div', 'compare');
+    d.style.cssText = 'grid-template-columns:1fr;margin:0' + (pi > S.phase ? ';opacity:.45' : '');
+    const inner = el('div');
+    inner.append(el('h3', '', `${esc(ph.title)} ${past ? '<span class="pill ok">done</span>' : active ? '<span class="pill wait">now</span>' : ''}`));
+    inner.append(el('p', '', esc(ph.ask)));
+    if (!ph.multi) {
+      const opts = el('div', 'opts'); opts.style.display = 'grid'; opts.style.gap = '6px';
+      ph.choices.forEach(([label, mins], ci) => {
+        const b = el('button', 'choice', `${esc(label)} <span class="muted">(${mins} min)</span>`);
+        b.type = 'button'; b.disabled = !active;
+        if (S.picked[pi] && S.picked[pi].has(ci)) b.setAttribute('aria-pressed', 'true');
+        b.addEventListener('click', () => choose(pi, ci));
+        opts.append(b);
+      });
+      inner.append(opts);
+    } else {
+      const c = el('div', 'opts'); c.style.cssText = 'display:grid;gap:6px';
+      ph.causes.forEach(([label, ok, why], ci) => {
+        const b = el('button', 'choice', esc(label)); b.type = 'button'; b.disabled = !active;
+        if (S.pm.cause === ci) b.setAttribute('aria-pressed', 'true');
+        b.addEventListener('click', () => { S.pm.cause = ci; S.log.push([clock(S.minutes), 'Root cause: ' + label, why, ok ? 'good' : 'bad']); checkPM(); render(); });
+        c.append(b);
+      });
+      inner.append(el('p', 'muted', 'Root cause'), c);
+      const a = el('div', 'opts'); a.style.cssText = 'display:grid;gap:6px;margin-top:8px';
+      ph.actions.forEach(([label], ai) => {
+        const b = el('button', 'choice', (S.pm.actions.has(ai) ? '☑ ' : '☐ ') + esc(label)); b.type = 'button'; b.disabled = !active;
+        b.setAttribute('aria-pressed', S.pm.actions.has(ai) ? 'true' : 'false');
+        b.addEventListener('click', () => { S.pm.actions.has(ai) ? S.pm.actions.delete(ai) : S.pm.actions.add(ai); checkPM(); render(); });
+        a.append(b);
+      });
+      inner.append(el('p', 'muted', 'Action items (pick all that will actually help)'), a);
+      if (active || past) {
+        const st = el('div', 'status');
+        const good = [...S.pm.actions].filter(i => ph.actions[i][1]).length, bad = [...S.pm.actions].some(i => !ph.actions[i][1]);
+        if (S.done.pm) { st.className = 'status ok'; st.textContent = '✓ Postmortem done: blameless root cause, and action items that change the system. Incident closed.'; }
+        else if (S.pm.cause === 0) { st.className = 'status bad'; st.textContent = '✕ That root cause blames a person. Ask what let the mistake through.'; }
+        else if (bad) { st.className = 'status bad'; st.textContent = '✕ “Be more careful” isn\'t an action item: nobody can do it, and nobody can check it.'; }
+        else { st.className = 'status'; st.textContent = `Pick the systemic root cause and at least 2 action items (${good} so far).`; }
+        inner.append(st);
+      }
+    }
+    d.append(inner); box.append(d);
+  });
+  const tl = $('#timeline'); tl.innerHTML = '';
+  if (!S.log.length) tl.append(el('li', 'mut', 'The incident timeline fills in as you act.'));
+  else { tl.append(el('li', 'mut', '21:03  ALERT  checkout error rate 38%')); S.log.forEach(([t, label, text, eff]) => tl.append(el('li', eff === 'good' ? 'ok' : 'bad', esc(`${t}  ${label}\n       → ${text}`)))); }
+  tl.scrollTop = tl.scrollHeight;
+  mis.update(S);
+}
+function checkPM() {
+  const ph = PHASES[4];
+  const good = [...S.pm.actions].filter(i => ph.actions[i][1]).length, bad = [...S.pm.actions].some(i => !ph.actions[i][1]);
+  if (S.pm.cause === 1 && good >= 2 && !bad) { S.done.pm = true; S.phase = 5; }
+}
+const mis = X.missions($('#missions'), [
+  { text: '<b>Respond</b>: take the alert and organize.', hint: 'Restarting or waiting costs minutes and teaches you nothing.', check: s => !!s.done.respond },
+  { text: '<b>Find the cause</b>: what changed?', hint: 'Most incidents start with a change: a deploy, a config, a job.', check: s => !!s.done.cause },
+  { text: '<b>Stop the bleeding</b> before repairing anything.', hint: 'Every minute the job runs, 40 more orders vanish.', check: s => !!s.done.stop },
+  { text: '<b>Recover</b> the data with the smallest loss.', hint: 'Which option gets back to the moment just before the damage?', check: s => !!s.done.recover },
+  { text: 'Write a <b>blameless postmortem</b>.', hint: 'A root cause in the system, plus action items someone can actually do.', check: s => !!s.done.pm },
+]);
+$('#restart').addEventListener('click', () => { S = init(); mis.reset(); render(); });
+S = init(); render();
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="key"># Postmortem: deleted orders (incident #142)</span>', null],
+  ['<span class="key">Impact:</span> 38% of checkouts failed for 34 min; 1,240 orders deleted, all restored', 'impact'],
+  ['<span class="key">Timeline:</span> 20:58 job deployed · 21:03 alert · 21:08 cause · 21:09 job off · 21:34 restored', 'timeline'],
+  ['<span class="key">Root cause:</span> a cleanup job used interval \'30 minutes\' instead of \'30 days\';', 'root'],
+  ['  no row-count guard, and staging data was too small to notice', 'root'],
+  ['<span class="key">What went well:</span> the alert fired within 5 min; point-in-time recovery worked', 'well'],
+  ['<span class="key">Action items:</span> guard destructive jobs (Ben, Nov 20) · monthly restore drill (Dee, Dec 1)', 'actions'],
+  ['', null],
+  ['<span class="c"># postgresql.conf: archive the write-ahead log for point-in-time recovery</span>', null],
+  ['<span class="key">archive_mode</span> = on', 'pitr'],
+  ['<span class="key">archive_command</span> = <span class="s">\'wal-g wal-push %p\'</span>', 'pitr'],
+  ['<span class="c"># restore: recovery_target_time = \'… 20:57:59\'</span>', 'target'],
+], {
+  impact: ['Impact', 'Who was affected, how badly, for how long. Numbers, not adjectives.'],
+  timeline: ['Timeline', 'Written during the incident, in the channel. That\'s why the lab keeps one. Minutes matter: “21:08 cause found” shows what went fast and what didn\'t.'],
+  root: ['Root cause', 'Describes the system, not the person. The typo was normal; the missing guard and unrealistic staging data were the real gaps.'],
+  well: ['What went well', 'Name what worked, so it gets kept. The alert and the restore saved the evening.'],
+  actions: ['Action items', 'Specific, owned and dated. “Be more careful” fails all three tests.'],
+  pitr: ['Log archiving', 'Every change to the database is copied to storage continuously. Together with a base backup, you can rebuild the database at any moment. That\'s what made “20:57:59” possible.'],
+  target: ['Recovery target', 'Restore into a separate copy, stop one second before the damage, and copy the lost rows back. Nightly backups alone could only take you back to 02:00.'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: 'Mid-incident, a job is corrupting data and Ana has a fix ready for review. What comes first?', opts: [
+    ['Merge the fix as soon as it\'s reviewed', false, 'Reviewing and deploying takes time, and the damage grows meanwhile.'],
+    ['Stop the damage now (disable the job, roll back, or flip a flag), then fix properly', true, 'Mitigate first, repair second. A feature flag or kill switch is the fastest way to stop the bleeding.'],
+    ['Write the postmortem while it\'s fresh', false, 'Keep notes during the incident, but write it up after the damage has stopped.'],
+  ] },
+  { q: 'Encore takes a full database backup every night at 02:00 and never archives the log. What is its RPO?', opts: [
+    ['Zero', false, 'Nothing protects changes made after 02:00.'],
+    ['Up to 24 hours of data loss', true, 'Anything since the last backup is at risk. Log archiving brings that down to seconds.'],
+    ['It depends on how fast the restore runs', false, 'That\'s RTO, the time to recover. RPO is how much data you lose.'],
+  ] },
+  { q: 'Why are postmortems written blamelessly?', opts: [
+    ['To protect people from consequences, no matter what', false, 'It\'s about learning, not immunity. Deliberate harm is a different conversation.'],
+    ['Because people only share what really happened when they won\'t be punished for normal mistakes, and the fixes belong in the system', true, 'If the mistake was easy to make, the next person will make it too. Change the system so the mistake gets caught.'],
+    ['Because nobody is ever at fault', false, 'People make mistakes all the time. Blamelessness accepts that and designs for it.'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'incident-simulator');
+})();
+</script>
+</body>
+</html>
