@@ -66,6 +66,12 @@ const FLOWS = {
     ['click', '#poison', 5000],
     ['click', seg('dlqSeg', 2), 1000],
   ],
+  'timeouts-retries-backoff': [
+    ['click', '#player .btn.primary', 2500],
+    ['click', seg('toSeg', 1), 100], ['click', '#hiccup', 3600],
+    ['click', seg('toSeg', 2), 100], ['fill', ['#retries', '3'], 100], ['click', seg('bkSeg', 1), 100], ['click', '#hiccup', 6500],
+    ['click', seg('bkSeg', 3), 100], ['wait', null, 3000], ['click', '#hiccup', 11000],
+  ],
 };
 
 (async () => {

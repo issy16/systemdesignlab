@@ -251,7 +251,7 @@
     [6, 2, 'load-balancing-scaling', 'Load balancing and scaling', [3, 46, 47], 'built'],
     [7, 2, 'rate-limiting', 'Rate limiting', [1], 'built'],
     [8, 2, 'message-queues', 'Message queues', [15, 20, 44], 'built'],
-    [9, 3, 'timeouts-retries-backoff', 'Timeouts, retries and backoff', [11, 12, 13], 'planned'],
+    [9, 3, 'timeouts-retries-backoff', 'Timeouts, retries and backoff', [11, 12, 13], 'built'],
     [10, 3, 'idempotency', 'Idempotency', [14], 'planned'],
     [11, 3, 'circuit-breakers-health-checks', 'Circuit breakers and health checks', [10, 56, 57], 'planned'],
     [12, 4, 'race-conditions', 'Race conditions', [39, 43], 'planned'],

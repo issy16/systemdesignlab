@@ -1,0 +1,665 @@
+{
+ "page": "timeouts-retries-backoff",
+ "segments": [
+  {
+   "kind": "attr",
+   "en": "width=device-width, initial-scale=1, viewport-fit=cover",
+   "zh": "="
+  },
+  {
+   "kind": "attr",
+   "en": "Trigger a retry storm against a struggling payment provider, then fix it with timeouts, exponential backoff and jitter.",
+   "zh": "對著吃力的金流服務引發一場重試風暴，再用逾時、指數退避與抖動把它修好。"
+  },
+  {
+   "kind": "attr",
+   "en": "Sections",
+   "zh": "章節"
+  },
+  {
+   "kind": "attr",
+   "en": "Calls sent to the provider per second, against its capacity",
+   "zh": "每秒送到金流服務的呼叫數，以及它的容量"
+  },
+  {
+   "kind": "attr",
+   "en": "Example retry loop with timeout, backoff and jitter",
+   "zh": "包含逾時、退避與抖動的重試迴圈範例"
+  },
+  {
+   "kind": "attr",
+   "en": "Pages",
+   "zh": "頁面"
+  },
+  {
+   "kind": "html",
+   "en": "Timeouts, Retries and Backoff · System Design Lab",
+   "zh": "逾時、重試與退避 · System Design Lab"
+  },
+  {
+   "kind": "html",
+   "en": "system<b>.design.lab</b>",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "Lab",
+   "zh": "實驗室"
+  },
+  {
+   "kind": "html",
+   "en": "The code",
+   "zh": "程式碼"
+  },
+  {
+   "kind": "html",
+   "en": "Recap",
+   "zh": "重點整理"
+  },
+  {
+   "kind": "html",
+   "en": "page 9 · stage 3 · survive failures",
+   "zh": "第 9 頁 · 階段 3 · 在故障中存活"
+  },
+  {
+   "kind": "html",
+   "en": "Timeouts, retries, exponential backoff",
+   "zh": "逾時、重試、指數退避"
+  },
+  {
+   "kind": "html",
+   "en": "Retrying is how a 3-second blip <em>turns into a 3-minute outage.</em>",
+   "zh": "重試，就是 3 秒的小狀況<em>變成 3 分鐘停機的原因。</em>"
+  },
+  {
+   "kind": "html",
+   "en": "<b>Encore</b>Every checkout calls the payment provider. For 3 seconds the provider slows to a crawl. Ben's code retries failed calls, which sounds sensible. Then the provider recovers, and Encore keeps it down anyway.",
+   "zh": "<b>Encore</b>每次結帳都會呼叫金流服務。有 3 秒鐘，金流服務慢得像在爬。Ben 的程式碼會重試失敗的呼叫，聽起來很合理。接著金流服務恢復了，Encore 卻還是把它壓得爬不起來。"
+  },
+  {
+   "kind": "html",
+   "en": "Open the lab ↓",
+   "zh": "打開實驗室 ↓"
+  },
+  {
+   "kind": "html",
+   "en": "lab · break it, then fix it",
+   "zh": "實驗室 · 先弄壞，再修好"
+  },
+  {
+   "kind": "html",
+   "en": "no retries",
+   "zh": "不重試"
+  },
+  {
+   "kind": "html",
+   "en": "30 checkouts a second, one payment provider",
+   "zh": "每秒 30 次結帳，一個金流服務"
+  },
+  {
+   "kind": "html",
+   "en": "The provider handles about <b>50 calls a second</b>. Encore sends 30, plus any retries. During a <b>hiccup</b> the provider handles only 3 a second for 3 seconds. All numbers are simulated.",
+   "zh": "金流服務每秒大約能處理 <b>50 次呼叫</b>。Encore 每秒送出 30 次，再加上重試。發生<b>小狀況</b>時，金流服務有 3 秒鐘每秒只能處理 3 次。所有數字都是模擬的。"
+  },
+  {
+   "kind": "html",
+   "en": "Timeout (how long to wait for an answer)",
+   "zh": "逾時（等待回應多久）"
+  },
+  {
+   "kind": "html",
+   "en": "Retries per checkout: <b id=\"retriesV\">0</b>",
+   "zh": "每次結帳的重試次數：<b id=\"retriesV\">0</b>"
+  },
+  {
+   "kind": "html",
+   "en": "When to retry",
+   "zh": "何時重試"
+  },
+  {
+   "kind": "html",
+   "en": "Simulation",
+   "zh": "模擬"
+  },
+  {
+   "kind": "html",
+   "en": "⚡ Provider hiccup (3 s)",
+   "zh": "⚡ 金流服務出狀況（3 秒）"
+  },
+  {
+   "kind": "html",
+   "en": "<i style=\"background:var(--accent)\"></i>calls sent to the provider / s",
+   "zh": "<i style=\"background:var(--accent)\"></i>每秒送到金流服務的呼叫數"
+  },
+  {
+   "kind": "html",
+   "en": "<i style=\"background:var(--muted)\"></i>capacity (dashed)",
+   "zh": "<i style=\"background:var(--muted)\"></i>容量（虛線）"
+  },
+  {
+   "kind": "html",
+   "en": "Calls sent",
+   "zh": "送出的呼叫"
+  },
+  {
+   "kind": "html",
+   "en": "first tries + retries",
+   "zh": "首次嘗試＋重試"
+  },
+  {
+   "kind": "html",
+   "en": "Checkouts OK",
+   "zh": "成功的結帳"
+  },
+  {
+   "kind": "html",
+   "en": "last 2 s",
+   "zh": "最近 2 秒"
+  },
+  {
+   "kind": "html",
+   "en": "Waiting checkouts",
+   "zh": "等待中的結帳"
+  },
+  {
+   "kind": "html",
+   "en": "each holds a server thread",
+   "zh": "每個都佔住一條伺服器執行緒"
+  },
+  {
+   "kind": "html",
+   "en": "Provider",
+   "zh": "金流服務"
+  },
+  {
+   "kind": "html",
+   "en": "healthy",
+   "zh": "健康"
+  },
+  {
+   "kind": "html",
+   "en": "50 calls/s",
+   "zh": "每秒 50 次呼叫"
+  },
+  {
+   "kind": "html",
+   "en": "Since the hiccup",
+   "zh": "小狀況之後"
+  },
+  {
+   "kind": "html",
+   "en": "peak calls/s · failed checkouts",
+   "zh": "每秒呼叫數峰值 · 失敗的結帳"
+  },
+  {
+   "kind": "html",
+   "en": "Press Play to start checkouts.",
+   "zh": "按「播放」開始結帳。"
+  },
+  {
+   "kind": "html",
+   "en": "Try this",
+   "zh": "試試看"
+  },
+  {
+   "kind": "html",
+   "en": "Timeout",
+   "zh": "逾時（Timeout）"
+  },
+  {
+   "kind": "html",
+   "en": "How long you wait before giving up on one call. With <b>no timeout</b>, a slow dependency makes every request wait with it, and your own servers run out of threads.",
+   "zh": "放棄一次呼叫前要等多久。<b>沒有逾時</b>時，一個慢的相依服務會讓每個請求陪它一起等，你自己的伺服器也會用光執行緒。"
+  },
+  {
+   "kind": "html",
+   "en": "Retry",
+   "zh": "重試（Retry）"
+  },
+  {
+   "kind": "html",
+   "en": "Trying again after a failure. It fixes brief, random errors. But every retry is <b>extra load</b>, sent at the exact moment the other side is struggling.",
+   "zh": "失敗後再試一次。它能修好短暫、隨機的錯誤。但每次重試都是<b>額外的負載</b>，而且偏偏是在對方最吃力的時候送出。"
+  },
+  {
+   "kind": "html",
+   "en": "The one difference",
+   "zh": "關鍵差別"
+  },
+  {
+   "kind": "html",
+   "en": "Retrying <b>immediately</b> makes every client retry at the same moment, so failures come back as bigger waves. <b>Exponential backoff</b> waits longer after each failure (1 s, 2 s, 4 s…), and <b>jitter</b> adds randomness so clients spread out instead of retrying in sync.",
+   "zh": "<b>立刻</b>重試，會讓所有客戶端在同一時間重試，失敗就以更大的浪潮回來。<b>指數退避（exponential backoff）</b>在每次失敗後等更久（1 秒、2 秒、4 秒……），<b>抖動（jitter）</b>再加上隨機性，讓客戶端分散開來，而不是同步重試。"
+  },
+  {
+   "kind": "html",
+   "en": "act 2 · the real thing",
+   "zh": "第 2 幕 · 真實世界"
+  },
+  {
+   "kind": "html",
+   "en": "code",
+   "zh": "程式碼"
+  },
+  {
+   "kind": "html",
+   "en": "A retry loop that won't take anyone down",
+   "zh": "一個不會把任何人拖垮的重試迴圈"
+  },
+  {
+   "kind": "html",
+   "en": "About a dozen lines, and every line matters. <b>Hover or tap a line.</b>",
+   "zh": "大約十幾行，每一行都很重要。<b>把滑鼠移到某一行上，或點一下。</b>"
+  },
+  {
+   "kind": "html",
+   "en": "👆 pick a line",
+   "zh": "👆 選一行"
+  },
+  {
+   "kind": "html",
+   "en": "Each highlighted line maps to a control in the lab.",
+   "zh": "每一行反白後，都會對應到實驗室裡的一個控制項。"
+  },
+  {
+   "kind": "html",
+   "en": "recap · keep this",
+   "zh": "重點整理 · 帶走這些"
+  },
+  {
+   "kind": "html",
+   "en": "The whole page on one screen",
+   "zh": "整頁濃縮在一個畫面"
+  },
+  {
+   "kind": "html",
+   "en": "Stop waiting",
+   "zh": "不要一直等"
+  },
+  {
+   "kind": "html",
+   "en": "Every network call gets a deadline. Without one, a slow dependency freezes your whole service.",
+   "zh": "每次網路呼叫都要有期限。沒有期限，一個慢的相依服務就能凍結你整個服務。"
+  },
+  {
+   "kind": "html",
+   "en": "Try again",
+   "zh": "再試一次"
+  },
+  {
+   "kind": "html",
+   "en": "Retry only errors that might go away (timeouts, 503, 429), a limited number of times, and only for requests that are safe to repeat.",
+   "zh": "只重試可能會自己恢復的錯誤（逾時、503、429），次數有限，而且只重試可以安全重複的請求。"
+  },
+  {
+   "kind": "html",
+   "en": "Spread out",
+   "zh": "分散開來"
+  },
+  {
+   "kind": "html",
+   "en": "Backoff + jitter",
+   "zh": "退避＋抖動"
+  },
+  {
+   "kind": "html",
+   "en": "Wait longer after each failure, with a random part, so retries don't arrive as one synchronized wave.",
+   "zh": "每次失敗後等更久，並加上隨機的成分，讓重試不會變成一波同步的浪潮。"
+  },
+  {
+   "kind": "html",
+   "en": "The tradeoff",
+   "zh": "取捨"
+  },
+  {
+   "kind": "html",
+   "en": "Retries trade extra load for a better chance of success. Short timeouts and many retries fail fast but multiply traffic; long timeouts and few retries are gentle but slow. Cap retries, back off with jitter, and retry only requests that are safe to repeat (page 10).",
+   "zh": "重試是用額外的負載換取更高的成功機會。逾時短、重試多，失敗得快但會讓流量倍增；逾時長、重試少，比較溫和但比較慢。限制重試次數、搭配抖動退避，而且只重試可以安全重複的請求（第 10 頁）。"
+  },
+  {
+   "kind": "html",
+   "en": "Check it",
+   "zh": "考考自己"
+  },
+  {
+   "kind": "js",
+   "en": "'Press <b>Play</b> with a 1 s timeout and no retries.'",
+   "zh": "'在逾時 1 秒、不重試的設定下按<b>播放</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'30 calls a second against a capacity of 50. Everything is fine.'",
+   "zh": "'每秒 30 次呼叫，容量 50。一切正常。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Set the timeout to <b>None</b> and trigger a <b>Provider hiccup</b>.'",
+   "zh": "'把逾時設成<b>無</b>，然後觸發<b>金流服務出狀況</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Every checkout now waits as long as the provider takes. Watch “Waiting checkouts” climb: each one holds a server thread.'",
+   "zh": "'現在每次結帳都要等金流服務慢慢回應。看「等待中的結帳」不斷攀升：每一個都佔住一條伺服器執行緒。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Set a <b>1 s</b> timeout, <b>3 retries</b>, retry <b>Immediately</b>, and trigger another hiccup.'",
+   "zh": "'設定 <b>1 秒</b>逾時、<b>重試 3 次</b>、<b>立刻</b>重試，再觸發一次狀況。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Every failure comes straight back, so calls spike to over twice what the provider can take, and it gets overloaded. That\\'s a retry storm, and many checkouts fail anyway.'",
+   "zh": "'每次失敗都馬上回來，所以呼叫量衝到金流服務能承受的兩倍以上，它就超載了。這就是重試風暴，而且很多結帳最後還是失敗。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Switch to <b>Exponential + jitter</b> and trigger one more hiccup.'",
+   "zh": "'切換到<b>指數退避＋抖動</b>，再觸發一次狀況。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Same number of retries, spread out over time. The load stays much lower, the provider never gets overloaded, and every checkout eventually succeeds.'",
+   "zh": "'重試次數一樣，只是在時間上分散開來。負載低很多，金流服務從未超載，每一次結帳最後都成功。'"
+  },
+  {
+   "kind": "js",
+   "en": "`${S.retries} retries · ${['immediately', 'exponential', 'exponential + jitter'][S.mode]}`",
+   "zh": "`重試 ${S.retries} 次 · ${['立刻', '指數退避', '指數退避＋抖動'][S.mode]}`"
+  },
+  {
+   "kind": "js",
+   "en": "'no retries'",
+   "zh": "'不重試'"
+  },
+  {
+   "kind": "js",
+   "en": "`${Math.round(S.peak)}/s peak`",
+   "zh": "`峰值每秒 ${Math.round(S.peak)} 次`"
+  },
+  {
+   "kind": "js",
+   "en": "`${X.fmt(S.failedSince)} checkouts failed`",
+   "zh": "`${X.fmt(S.failedSince)} 次結帳失敗`"
+  },
+  {
+   "kind": "js",
+   "en": "'peak calls/s · failed checkouts'",
+   "zh": "'每秒呼叫數峰值 · 失敗的結帳'"
+  },
+  {
+   "kind": "js",
+   "en": "' calls/s'",
+   "zh": "' 次呼叫/秒'"
+  },
+  {
+   "kind": "js",
+   "en": "'Press Play to start checkouts.'",
+   "zh": "'按「播放」開始結帳。'"
+  },
+  {
+   "kind": "js",
+   "en": "`✕ No timeout: ${X.fmt(S.q)} checkouts are stuck waiting on the provider, each holding a thread. Fans see a frozen spinner.`",
+   "zh": "`✕ 沒有逾時：${X.fmt(S.q)} 次結帳卡在等金流服務，每一個都佔住一條執行緒。歌迷看到的是一直轉圈圈的畫面。`"
+  },
+  {
+   "kind": "js",
+   "en": "'✕ The provider is having a hiccup. Calls time out after 1 s.'",
+   "zh": "'✕ 金流服務出狀況了。呼叫在 1 秒後逾時。'"
+  },
+  {
+   "kind": "js",
+   "en": "`✕ Retry storm: the hiccup is over, but Encore is sending ${m.sent} calls/s to a provider that handles ${CAP}, and the overloaded provider gets even less done. Retries cause failures, which cause more retries.`",
+   "zh": "`✕ 重試風暴：狀況已經結束，但 Encore 每秒送出 ${m.sent} 次呼叫給一個只能處理 ${CAP} 次的金流服務，超載的服務能完成的工作還更少。重試造成失敗，失敗又造成更多重試。`"
+  },
+  {
+   "kind": "js",
+   "en": "'⚠ Recovering: some checkouts are still failing.'",
+   "zh": "'⚠ 恢復中：還有一些結帳在失敗。'"
+  },
+  {
+   "kind": "js",
+   "en": "'✓ Healthy: calls go out at the normal rate and checkouts succeed.'",
+   "zh": "'✓ 健康：呼叫以正常速率送出，結帳都成功。'"
+  },
+  {
+   "kind": "js",
+   "en": "`t = ${(S.t / 1000).toFixed(1)} s`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'None'",
+   "zh": "'無'"
+  },
+  {
+   "kind": "js",
+   "en": "'Immediately'",
+   "zh": "'立刻'"
+  },
+  {
+   "kind": "js",
+   "en": "'Exponential'",
+   "zh": "'指數退避'"
+  },
+  {
+   "kind": "js",
+   "en": "'Exponential + jitter'",
+   "zh": "'指數退避＋抖動'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">async function</span> chargeWithRetry(order) {'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  <span class=\"key\">for</span> (<span class=\"key\">let</span> attempt = 0; attempt &lt;= MAX_RETRIES; attempt++) {'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'    <span class=\"key\">try</span> {'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'      <span class=\"key\">return await</span> payments.charge(order, {'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'        signal: AbortSignal.<span class=\"key\">timeout</span>(<span class=\"s\">1000</span>),'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'        headers: { <span class=\"s\">\"Idempotency-Key\"</span>: order.id },'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'    } <span class=\"key\">catch</span> (err) {'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'      <span class=\"key\">if</span> (attempt === MAX_RETRIES || !isRetryable(err)) <span class=\"key\">throw</span> err;'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'      <span class=\"key\">const</span> backoff = BASE_MS * 2 ** attempt;  <span class=\"c\">// 1000, 2000, 4000…</span>'",
+   "zh": "'      <span class=\"key\">const</span> backoff = BASE_MS * 2 ** attempt;  <span class=\"c\">// 1000、2000、4000……</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'      <span class=\"key\">await</span> sleep(backoff / 2 + Math.random() * backoff / 2);  <span class=\"c\">// jitter</span>'",
+   "zh": "'      <span class=\"key\">await</span> sleep(backoff / 2 + Math.random() * backoff / 2);  <span class=\"c\">// 抖動</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'Retry limit'",
+   "zh": "'重試上限'"
+  },
+  {
+   "kind": "js",
+   "en": "'A fixed number of attempts, never “until it works”. This is the Retries slider. Each retry is one more call during a bad moment.'",
+   "zh": "'固定的嘗試次數，絕不是「試到成功為止」。這就是「重試次數」滑桿。每次重試都是在糟糕時刻多送出的一次呼叫。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Timeout'",
+   "zh": "'逾時'"
+  },
+  {
+   "kind": "js",
+   "en": "'Give up on this attempt after 1 second. Without it, a stuck provider holds this request (and a server thread) for as long as it likes. That\\'s the pile-up you saw with “None”.'",
+   "zh": "'這次嘗試 1 秒後就放棄。沒有它，卡住的金流服務愛佔住這個請求（和一條伺服器執行緒）多久就佔多久。這就是你在「無」看到的堆積。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Safe to repeat?'",
+   "zh": "'可以安全重複嗎？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Retrying a payment is only safe if the provider can recognize the repeat. An idempotency key does exactly that. That\\'s the next page.'",
+   "zh": "'只有在金流服務認得出重複的請求時，重試付款才安全。冪等鍵（idempotency key）就是做這件事的，那是下一頁。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Retry only what might recover'",
+   "zh": "'只重試可能恢復的錯誤'"
+  },
+  {
+   "kind": "js",
+   "en": "'Timeouts, 429 and 503 might go away. A declined card or a 400 never will, so retrying it only adds load.'",
+   "zh": "'逾時、429 和 503 有可能自己消失。被拒絕的卡片或 400 永遠不會，所以重試只會增加負載。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Exponential backoff'",
+   "zh": "'指數退避'"
+  },
+  {
+   "kind": "js",
+   "en": "'The wait doubles after each failure. Struggling services get more and more breathing room.'",
+   "zh": "'每次失敗後，等待時間加倍。吃力的服務會得到越來越多喘息的空間。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Jitter'",
+   "zh": "'抖動'"
+  },
+  {
+   "kind": "js",
+   "en": "'Wait a random time between half and all of the backoff (“equal jitter”). Thousands of clients that failed at the same moment now come back at different moments. Another common choice, “full jitter”, picks anywhere from 0 to the backoff.'",
+   "zh": "'在退避時間的一半到全部之間隨機等待（「equal jitter」）。數千個在同一時刻失敗的客戶端，現在會在不同時刻回來。另一種常見做法「full jitter」則是在 0 到退避時間之間任選。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The provider had a 5-second blip, but Encore\\'s checkout errors lasted 10 minutes. The provider\\'s graphs show 4× normal traffic the whole time. What happened?'",
+   "zh": "'金流服務只出了 5 秒的小狀況，Encore 的結帳錯誤卻持續了 10 分鐘。金流服務的圖表顯示整段時間的流量都是平常的 4 倍。發生了什麼事？'"
+  },
+  {
+   "kind": "js",
+   "en": "'The provider was down for 10 minutes and hid it'",
+   "zh": "'金流服務其實掛了 10 分鐘，只是沒說'"
+  },
+  {
+   "kind": "js",
+   "en": "'Its traffic graph shows it was up and receiving far more calls than usual. That extra traffic came from Encore.'",
+   "zh": "'它的流量圖顯示它一直在線上，而且收到比平常多很多的呼叫。那些額外的流量來自 Encore。'"
+  },
+  {
+   "kind": "js",
+   "en": "'A retry storm: synchronized retries kept the provider overloaded after it recovered'",
+   "zh": "'重試風暴：同步的重試讓金流服務在恢復後仍然超載'"
+  },
+  {
+   "kind": "js",
+   "en": "'Each failure created more calls. Backoff with jitter and a retry cap let the load drop back below capacity.'",
+   "zh": "'每次失敗都製造出更多呼叫。搭配抖動的退避與重試上限，才能讓負載降回容量以下。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The timeout was too long'",
+   "zh": "'逾時設得太長'"
+  },
+  {
+   "kind": "js",
+   "en": "'A long timeout slows failures down. It doesn\\'t multiply traffic. Immediate, unlimited retries do.'",
+   "zh": "'逾時太長會讓失敗變慢，但不會讓流量倍增。立刻、不限次數的重試才會。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Cai\\'s page calls a recommendations service with no timeout. That service starts taking 60 s to answer. What happens to Encore?'",
+   "zh": "'Cai 的頁面呼叫推薦服務時沒有設逾時。那個服務開始要 60 秒才回應。Encore 會怎樣？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Only the recommendations box is slow'",
+   "zh": "'只有推薦區塊變慢'"
+  },
+  {
+   "kind": "js",
+   "en": "'Each request waits for the slow call, holding a thread or connection the whole time.'",
+   "zh": "'每個請求都在等那個慢呼叫，整段時間都佔著一條執行緒或連線。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Requests pile up waiting until Encore\\'s servers run out of threads, and every page gets slow'",
+   "zh": "'請求不斷堆積等待，直到 Encore 的伺服器用光執行緒，每個頁面都變慢'"
+  },
+  {
+   "kind": "js",
+   "en": "'A missing timeout lets one slow dependency take everything down. Always set one, and show the page without the box if it\\'s late.'",
+   "zh": "'少了逾時，一個慢的相依服務就能拖垮一切。一定要設逾時，而且回應太晚時，就先顯示沒有那個區塊的頁面。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The browser automatically cancels the call after 5 s'",
+   "zh": "'瀏覽器會在 5 秒後自動取消那次呼叫'"
+  },
+  {
+   "kind": "js",
+   "en": "'The call is made by Encore\\'s server, not the browser. Nothing cancels it unless you set a timeout.'",
+   "zh": "'那次呼叫是 Encore 的伺服器發出的，不是瀏覽器。除非你設了逾時，否則沒有東西會取消它。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Which error is worth retrying?'",
+   "zh": "'哪一種錯誤值得重試？'"
+  },
+  {
+   "kind": "js",
+   "en": "'400 Bad Request: the card number field is missing'",
+   "zh": "'400 Bad Request：缺少卡號欄位'"
+  },
+  {
+   "kind": "js",
+   "en": "'It will fail the same way every time. Fix the request instead.'",
+   "zh": "'它每次都會以同樣的方式失敗。應該修正請求。'"
+  },
+  {
+   "kind": "js",
+   "en": "'503 Service Unavailable from the payment provider'",
+   "zh": "'金流服務回傳 503 Service Unavailable'"
+  },
+  {
+   "kind": "js",
+   "en": "'A temporary error. Retry a few times with backoff and jitter, and send an idempotency key so a repeat can\\'t charge twice.'",
+   "zh": "'暫時性的錯誤。用退避與抖動重試幾次，並送出冪等鍵，讓重複的請求不會扣款兩次。'"
+  },
+  {
+   "kind": "js",
+   "en": "'402 Payment Required: the card was declined'",
+   "zh": "'402 Payment Required：卡片被拒絕'"
+  },
+  {
+   "kind": "js",
+   "en": "'The bank said no. Retrying won\\'t change its answer, and it may look like fraud.'",
+   "zh": "'銀行說不。重試不會改變它的答案，還可能看起來像詐騙。'"
+  }
+ ]
+}

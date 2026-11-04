@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW" data-lang="zh-tw" data-slug="timeouts-retries-backoff">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="對著吃力的金流服務引發一場重試風暴，再用逾時、指數退避與抖動把它修好。">
+<title>逾時、重試與退避 · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/explainer.css">
+</head>
+<body>
+<!-- Plan. Stuck point: "just retry" sounds harmless; people don't see that synchronized retries multiply load and keep a recovering service down.
+     Lab: provider capacity 50/s, Encore sends 30/s, a 3 s hiccup drops capacity. Controls: timeout, retries, retry timing.
+     One difference: retry immediately vs exponential backoff with jitter. Artifact: retry loop with AbortSignal.timeout and full jitter. -->
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="章節"><a href="#lab">實驗室</a><a href="#real">程式碼</a><a href="#recap">重點整理</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>第 9 頁 · 階段 3 · 在故障中存活</span><span class="hot">11 · 12 · 13</span></div>
+  <div class="eyebrow">逾時、重試、指數退避</div>
+  <h1>重試，就是 3 秒的小狀況<em>變成 3 分鐘停機的原因。</em></h1>
+  <div class="scenario"><b>Encore</b>每次結帳都會呼叫金流服務。有 3 秒鐘，金流服務慢得像在爬。Ben 的程式碼會重試失敗的呼叫，聽起來很合理。接著金流服務恢復了，Encore 卻還是把它壓得爬不起來。</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">打開實驗室 ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>實驗室 · 先弄壞，再修好</span><span class="hot" id="tag">不重試</span></div>
+  <h2>每秒 30 次結帳，一個金流服務</h2>
+  <p>金流服務每秒大約能處理 <b>50 次呼叫</b>。Encore 每秒送出 30 次，再加上重試。發生<b>小狀況</b>時，金流服務有 3 秒鐘每秒只能處理 3 次。所有數字都是模擬的。</p>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">逾時（等待回應多久）</span><div id="toSeg"></div></div>
+      <div class="ctl">
+        <label for="retries">每次結帳的重試次數：<b id="retriesV">0</b></label>
+        <input type="range" id="retries" min="0" max="5" step="1" value="0">
+      </div>
+      <div class="ctl"><span class="lab-k">何時重試</span><div id="bkSeg"></div></div>
+      <div class="ctl"><span class="lab-k">模擬</span><div id="player"></div>
+        <button class="btn sm bad" id="hiccup" type="button" style="margin-top:6px">⚡ 金流服務出狀況（3 秒）</button></div>
+    </div>
+    <canvas class="chart" id="chart" aria-label="每秒送到金流服務的呼叫數，以及它的容量"></canvas>
+    <div class="legend"><span><i style="background:var(--accent)"></i>每秒送到金流服務的呼叫數</span><span><i style="background:var(--muted)"></i>容量（虛線）</span></div>
+    <div class="meters" style="margin:0">
+      <div class="meter"><div class="k">送出的呼叫</div><div class="v" id="mSent">0/s</div><div class="d">首次嘗試＋重試</div></div>
+      <div class="meter"><div class="k">成功的結帳</div><div class="v" id="mOk">–</div><div class="d">最近 2 秒</div></div>
+      <div class="meter"><div class="k">等待中的結帳</div><div class="v" id="mWait">0</div><div class="d">每個都佔住一條伺服器執行緒</div></div>
+      <div class="meter"><div class="k">金流服務</div><div class="v" id="mProv">健康</div><div class="d" id="mProvD">每秒 50 次呼叫</div></div>
+      <div class="meter"><div class="k">小狀況之後</div><div class="v" id="mRec">–</div><div class="d" id="mRecD">每秒呼叫數峰值 · 失敗的結帳</div></div>
+    </div>
+    <div class="status" id="status" role="status">按「播放」開始結帳。</div>
+  </div>
+
+  <h3>試試看</h3>
+  <ol class="missions" id="missions"></ol>
+
+  <div class="compare">
+    <div><h3>逾時（Timeout）</h3><p style="margin:0">放棄一次呼叫前要等多久。<b>沒有逾時</b>時，一個慢的相依服務會讓每個請求陪它一起等，你自己的伺服器也會用光執行緒。</p></div>
+    <div><h3>重試（Retry）</h3><p style="margin:0">失敗後再試一次。它能修好短暫、隨機的錯誤。但每次重試都是<b>額外的負載</b>，而且偏偏是在對方最吃力的時候送出。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">關鍵差別</div><p><b>立刻</b>重試，會讓所有客戶端在同一時間重試，失敗就以更大的浪潮回來。<b>指數退避（exponential backoff）</b>在每次失敗後等更久（1 秒、2 秒、4 秒……），<b>抖動（jitter）</b>再加上隨機性，讓客戶端分散開來，而不是同步重試。</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>第 2 幕 · 真實世界</span><span class="hot">程式碼</span></div>
+  <h2>一個不會把任何人拖垮的重試迴圈</h2>
+  <p>大約十幾行，每一行都很重要。<b>把滑鼠移到某一行上，或點一下。</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="包含逾時、退避與抖動的重試迴圈範例"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 選一行</div><p id="exP">每一行反白後，都會對應到實驗室裡的一個控制項。</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>重點整理 · 帶走這些</span><span class="hot">♥</span></div>
+  <h2>整頁濃縮在一個畫面</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">不要一直等</div><div class="t">逾時（Timeout）</div><p>每次網路呼叫都要有期限。沒有期限，一個慢的相依服務就能凍結你整個服務。</p></div>
+    <div class="card"><div class="sub">再試一次</div><div class="t">重試（Retry）</div><p>只重試可能會自己恢復的錯誤（逾時、503、429），次數有限，而且只重試可以安全重複的請求。</p></div>
+    <div class="card"><div class="sub">分散開來</div><div class="t">退避＋抖動</div><p>每次失敗後等更久，並加上隨機的成分，讓重試不會變成一波同步的浪潮。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">取捨</div><p>重試是用額外的負載換取更高的成功機會。逾時短、重試多，失敗得快但會讓流量倍增；逾時長、重試少，比較溫和但比較慢。限制重試次數、搭配抖動退避，而且只重試可以安全重複的請求（第 10 頁）。</p></div>
+  <h3 style="margin-top:26px">考考自己 <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="頁面"></nav>
+</main>
+
+<script src="../../assets/explainer.js"></script>
+<script src="../../assets/i18n.zh-tw.js"></script>
+<script>
+(() => {
+const { $ } = X;
+const DT = 100, NEW_RATE = 30, CAP = 50, HICCUP_CAP = 3, HICCUP_MS = 3000, BASE = 1000, WIN = 2000, THRASH_AT = 60, THRASH_CAP = 40;
+const TIMEOUTS = [null, 1000];
+
+/* ---------- simulation: a deterministic flow model (volumes per 100 ms tick) ---------- */
+// Each retry "generation" is tracked as a volume arriving at future ticks, so backoff and jitter
+// visibly spread retries out, and the same settings always replay the same way.
+function init(seed, o = {}) {
+  return Object.assign({ r: seed, t: 0, timeout: 1000, retries: 0, mode: 0, hiccupUntil: -1, hiccupEnd: -1, future: {}, q: 0,
+    ev: [], hist: [], ticks: 0, stormTicks: 0, recoveredAt: -1, thrash: false, sent: 0, peak: 0, failedSince: 0 }, o);
+}
+function schedule(s, at, g, v) { const k = s.future[at] || (s.future[at] = []); k[g] = (k[g] || 0) + v; }
+function tick(s) {
+  const i = Math.round(s.t / DT), t1 = s.t + DT, hic = s.t < s.hiccupUntil;
+  const cap = (hic ? HICCUP_CAP : s.thrash ? THRASH_CAP : CAP) * DT / 1000;
+  const fresh = NEW_RATE * DT / 1000, gens = s.future[i] || [];
+  delete s.future[i];
+  let ok = 0, fail = 0, sent;
+  if (s.timeout == null) {
+    const total = s.q + fresh, served = Math.min(cap, total);
+    s.q = total - served; ok = served; sent = fresh;
+  } else {
+    sent = fresh + gens.reduce((a, v) => a + (v || 0), 0);
+    const f = sent > 0 ? Math.min(1, cap / sent) : 1;
+    const to = Math.round(s.timeout / DT);
+    for (let g = 0; g < Math.max(1, gens.length); g++) {
+      const vol = g === 0 ? fresh : gens[g] || 0;
+      if (!vol) continue;
+      ok += vol * f;
+      const failed = vol * (1 - f);
+      if (g >= s.retries) { fail += failed; continue; }
+      const back = Math.round(BASE * Math.pow(2, g) / DT);
+      if (s.mode === 0) schedule(s, i + to, g + 1, failed);
+      else if (s.mode === 1) schedule(s, i + to + back, g + 1, failed);
+      else { const half = Math.floor(back / 2); for (let k = half; k < back; k++) schedule(s, i + to + k, g + 1, failed / (back - half)); } // equal jitter
+    }
+  }
+  const rate = sent * 1000 / DT;
+  s.thrash = !hic && rate > THRASH_AT; // an overloaded provider spends its effort on calls whose callers already gave up
+  s.sent = rate;
+  if (s.hiccupEnd > 0) { s.peak = Math.max(s.peak, rate); s.failedSince += fail; }
+  s.ev.push({ t: t1, ok, fail });
+  s.ev = s.ev.filter(e => e.t > t1 - WIN);
+  s.t = t1; s.ticks++;
+  s.hist.push(rate); if (s.hist.length > 150) s.hist.shift();
+  if (!hic && s.hiccupEnd > 0 && t1 > s.hiccupEnd) {
+    if (rate > CAP * 1.2) s.stormTicks++;
+    if (s.recoveredAt < 0 && rate <= CAP * 1.05 && metrics(s).waiting < 5) s.recoveredAt = t1;
+  }
+  return s;
+}
+function metrics(s) {
+  const ok = s.ev.reduce((a, e) => a + e.ok, 0), fail = s.ev.reduce((a, e) => a + e.fail, 0);
+  const pending = Object.values(s.future).reduce((a, k) => a + k.reduce((x, v) => x + (v || 0), 0), 0);
+  return { sent: Math.round(s.sent), okRate: ok + fail ? ok / (ok + fail) : null, waiting: Math.round(s.q + pending), hic: s.t < s.hiccupUntil };
+}
+
+/* ---------- UI ---------- */
+let S = init(9);
+const flags = { piled: false, storm: false, recovered: false };
+const t0 = () => { S.ticks = 0; };
+const mis = X.missions($('#missions'), [
+  { text: '在逾時 1 秒、不重試的設定下按<b>播放</b>。', hint: '每秒 30 次呼叫，容量 50。一切正常。', check: s => s.ticks >= 20 },
+  { text: '把逾時設成<b>無</b>，然後觸發<b>金流服務出狀況</b>。', hint: '現在每次結帳都要等金流服務慢慢回應。看「等待中的結帳」不斷攀升：每一個都佔住一條伺服器執行緒。', check: s => { if (s.timeout == null && s.q > 40) flags.piled = true; return flags.piled; } },
+  { text: '設定 <b>1 秒</b>逾時、<b>重試 3 次</b>、<b>立刻</b>重試，再觸發一次狀況。', hint: '每次失敗都馬上回來，所以呼叫量衝到金流服務能承受的兩倍以上，它就超載了。這就是重試風暴，而且很多結帳最後還是失敗。', check: s => { if (s.timeout && s.retries >= 3 && s.mode === 0 && s.peak > 90 && s.failedSince > 20 && s.t > s.hiccupEnd) flags.storm = true; return flags.storm; } },
+  { text: '切換到<b>指數退避＋抖動</b>，再觸發一次狀況。', hint: '重試次數一樣，只是在時間上分散開來。負載低很多，金流服務從未超載，每一次結帳最後都成功。', check: s => { if (s.timeout && s.retries >= 3 && s.mode === 2 && s.recoveredAt > 0 && s.peak < 80 && s.failedSince < 1) flags.recovered = true; return flags.recovered; } },
+]);
+function render() {
+  const m = metrics(S);
+  $('#retriesV').textContent = S.retries;
+  $('#tag').textContent = S.retries ? `重試 ${S.retries} 次 · ${['立刻', '指數退避', '指數退避＋抖動'][S.mode]}` : '不重試';
+  $('#mSent').textContent = m.sent + '/s';
+  $('#mSent').parentElement.className = 'meter' + (m.sent > CAP * 1.2 ? ' bad' : m.sent > CAP * 0.9 ? ' wait' : '');
+  $('#mOk').textContent = m.okRate == null ? '–' : Math.round(m.okRate * 100) + '%';
+  $('#mOk').parentElement.className = 'meter' + (m.okRate == null ? '' : m.okRate < 0.8 ? ' bad' : m.okRate < 0.98 ? ' wait' : ' ok');
+  $('#mWait').textContent = X.fmt(m.waiting);
+  $('#mWait').parentElement.className = 'meter' + (m.waiting > 100 ? ' bad' : m.waiting > 20 ? ' wait' : '');
+  $('#mProv').parentElement.className = 'meter' + (m.hic || S.thrash ? ' bad' : ' ok');
+  $('#hiccup').disabled = m.hic;
+  const after0 = S.hiccupEnd > 0 && S.t > S.hiccupEnd;
+  $('#mRec').textContent = S.hiccupEnd > 0 ? `峰值每秒 ${Math.round(S.peak)} 次` : '–';
+  $('#mRecD').textContent = S.hiccupEnd > 0 ? `${X.fmt(S.failedSince)} 次結帳失敗` : '每秒呼叫數峰值 · 失敗的結帳';
+  $('#mRec').parentElement.className = 'meter' + (S.hiccupEnd < 0 ? '' : S.peak > 90 || S.failedSince >= 1 ? ' bad' : ' ok');
+  $('#mProv').textContent = m.hic ? 'hiccup' : S.thrash ? 'overloaded' : 'healthy';
+  $('#mProvD').textContent = (m.hic ? HICCUP_CAP : S.thrash ? THRASH_CAP : CAP) + ' 次呼叫/秒';
+  X.lineChart($('#chart'), [{ data: S.hist, token: '--accent' }], { points: 150, max: 200, limit: CAP });
+  const st = $('#status');
+  const after = !m.hic && S.hiccupEnd > 0 && S.t > S.hiccupEnd;
+  if (!S.t) { st.className = 'status'; st.textContent = '按「播放」開始結帳。'; }
+  else if (m.hic && S.timeout == null) { st.className = 'status bad'; st.textContent = `✕ 沒有逾時：${X.fmt(S.q)} 次結帳卡在等金流服務，每一個都佔住一條執行緒。歌迷看到的是一直轉圈圈的畫面。`; }
+  else if (m.hic) { st.className = 'status bad'; st.textContent = '✕ 金流服務出狀況了。呼叫在 1 秒後逾時。'; }
+  else if (after && (m.sent > CAP * 1.2 || S.thrash)) { st.className = 'status bad'; st.textContent = `✕ 重試風暴：狀況已經結束，但 Encore 每秒送出 ${m.sent} 次呼叫給一個只能處理 ${CAP} 次的金流服務，超載的服務能完成的工作還更少。重試造成失敗，失敗又造成更多重試。`; }
+  else if (m.okRate != null && m.okRate < 0.98) { st.className = 'status wait'; st.textContent = '⚠ 恢復中：還有一些結帳在失敗。'; }
+  else { st.className = 'status ok'; st.textContent = '✓ 健康：呼叫以正常速率送出，結帳都成功。'; }
+  player.clock(`t = ${(S.t / 1000).toFixed(1)} s`);
+  mis.update(S);
+}
+const player = X.player($('#player'), {
+  step: () => { tick(S); render(); }, stepTicks: 5,
+  reset: () => { S = init(9, { timeout: S.timeout, retries: S.retries, mode: S.mode }); Object.keys(flags).forEach(k => (flags[k] = false)); mis.reset(); render(); },
+});
+X.seg($('#toSeg'), ['無', '1 s'], i => { S.timeout = TIMEOUTS[i]; if (S.timeout) { schedule(S, Math.round(S.t / DT) + 1, 1, S.q); S.q = 0; } t0(); render(); }, 1);
+X.seg($('#bkSeg'), ['立刻', '指數退避', '指數退避＋抖動'], i => { S.mode = i; t0(); render(); }, 0);
+$('#retries').addEventListener('input', e => { S.retries = +e.target.value; t0(); render(); });
+$('#hiccup').addEventListener('click', () => {
+  S.hiccupUntil = S.t + HICCUP_MS; S.hiccupEnd = S.hiccupUntil; S.stormTicks = 0; S.recoveredAt = -1; S.peak = 0; S.failedSince = 0;
+  if (!player.running) player.play(); render();
+});
+addEventListener('resize', render);
+render();
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="key">async function</span> chargeWithRetry(order) {', null],
+  ['  <span class="key">for</span> (<span class="key">let</span> attempt = 0; attempt &lt;= MAX_RETRIES; attempt++) {', 'retries'],
+  ['    <span class="key">try</span> {', null],
+  ['      <span class="key">return await</span> payments.charge(order, {', null],
+  ['        signal: AbortSignal.<span class="key">timeout</span>(<span class="s">1000</span>),', 'timeout'],
+  ['        headers: { <span class="s">"Idempotency-Key"</span>: order.id },', 'idem'],
+  ['      });', null],
+  ['    } <span class="key">catch</span> (err) {', null],
+  ['      <span class="key">if</span> (attempt === MAX_RETRIES || !isRetryable(err)) <span class="key">throw</span> err;', 'which'],
+  ['      <span class="key">const</span> backoff = BASE_MS * 2 ** attempt;  <span class="c">// 1000、2000、4000……</span>', 'backoff'],
+  ['      <span class="key">await</span> sleep(backoff / 2 + Math.random() * backoff / 2);  <span class="c">// 抖動</span>', 'jitter'],
+  ['    }', null],
+  ['  }', null],
+  ['}', null],
+], {
+  retries: ['重試上限', '固定的嘗試次數，絕不是「試到成功為止」。這就是「重試次數」滑桿。每次重試都是在糟糕時刻多送出的一次呼叫。'],
+  timeout: ['逾時', '這次嘗試 1 秒後就放棄。沒有它，卡住的金流服務愛佔住這個請求（和一條伺服器執行緒）多久就佔多久。這就是你在「無」看到的堆積。'],
+  idem: ['可以安全重複嗎？', '只有在金流服務認得出重複的請求時，重試付款才安全。冪等鍵（idempotency key）就是做這件事的，那是下一頁。'],
+  which: ['只重試可能恢復的錯誤', '逾時、429 和 503 有可能自己消失。被拒絕的卡片或 400 永遠不會，所以重試只會增加負載。'],
+  backoff: ['指數退避', '每次失敗後，等待時間加倍。吃力的服務會得到越來越多喘息的空間。'],
+  jitter: ['抖動', '在退避時間的一半到全部之間隨機等待（「equal jitter」）。數千個在同一時刻失敗的客戶端，現在會在不同時刻回來。另一種常見做法「full jitter」則是在 0 到退避時間之間任選。'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: '金流服務只出了 5 秒的小狀況，Encore 的結帳錯誤卻持續了 10 分鐘。金流服務的圖表顯示整段時間的流量都是平常的 4 倍。發生了什麼事？', opts: [
+    ['金流服務其實掛了 10 分鐘，只是沒說', false, '它的流量圖顯示它一直在線上，而且收到比平常多很多的呼叫。那些額外的流量來自 Encore。'],
+    ['重試風暴：同步的重試讓金流服務在恢復後仍然超載', true, '每次失敗都製造出更多呼叫。搭配抖動的退避與重試上限，才能讓負載降回容量以下。'],
+    ['逾時設得太長', false, '逾時太長會讓失敗變慢，但不會讓流量倍增。立刻、不限次數的重試才會。'],
+  ] },
+  { q: 'Cai 的頁面呼叫推薦服務時沒有設逾時。那個服務開始要 60 秒才回應。Encore 會怎樣？', opts: [
+    ['只有推薦區塊變慢', false, '每個請求都在等那個慢呼叫，整段時間都佔著一條執行緒或連線。'],
+    ['請求不斷堆積等待，直到 Encore 的伺服器用光執行緒，每個頁面都變慢', true, '少了逾時，一個慢的相依服務就能拖垮一切。一定要設逾時，而且回應太晚時，就先顯示沒有那個區塊的頁面。'],
+    ['瀏覽器會在 5 秒後自動取消那次呼叫', false, '那次呼叫是 Encore 的伺服器發出的，不是瀏覽器。除非你設了逾時，否則沒有東西會取消它。'],
+  ] },
+  { q: '哪一種錯誤值得重試？', opts: [
+    ['400 Bad Request：缺少卡號欄位', false, '它每次都會以同樣的方式失敗。應該修正請求。'],
+    ['金流服務回傳 503 Service Unavailable', true, '暫時性的錯誤。用退避與抖動重試幾次，並送出冪等鍵，讓重複的請求不會扣款兩次。'],
+    ['402 Payment Required：卡片被拒絕', false, '銀行說不。重試不會改變它的答案，還可能看起來像詐騙。'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'timeouts-retries-backoff');
+})();
+</script>
+</body>
+</html>

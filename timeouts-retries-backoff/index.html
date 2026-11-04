@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Trigger a retry storm against a struggling payment provider, then fix it with timeouts, exponential backoff and jitter.">
+<title>Timeouts, Retries and Backoff · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/explainer.css">
+</head>
+<body>
+<!-- Plan. Stuck point: "just retry" sounds harmless; people don't see that synchronized retries multiply load and keep a recovering service down.
+     Lab: provider capacity 50/s, Encore sends 30/s, a 3 s hiccup drops capacity. Controls: timeout, retries, retry timing.
+     One difference: retry immediately vs exponential backoff with jitter. Artifact: retry loop with AbortSignal.timeout and full jitter. -->
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="Sections"><a href="#lab">Lab</a><a href="#real">The code</a><a href="#recap">Recap</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>page 9 · stage 3 · survive failures</span><span class="hot">11 · 12 · 13</span></div>
+  <div class="eyebrow">Timeouts, retries, exponential backoff</div>
+  <h1>Retrying is how a 3-second blip <em>turns into a 3-minute outage.</em></h1>
+  <div class="scenario"><b>Encore</b>Every checkout calls the payment provider. For 3 seconds the provider slows to a crawl. Ben's code retries failed calls, which sounds sensible. Then the provider recovers, and Encore keeps it down anyway.</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">Open the lab ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>lab · break it, then fix it</span><span class="hot" id="tag">no retries</span></div>
+  <h2>30 checkouts a second, one payment provider</h2>
+  <p>The provider handles about <b>50 calls a second</b>. Encore sends 30, plus any retries. During a <b>hiccup</b> the provider handles only 3 a second for 3 seconds. All numbers are simulated.</p>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">Timeout (how long to wait for an answer)</span><div id="toSeg"></div></div>
+      <div class="ctl">
+        <label for="retries">Retries per checkout: <b id="retriesV">0</b></label>
+        <input type="range" id="retries" min="0" max="5" step="1" value="0">
+      </div>
+      <div class="ctl"><span class="lab-k">When to retry</span><div id="bkSeg"></div></div>
+      <div class="ctl"><span class="lab-k">Simulation</span><div id="player"></div>
+        <button class="btn sm bad" id="hiccup" type="button" style="margin-top:6px">⚡ Provider hiccup (3 s)</button></div>
+    </div>
+    <canvas class="chart" id="chart" aria-label="Calls sent to the provider per second, against its capacity"></canvas>
+    <div class="legend"><span><i style="background:var(--accent)"></i>calls sent to the provider / s</span><span><i style="background:var(--muted)"></i>capacity (dashed)</span></div>
+    <div class="meters" style="margin:0">
+      <div class="meter"><div class="k">Calls sent</div><div class="v" id="mSent">0/s</div><div class="d">first tries + retries</div></div>
+      <div class="meter"><div class="k">Checkouts OK</div><div class="v" id="mOk">–</div><div class="d">last 2 s</div></div>
+      <div class="meter"><div class="k">Waiting checkouts</div><div class="v" id="mWait">0</div><div class="d">each holds a server thread</div></div>
+      <div class="meter"><div class="k">Provider</div><div class="v" id="mProv">healthy</div><div class="d" id="mProvD">50 calls/s</div></div>
+      <div class="meter"><div class="k">Since the hiccup</div><div class="v" id="mRec">–</div><div class="d" id="mRecD">peak calls/s · failed checkouts</div></div>
+    </div>
+    <div class="status" id="status" role="status">Press Play to start checkouts.</div>
+  </div>
+
+  <h3>Try this</h3>
+  <ol class="missions" id="missions"></ol>
+
+  <div class="compare">
+    <div><h3>Timeout</h3><p style="margin:0">How long you wait before giving up on one call. With <b>no timeout</b>, a slow dependency makes every request wait with it, and your own servers run out of threads.</p></div>
+    <div><h3>Retry</h3><p style="margin:0">Trying again after a failure. It fixes brief, random errors. But every retry is <b>extra load</b>, sent at the exact moment the other side is struggling.</p></div>
+  </div>
+  <div class="takeaway"><div class="t">The one difference</div><p>Retrying <b>immediately</b> makes every client retry at the same moment, so failures come back as bigger waves. <b>Exponential backoff</b> waits longer after each failure (1 s, 2 s, 4 s…), and <b>jitter</b> adds randomness so clients spread out instead of retrying in sync.</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>act 2 · the real thing</span><span class="hot">code</span></div>
+  <h2>A retry loop that won't take anyone down</h2>
+  <p>About a dozen lines, and every line matters. <b>Hover or tap a line.</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="Example retry loop with timeout, backoff and jitter"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 pick a line</div><p id="exP">Each highlighted line maps to a control in the lab.</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>recap · keep this</span><span class="hot">♥</span></div>
+  <h2>The whole page on one screen</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">Stop waiting</div><div class="t">Timeout</div><p>Every network call gets a deadline. Without one, a slow dependency freezes your whole service.</p></div>
+    <div class="card"><div class="sub">Try again</div><div class="t">Retry</div><p>Retry only errors that might go away (timeouts, 503, 429), a limited number of times, and only for requests that are safe to repeat.</p></div>
+    <div class="card"><div class="sub">Spread out</div><div class="t">Backoff + jitter</div><p>Wait longer after each failure, with a random part, so retries don't arrive as one synchronized wave.</p></div>
+  </div>
+  <div class="takeaway"><div class="t">The tradeoff</div><p>Retries trade extra load for a better chance of success. Short timeouts and many retries fail fast but multiply traffic; long timeouts and few retries are gentle but slow. Cap retries, back off with jitter, and retry only requests that are safe to repeat (page 10).</p></div>
+  <h3 style="margin-top:26px">Check it <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="Pages"></nav>
+</main>
+
+<script src="../assets/explainer.js"></script>
+<script>
+(() => {
+const { $ } = X;
+const DT = 100, NEW_RATE = 30, CAP = 50, HICCUP_CAP = 3, HICCUP_MS = 3000, BASE = 1000, WIN = 2000, THRASH_AT = 60, THRASH_CAP = 40;
+const TIMEOUTS = [null, 1000];
+
+/* ---------- simulation: a deterministic flow model (volumes per 100 ms tick) ---------- */
+// Each retry "generation" is tracked as a volume arriving at future ticks, so backoff and jitter
+// visibly spread retries out, and the same settings always replay the same way.
+function init(seed, o = {}) {
+  return Object.assign({ r: seed, t: 0, timeout: 1000, retries: 0, mode: 0, hiccupUntil: -1, hiccupEnd: -1, future: {}, q: 0,
+    ev: [], hist: [], ticks: 0, stormTicks: 0, recoveredAt: -1, thrash: false, sent: 0, peak: 0, failedSince: 0 }, o);
+}
+function schedule(s, at, g, v) { const k = s.future[at] || (s.future[at] = []); k[g] = (k[g] || 0) + v; }
+function tick(s) {
+  const i = Math.round(s.t / DT), t1 = s.t + DT, hic = s.t < s.hiccupUntil;
+  const cap = (hic ? HICCUP_CAP : s.thrash ? THRASH_CAP : CAP) * DT / 1000;
+  const fresh = NEW_RATE * DT / 1000, gens = s.future[i] || [];
+  delete s.future[i];
+  let ok = 0, fail = 0, sent;
+  if (s.timeout == null) {
+    const total = s.q + fresh, served = Math.min(cap, total);
+    s.q = total - served; ok = served; sent = fresh;
+  } else {
+    sent = fresh + gens.reduce((a, v) => a + (v || 0), 0);
+    const f = sent > 0 ? Math.min(1, cap / sent) : 1;
+    const to = Math.round(s.timeout / DT);
+    for (let g = 0; g < Math.max(1, gens.length); g++) {
+      const vol = g === 0 ? fresh : gens[g] || 0;
+      if (!vol) continue;
+      ok += vol * f;
+      const failed = vol * (1 - f);
+      if (g >= s.retries) { fail += failed; continue; }
+      const back = Math.round(BASE * Math.pow(2, g) / DT);
+      if (s.mode === 0) schedule(s, i + to, g + 1, failed);
+      else if (s.mode === 1) schedule(s, i + to + back, g + 1, failed);
+      else { const half = Math.floor(back / 2); for (let k = half; k < back; k++) schedule(s, i + to + k, g + 1, failed / (back - half)); } // equal jitter
+    }
+  }
+  const rate = sent * 1000 / DT;
+  s.thrash = !hic && rate > THRASH_AT; // an overloaded provider spends its effort on calls whose callers already gave up
+  s.sent = rate;
+  if (s.hiccupEnd > 0) { s.peak = Math.max(s.peak, rate); s.failedSince += fail; }
+  s.ev.push({ t: t1, ok, fail });
+  s.ev = s.ev.filter(e => e.t > t1 - WIN);
+  s.t = t1; s.ticks++;
+  s.hist.push(rate); if (s.hist.length > 150) s.hist.shift();
+  if (!hic && s.hiccupEnd > 0 && t1 > s.hiccupEnd) {
+    if (rate > CAP * 1.2) s.stormTicks++;
+    if (s.recoveredAt < 0 && rate <= CAP * 1.05 && metrics(s).waiting < 5) s.recoveredAt = t1;
+  }
+  return s;
+}
+function metrics(s) {
+  const ok = s.ev.reduce((a, e) => a + e.ok, 0), fail = s.ev.reduce((a, e) => a + e.fail, 0);
+  const pending = Object.values(s.future).reduce((a, k) => a + k.reduce((x, v) => x + (v || 0), 0), 0);
+  return { sent: Math.round(s.sent), okRate: ok + fail ? ok / (ok + fail) : null, waiting: Math.round(s.q + pending), hic: s.t < s.hiccupUntil };
+}
+
+/* ---------- UI ---------- */
+let S = init(9);
+const flags = { piled: false, storm: false, recovered: false };
+const t0 = () => { S.ticks = 0; };
+const mis = X.missions($('#missions'), [
+  { text: 'Press <b>Play</b> with a 1 s timeout and no retries.', hint: '30 calls a second against a capacity of 50. Everything is fine.', check: s => s.ticks >= 20 },
+  { text: 'Set the timeout to <b>None</b> and trigger a <b>Provider hiccup</b>.', hint: 'Every checkout now waits as long as the provider takes. Watch “Waiting checkouts” climb: each one holds a server thread.', check: s => { if (s.timeout == null && s.q > 40) flags.piled = true; return flags.piled; } },
+  { text: 'Set a <b>1 s</b> timeout, <b>3 retries</b>, retry <b>Immediately</b>, and trigger another hiccup.', hint: 'Every failure comes straight back, so calls spike to over twice what the provider can take, and it gets overloaded. That\'s a retry storm, and many checkouts fail anyway.', check: s => { if (s.timeout && s.retries >= 3 && s.mode === 0 && s.peak > 90 && s.failedSince > 20 && s.t > s.hiccupEnd) flags.storm = true; return flags.storm; } },
+  { text: 'Switch to <b>Exponential + jitter</b> and trigger one more hiccup.', hint: 'Same number of retries, spread out over time. The load stays much lower, the provider never gets overloaded, and every checkout eventually succeeds.', check: s => { if (s.timeout && s.retries >= 3 && s.mode === 2 && s.recoveredAt > 0 && s.peak < 80 && s.failedSince < 1) flags.recovered = true; return flags.recovered; } },
+]);
+function render() {
+  const m = metrics(S);
+  $('#retriesV').textContent = S.retries;
+  $('#tag').textContent = S.retries ? `${S.retries} retries · ${['immediately', 'exponential', 'exponential + jitter'][S.mode]}` : 'no retries';
+  $('#mSent').textContent = m.sent + '/s';
+  $('#mSent').parentElement.className = 'meter' + (m.sent > CAP * 1.2 ? ' bad' : m.sent > CAP * 0.9 ? ' wait' : '');
+  $('#mOk').textContent = m.okRate == null ? '–' : Math.round(m.okRate * 100) + '%';
+  $('#mOk').parentElement.className = 'meter' + (m.okRate == null ? '' : m.okRate < 0.8 ? ' bad' : m.okRate < 0.98 ? ' wait' : ' ok');
+  $('#mWait').textContent = X.fmt(m.waiting);
+  $('#mWait').parentElement.className = 'meter' + (m.waiting > 100 ? ' bad' : m.waiting > 20 ? ' wait' : '');
+  $('#mProv').parentElement.className = 'meter' + (m.hic || S.thrash ? ' bad' : ' ok');
+  $('#hiccup').disabled = m.hic;
+  const after0 = S.hiccupEnd > 0 && S.t > S.hiccupEnd;
+  $('#mRec').textContent = S.hiccupEnd > 0 ? `${Math.round(S.peak)}/s peak` : '–';
+  $('#mRecD').textContent = S.hiccupEnd > 0 ? `${X.fmt(S.failedSince)} checkouts failed` : 'peak calls/s · failed checkouts';
+  $('#mRec').parentElement.className = 'meter' + (S.hiccupEnd < 0 ? '' : S.peak > 90 || S.failedSince >= 1 ? ' bad' : ' ok');
+  $('#mProv').textContent = m.hic ? 'hiccup' : S.thrash ? 'overloaded' : 'healthy';
+  $('#mProvD').textContent = (m.hic ? HICCUP_CAP : S.thrash ? THRASH_CAP : CAP) + ' calls/s';
+  X.lineChart($('#chart'), [{ data: S.hist, token: '--accent' }], { points: 150, max: 200, limit: CAP });
+  const st = $('#status');
+  const after = !m.hic && S.hiccupEnd > 0 && S.t > S.hiccupEnd;
+  if (!S.t) { st.className = 'status'; st.textContent = 'Press Play to start checkouts.'; }
+  else if (m.hic && S.timeout == null) { st.className = 'status bad'; st.textContent = `✕ No timeout: ${X.fmt(S.q)} checkouts are stuck waiting on the provider, each holding a thread. Fans see a frozen spinner.`; }
+  else if (m.hic) { st.className = 'status bad'; st.textContent = '✕ The provider is having a hiccup. Calls time out after 1 s.'; }
+  else if (after && (m.sent > CAP * 1.2 || S.thrash)) { st.className = 'status bad'; st.textContent = `✕ Retry storm: the hiccup is over, but Encore is sending ${m.sent} calls/s to a provider that handles ${CAP}, and the overloaded provider gets even less done. Retries cause failures, which cause more retries.`; }
+  else if (m.okRate != null && m.okRate < 0.98) { st.className = 'status wait'; st.textContent = '⚠ Recovering: some checkouts are still failing.'; }
+  else { st.className = 'status ok'; st.textContent = '✓ Healthy: calls go out at the normal rate and checkouts succeed.'; }
+  player.clock(`t = ${(S.t / 1000).toFixed(1)} s`);
+  mis.update(S);
+}
+const player = X.player($('#player'), {
+  step: () => { tick(S); render(); }, stepTicks: 5,
+  reset: () => { S = init(9, { timeout: S.timeout, retries: S.retries, mode: S.mode }); Object.keys(flags).forEach(k => (flags[k] = false)); mis.reset(); render(); },
+});
+X.seg($('#toSeg'), ['None', '1 s'], i => { S.timeout = TIMEOUTS[i]; if (S.timeout) { schedule(S, Math.round(S.t / DT) + 1, 1, S.q); S.q = 0; } t0(); render(); }, 1);
+X.seg($('#bkSeg'), ['Immediately', 'Exponential', 'Exponential + jitter'], i => { S.mode = i; t0(); render(); }, 0);
+$('#retries').addEventListener('input', e => { S.retries = +e.target.value; t0(); render(); });
+$('#hiccup').addEventListener('click', () => {
+  S.hiccupUntil = S.t + HICCUP_MS; S.hiccupEnd = S.hiccupUntil; S.stormTicks = 0; S.recoveredAt = -1; S.peak = 0; S.failedSince = 0;
+  if (!player.running) player.play(); render();
+});
+addEventListener('resize', render);
+render();
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="key">async function</span> chargeWithRetry(order) {', null],
+  ['  <span class="key">for</span> (<span class="key">let</span> attempt = 0; attempt &lt;= MAX_RETRIES; attempt++) {', 'retries'],
+  ['    <span class="key">try</span> {', null],
+  ['      <span class="key">return await</span> payments.charge(order, {', null],
+  ['        signal: AbortSignal.<span class="key">timeout</span>(<span class="s">1000</span>),', 'timeout'],
+  ['        headers: { <span class="s">"Idempotency-Key"</span>: order.id },', 'idem'],
+  ['      });', null],
+  ['    } <span class="key">catch</span> (err) {', null],
+  ['      <span class="key">if</span> (attempt === MAX_RETRIES || !isRetryable(err)) <span class="key">throw</span> err;', 'which'],
+  ['      <span class="key">const</span> backoff = BASE_MS * 2 ** attempt;  <span class="c">// 1000, 2000, 4000…</span>', 'backoff'],
+  ['      <span class="key">await</span> sleep(backoff / 2 + Math.random() * backoff / 2);  <span class="c">// jitter</span>', 'jitter'],
+  ['    }', null],
+  ['  }', null],
+  ['}', null],
+], {
+  retries: ['Retry limit', 'A fixed number of attempts, never “until it works”. This is the Retries slider. Each retry is one more call during a bad moment.'],
+  timeout: ['Timeout', 'Give up on this attempt after 1 second. Without it, a stuck provider holds this request (and a server thread) for as long as it likes. That\'s the pile-up you saw with “None”.'],
+  idem: ['Safe to repeat?', 'Retrying a payment is only safe if the provider can recognize the repeat. An idempotency key does exactly that. That\'s the next page.'],
+  which: ['Retry only what might recover', 'Timeouts, 429 and 503 might go away. A declined card or a 400 never will, so retrying it only adds load.'],
+  backoff: ['Exponential backoff', 'The wait doubles after each failure. Struggling services get more and more breathing room.'],
+  jitter: ['Jitter', 'Wait a random time between half and all of the backoff (“equal jitter”). Thousands of clients that failed at the same moment now come back at different moments. Another common choice, “full jitter”, picks anywhere from 0 to the backoff.'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: 'The provider had a 5-second blip, but Encore\'s checkout errors lasted 10 minutes. The provider\'s graphs show 4× normal traffic the whole time. What happened?', opts: [
+    ['The provider was down for 10 minutes and hid it', false, 'Its traffic graph shows it was up and receiving far more calls than usual. That extra traffic came from Encore.'],
+    ['A retry storm: synchronized retries kept the provider overloaded after it recovered', true, 'Each failure created more calls. Backoff with jitter and a retry cap let the load drop back below capacity.'],
+    ['The timeout was too long', false, 'A long timeout slows failures down. It doesn\'t multiply traffic. Immediate, unlimited retries do.'],
+  ] },
+  { q: 'Cai\'s page calls a recommendations service with no timeout. That service starts taking 60 s to answer. What happens to Encore?', opts: [
+    ['Only the recommendations box is slow', false, 'Each request waits for the slow call, holding a thread or connection the whole time.'],
+    ['Requests pile up waiting until Encore\'s servers run out of threads, and every page gets slow', true, 'A missing timeout lets one slow dependency take everything down. Always set one, and show the page without the box if it\'s late.'],
+    ['The browser automatically cancels the call after 5 s', false, 'The call is made by Encore\'s server, not the browser. Nothing cancels it unless you set a timeout.'],
+  ] },
+  { q: 'Which error is worth retrying?', opts: [
+    ['400 Bad Request: the card number field is missing', false, 'It will fail the same way every time. Fix the request instead.'],
+    ['503 Service Unavailable from the payment provider', true, 'A temporary error. Retry a few times with backoff and jitter, and send an idempotency key so a repeat can\'t charge twice.'],
+    ['402 Payment Required: the card was declined', false, 'The bank said no. Retrying won\'t change its answer, and it may look like fraud.'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'timeouts-retries-backoff');
+})();
+</script>
+</body>
+</html>
