@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW" data-lang="zh-tw" data-slug="circuit-breakers-health-checks">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="弄壞一個相依服務，看它拖垮整個頁面，再加上斷路器和健康檢查，把損害控制住。">
+<title>斷路器與健康檢查 · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/explainer.css">
+</head>
+<body>
+<!-- Plan. Stuck point: "it has a timeout, so it's fine" — but every call still waits the full timeout, and threads run out.
+     Lab: concert page → recommendations service. Break it; breaker off vs on (closed → open → half-open → closed).
+     Part 2: liveness vs readiness on three instances. Artifact: opossum breaker + Kubernetes probes. -->
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="章節"><a href="#lab">實驗室</a><a href="#probes">健康檢查</a><a href="#real">設定檔</a><a href="#recap">重點整理</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>第 11 頁 · 階段 3 · 在故障中存活</span><span class="hot">10 · 56 · 57</span></div>
+  <div class="eyebrow">斷路器、健康檢查、存活與就緒探針</div>
+  <h1>一個壞掉的推薦區塊，<em>不該弄壞整個頁面。</em></h1>
+  <div class="scenario"><b>Encore</b>演唱會頁面會顯示來自推薦服務的「買了這場的人也買了……」。那個服務卡住了。現在每個頁面都在等它逾時，Encore 的伺服器用光了執行緒，歌迷連演唱會資訊都看不到。一個沒人需要的區塊，拖垮了一切。</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">打開實驗室 ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>實驗室 · 先弄壞，再修好</span><span class="hot" id="tag">沒有斷路器</span></div>
+  <h2>每秒 20 次頁面瀏覽，一個不穩定的相依服務</h2>
+  <p>每次頁面瀏覽都會呼叫推薦服務。正常時呼叫花 50 毫秒；壞掉時呼叫會一直卡到 <b>2 秒逾時</b>。Encore 的伺服器有 <b>30 條執行緒</b>，每次呼叫佔一條。數字是模擬的。</p>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">推薦服務</span><div id="svcSeg"></div></div>
+      <div class="ctl"><span class="lab-k">斷路器（circuit breaker）</span><div id="brSeg"></div></div>
+      <div class="ctl"><span class="lab-k">模擬</span><div id="player"></div></div>
+    </div>
+    <div class="pipe" id="states" style="margin:0" aria-label="斷路器狀態">
+      <div class="stage"><div class="chip" data-s="closed">關閉（Closed）<small>呼叫照常通過</small></div></div>
+      <div class="stage"><div class="chip" data-s="open">開啟（Open）<small>跳過呼叫</small></div></div>
+      <div class="stage"><div class="chip" data-s="half">半開（Half-open）<small>一次測試呼叫</small></div></div>
+    </div>
+    <div class="meters" style="margin:0">
+      <div class="meter"><div class="k">頁面載入</div><div class="v" id="mLat">0 ms</div><div class="d">平均，最近 2 秒</div></div>
+      <div class="meter"><div class="k">失敗的頁面</div><div class="v" id="mErr">0%</div><div class="d">沒有執行緒可用</div></div>
+      <div class="meter"><div class="k">忙碌的執行緒</div><div class="v" id="mThr">0 / 30</div><div class="d">被等待中的呼叫佔住</div></div>
+      <div class="meter"><div class="k">推薦內容</div><div class="v" id="mRec">有顯示</div><div class="d" id="mRecD">每個頁面都有</div></div>
+    </div>
+    <div class="status" id="status" role="status">按「播放」開始送出流量。</div>
+  </div>
+  <h3>試試看</h3>
+  <ol class="missions" id="missions"></ol>
+  <div class="takeaway"><div class="t">關鍵差別</div><p>沒有斷路器時，每個請求都會<b>持續呼叫</b>一個明知壞掉的相依服務，而且每次都等滿逾時。<b>斷路器</b>會計算失敗次數；連續失敗幾次後它就<b>開啟</b>：呼叫立刻被跳過，改用備援方案（fallback）。冷卻一段時間後，它會放<b>一次測試呼叫</b>通過，成功的話就再度關閉。</p></div>
+</section>
+
+<section class="panel" id="probes">
+  <div class="panel-label"><span>第 2 幕 · 健康檢查</span><span class="hot">56 · 57</span></div>
+  <h2>三個執行個體，兩種「你還好嗎？」</h2>
+  <p>負載平衡器把流量送到 Encore API 的三份副本。<b>api-2</b> 剛啟動，還在載入快取。<b>api-3</b> 卡在死結裡：行程還在跑，卻永遠不回應。選擇平台要執行哪些檢查，然後讓時間往前走。</p>
+  <div class="row"><div id="prSeg"></div><button class="btn" id="adv" type="button">前進 10 秒 →</button><button class="btn sm" id="prReset" type="button">↺ 重設</button><span class="clock mono" id="prClock" style="color:var(--muted)">t = 0 s</span></div>
+  <div class="servers" id="pods" aria-label="API 執行個體"></div>
+  <p class="status" id="prTxt" style="margin-top:10px" role="status"></p>
+  <div class="compare">
+    <div><h3>存活探針（Liveness probe）</h3><p style="margin:0">「這個行程卡住了嗎？」連續失敗幾次就<b>重新啟動</b>它。這能修好死結和卡死。</p></div>
+    <div><h3>就緒探針（Readiness probe）</h3><p style="margin:0">「它<i>現在</i>能接流量嗎？」不能的話就<b>停止送請求給它</b>，但不要重新啟動。用於啟動中、暖機中，或資料庫連線中斷時。</p></div>
+  </div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>第 3 幕 · 真實世界</span><span class="hot">程式碼＋YAML</span></div>
+  <h2>幾行就是一個斷路器，再幾行就是探針</h2>
+  <p>斷路器使用 <a href="https://github.com/nodeshift/opossum">opossum</a>，一個常見的 Node.js 函式庫。探針則是 Kubernetes 的設定。<b>把滑鼠移到某一行上，或點一下。</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="斷路器程式碼與 Kubernetes 探針範例"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 選一行</div><p id="exP">每一行反白後，都會對應到實驗室。</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>重點整理 · 帶走這些</span><span class="hot">♥</span></div>
+  <h2>整頁濃縮在一個畫面</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">停止呼叫</div><div class="t">斷路器（circuit breaker）</div><p>連續失敗後，跳過呼叫並改用備援方案。偶爾測試一下，恢復正常時再繼續呼叫。</p></div>
+    <div class="card"><div class="sub">重新啟動</div><div class="t">存活探針</div><p>偵測卡住的行程並重新啟動它。保持簡單：不要因為相依服務掛了就讓它失敗。</p></div>
+    <div class="card"><div class="sub">繞道而行</div><div class="t">就緒探針</div><p>偵測還不能服務的執行個體，把它從負載平衡器中移除，直到它準備好。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">取捨</div><p>斷路器把緩慢的失敗變成快速的、局部的失敗：歌迷看到的是沒有推薦內容的頁面。前提是你設計了備援方案。門檻太敏感，小小波動就會開啟；太寬鬆，等它開啟時傷害已經造成了。</p></div>
+  <h3 style="margin-top:26px">考考自己 <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="頁面"></nav>
+</main>
+
+<script src="../../assets/explainer.js"></script>
+<script src="../../assets/i18n.zh-tw.js"></script>
+<script>
+(() => {
+const { $, el } = X;
+const DT = 100, RATE = 20, THREADS = 30, OK_MS = 50, TIMEOUT = 2000, BASE = 80, TRIP = 5, COOLDOWN = 5000, WIN = 2000;
+
+/* ---------- simulation: deterministic, pure state + tick ---------- */
+function init(o = {}) {
+  return Object.assign({ t: 0, broken: false, breakerOn: false, state: 'closed', fails: 0, openUntil: 0, trial: null,
+    inflight: [], ev: [], ticks: 0, seen: { open: false, half: false, closedAfter: false } }, o);
+}
+function tick(s) {
+  const t0 = s.t, t1 = t0 + DT;
+  // finish calls that were waiting
+  s.inflight = s.inflight.filter(c => {
+    if (c.end > t1) return true;
+    if (c.trial) {
+      s.trial = null;
+      if (c.ok) { s.state = 'closed'; s.fails = 0; s.seen.closedAfter = s.seen.open; }
+      else { s.state = 'open'; s.openUntil = c.end + COOLDOWN; }
+    } else if (!c.ok) { s.fails++; if (s.breakerOn && s.state === 'closed' && s.fails >= TRIP) { s.state = 'open'; s.openUntil = c.end + COOLDOWN; s.seen.open = true; } }
+    else s.fails = 0;
+    return false;
+  });
+  if (s.breakerOn && s.state === 'open' && t0 >= s.openUntil) { s.state = 'half'; s.seen.half = true; }
+  const n = RATE * DT / 1000;
+  for (let i = 0; i < n; i++) {
+    const at = t0 + (i / n) * DT;
+    const skip = s.breakerOn && (s.state === 'open' || (s.state === 'half' && s.trial));
+    if (skip) { s.ev.push({ t: at, lat: BASE, ok: 1, recs: 0 }); continue; }
+    if (s.inflight.length >= THREADS) { s.ev.push({ t: at, lat: 0, ok: 0, recs: 0 }); continue; }
+    const ms = s.broken ? TIMEOUT : OK_MS;
+    const call = { end: at + ms, ok: !s.broken };
+    if (s.breakerOn && s.state === 'half') { call.trial = true; s.trial = call; }
+    s.inflight.push(call);
+    s.ev.push({ t: at, lat: BASE + ms, ok: 1, recs: s.broken ? 0 : 1 });
+  }
+  s.t = t1; s.ticks++;
+  s.ev = s.ev.filter(e => e.t > t1 - WIN);
+  return s;
+}
+function metrics(s) {
+  const e = s.ev, served = e.filter(x => x.ok);
+  return { lat: X.avg(served.map(x => x.lat)), err: e.length ? 1 - served.length / e.length : 0, thr: s.inflight.length, recs: served.length ? served.filter(x => x.recs).length / served.length : 1 };
+}
+
+/* ---------- lab UI ---------- */
+let S = init();
+const chips = { closed: $('[data-s="closed"]'), open: $('[data-s="open"]'), half: $('[data-s="half"]') };
+const t0 = () => { S.ticks = 0; };
+const mis = X.missions($('#missions'), [
+  { text: '在服務健康、沒有斷路器的情況下按<b>播放</b>。', hint: '呼叫只要 50 毫秒。同一時間只有一條執行緒在忙。', check: s => s.ticks >= 20 && !s.broken },
+  { text: '把服務設成<b>壞掉</b>。', hint: '現在每個頁面都要等 2 秒逾時。執行緒被佔滿，很快頁面就完全失敗了。', check: s => s.broken && !s.breakerOn && metrics(s).err > 0.2 },
+  { text: '把<b>斷路器開啟</b>。', hint: '連續失敗 5 次後它就開啟。頁面又能在 80 毫秒內載入，只是沒有推薦內容。', check: s => s.broken && s.breakerOn && s.seen.open && metrics(s).err === 0 && s.ticks > 25 },
+  { text: '把服務設回<b>健康</b>，然後等一下。', hint: '冷卻 5 秒後，斷路器進入半開狀態，送出一次測試呼叫，看到成功就關閉。', check: s => !s.broken && s.breakerOn && s.seen.closedAfter && s.state === 'closed' },
+]);
+function render() {
+  const m = metrics(S);
+  $('#tag').textContent = S.breakerOn ? '斷路器：' + S.state.replace('half', 'half-open') : '沒有斷路器';
+  Object.entries(chips).forEach(([k, c]) => X.chip(c, !S.breakerOn ? '' : S.state === k ? (k === 'closed' ? 'ok' : k === 'open' ? 'fail' : 'wait') : '', !S.breakerOn ? '' : S.state === k ? '● 目前' : ''));
+  $('#states').style.opacity = S.breakerOn ? 1 : 0.45;
+  $('#mLat').textContent = X.fmt(m.lat) + ' 毫秒';
+  $('#mLat').parentElement.className = 'meter' + (m.lat > 1000 ? ' bad' : m.lat > 300 ? ' wait' : ' ok');
+  $('#mErr').textContent = Math.round(m.err * 100) + '%';
+  $('#mErr').parentElement.className = 'meter' + (m.err > 0 ? ' bad' : '');
+  $('#mThr').textContent = `${m.thr} / ${THREADS}`;
+  $('#mThr').parentElement.className = 'meter' + (m.thr >= THREADS ? ' bad' : m.thr > 10 ? ' wait' : '');
+  $('#mRec').textContent = m.recs > 0.95 ? 'shown' : m.recs < 0.05 ? 'hidden' : 'some';
+  $('#mRecD').textContent = m.recs > 0.95 ? '每個頁面都有' : '頁面在沒有推薦內容時也能運作';
+  const st = $('#status');
+  if (!S.t) { st.className = 'status'; st.textContent = '按「播放」開始送出流量。'; }
+  else if (m.err > 0) { st.className = 'status bad'; st.textContent = `✕ ${THREADS} 條執行緒全都卡在等那個壞掉的服務，所以 ${Math.round(m.err * 100)}% 的頁面瀏覽完全失敗，即使演唱會資訊本身一點問題都沒有。`; }
+  else if (S.broken && !S.breakerOn) { st.className = 'status wait'; st.textContent = '⚠ 每個頁面都要等滿 2 秒逾時，等一份永遠不會來的推薦內容。'; }
+  else if (S.breakerOn && S.state === 'open') { st.className = 'status ok'; st.textContent = `✓ 斷路器開啟：呼叫被跳過，頁面在 ${BASE} 毫秒內載入，只是沒有推薦內容。${Math.max(0, Math.ceil((S.openUntil - S.t) / 1000))} 秒後進行下一次測試呼叫。`; }
+  else if (S.breakerOn && S.state === 'half') { st.className = 'status wait'; st.textContent = '⏸ 半開：一次測試呼叫正在進行。其他人仍然拿到備援方案。'; }
+  else { st.className = 'status ok'; st.textContent = '✓ 健康：頁面載入很快，而且有推薦內容。'; }
+  player.clock(`t = ${(S.t / 1000).toFixed(1)} s`);
+  mis.update(S);
+}
+const player = X.player($('#player'), {
+  step: () => { tick(S); render(); }, stepTicks: 5,
+  reset: () => { S = init({ broken: S.broken, breakerOn: S.breakerOn }); mis.reset(); render(); },
+});
+X.seg($('#svcSeg'), ['健康', '壞掉（卡住）'], i => { S.broken = i === 1; t0(); render(); }, 0);
+X.seg($('#brSeg'), ['關閉', '開啟'], i => { S.breakerOn = i === 1; S.state = 'closed'; S.fails = 0; S.trial = null; t0(); render(); }, 0);
+render();
+
+/* ---------- act 2: probes (stepper) ---------- */
+let mode = 0, step = 0;
+function podAt(name, k) {
+  // returns { proc: 'running'|'deadlocked'|'restarting', ready, note }
+  if (name === 'api-1') return { proc: 'running', ready: true };
+  if (name === 'api-2') return { proc: 'running', ready: k >= 2, note: k < 2 ? '載入快取中' : '' };
+  if (mode === 0) return { proc: 'deadlocked', ready: false, note: '永遠不回應' };
+  if (k === 0) return { proc: 'deadlocked', ready: false, note: '永遠不回應' };
+  return k < 3 ? { proc: 'restarted', ready: false, note: '載入快取中' } : { proc: 'running', ready: true };
+}
+function drawProbes() {
+  const pods = ['api-1', 'api-2', 'api-3'].map(n => ({ n, ...podAt(n, step) }));
+  const gets = p => (mode === 2 ? p.ready : true);
+  const traffic = pods.filter(gets);
+  const bad = traffic.filter(p => !p.ready).length;
+  const box = $('#pods'); box.innerHTML = '';
+  pods.forEach(p => {
+    const d = el('div', 'server' + (p.proc === 'deadlocked' ? ' down' : ''));
+    const pill = p.ready ? '<span class="pill ok">就緒</span>' : p.proc === 'deadlocked' ? '<span class="pill bad">卡住</span>' : '<span class="pill wait">啟動中</span>';
+    d.innerHTML = `<div class="nm"><span>${p.n}</span>${pill}</div>
+      <div class="mono">${p.proc === 'restarted' ? '↻ 已由存活探針重新啟動' : p.proc === 'deadlocked' ? '死結' : '執行中'}${p.note ? ' · ' + p.note : ''}</div>
+      <div class="mono">${gets(p) ? (p.ready ? '✓ 有接到流量' : '✕ 有接到流量，但處理失敗') : '– 沒有流量（尚未就緒）'}</div>`;
+    box.append(d);
+  });
+  $('#prClock').textContent = `t = ${step * 10} s`;
+  $('#adv').disabled = step >= 4;
+  const pct = Math.round((bad / traffic.length) * 100);
+  const t = $('#prTxt');
+  t.className = 'status ' + (pct ? 'bad' : 'ok');
+  t.textContent = pct
+    ? `✕ ${pct}% 的請求被送到無法回應的執行個體。${mode === 0 ? '沒有任何檢查，永遠沒人發現 api-3 卡住了。' : mode === 1 ? '存活探針重新啟動了 api-3，但執行個體在暖機時仍然會接到流量。' : ''}`
+    : `✓ 每個請求都落在已就緒的執行個體上。${mode === 2 && step < 3 ? '暖機中的執行個體會被跳過，直到它的就緒探針通過。' : ''}`;
+}
+X.seg($('#prSeg'), ['沒有健康檢查', '只有存活探針', '存活＋就緒探針'], i => { mode = i; step = 0; drawProbes(); }, 0);
+$('#adv').addEventListener('click', () => { step = Math.min(4, step + 1); drawProbes(); });
+$('#prReset').addEventListener('click', () => { step = 0; drawProbes(); });
+drawProbes();
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="key">const</span> breaker = <span class="key">new</span> CircuitBreaker(getRecommendations, {', 'breaker'],
+  ['  timeout: <span class="s">2000</span>,', 'timeout'],
+  ['  errorThresholdPercentage: <span class="s">50</span>,', 'threshold'],
+  ['  resetTimeout: <span class="s">5000</span>,', 'reset'],
+  ['});', null],
+  ['breaker.<span class="key">fallback</span>(() =&gt; []);  <span class="c">// 在沒有推薦內容的情況下呈現頁面</span>', 'fallback'],
+  ['<span class="key">const</span> recs = <span class="key">await</span> breaker.fire(concertId);', 'fire'],
+  ['', null],
+  ['<span class="c"># Kubernetes 容器設定</span>', null],
+  ['<span class="key">livenessProbe</span>:', 'liveness'],
+  ['  httpGet: { path: <span class="s">/healthz</span>, port: <span class="s">3000</span> }', 'liveness'],
+  ['  periodSeconds: <span class="s">10</span>', 'liveness'],
+  ['  failureThreshold: <span class="s">3</span>', 'liveness'],
+  ['<span class="key">readinessProbe</span>:', 'readiness'],
+  ['  httpGet: { path: <span class="s">/ready</span>, port: <span class="s">3000</span> }', 'readiness'],
+  ['  periodSeconds: <span class="s">5</span>', 'readiness'],
+], {
+  breaker: ['包住這次呼叫', '斷路器位於你的程式碼和相依服務之間，記錄每次呼叫的結果。'],
+  timeout: ['逾時', '超過 2 秒的呼叫就算失敗。你仍然需要逾時；斷路器是建立在逾時之上的。'],
+  threshold: ['何時開啟', 'opossum 會在最近的呼叫有一半失敗時開啟，以滾動時間窗計算。實驗室用的是更簡單的規則：連續失敗 5 次。'],
+  reset: ['冷卻時間', '開啟後要等多久才嘗試測試呼叫（半開）。實驗室用的是 5 秒。'],
+  fallback: ['備援方案', '開啟時要回傳什麼。這裡是空的清單，所以頁面會在沒有那個區塊的情況下呈現。沒有備援方案，斷路器只是讓失敗來得更快。'],
+  fire: ['透過斷路器呼叫', '關閉時：呼叫服務。開啟時：立刻回傳備援方案，完全不碰網路。'],
+  liveness: ['存活探針', 'Kubernetes 每 10 秒呼叫一次 <code>/healthz</code>，失敗 3 次就重新啟動容器。這就是修好卡住的 api-3 的東西。讓這個端點保持單純：「行程能回應」就好。'],
+  readiness: ['就緒探針', '<code>/ready</code> 失敗期間，執行個體會被移出負載平衡器，但不會被重新啟動。這就是讓流量遠離暖機中執行個體的東西。'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: '評論服務掛了。逾時設 3 秒，每個演唱會頁面都要 3 秒，有些還會失敗。什麼最有幫助？', opts: [
+    ['把逾時提高到 30 秒，讓呼叫有時間完成', false, '服務掛了。更長的逾時只會讓每個頁面等更久、佔住執行緒更久。'],
+    ['加上斷路器，並提供在沒有評論時呈現頁面的備援方案', true, '失敗幾次後就完全跳過呼叫，顯示沒有那個區塊的頁面。又快又仍然有用。'],
+    ['每次失敗的呼叫重試 3 次', false, '重試一個掛掉的服務，只會讓負載和等待加倍（見第 9 頁）。'],
+  ] },
+  { q: 'Dee 讓存活探針也檢查資料庫。資料庫出了 1 分鐘的小狀況。會發生什麼事？', opts: [
+    ['沒事：探針只是回報這個狀況', false, '存活探針失敗會觸發重新啟動。'],
+    ['每個執行個體的存活探針都失敗，同時被重新啟動，小狀況變成全面停擺', true, '存活探針只該問「這個行程卡住了嗎？」。相依服務的檢查放在就緒探針，或乾脆不放。'],
+    ['只有會連到資料庫的執行個體會重新啟動', false, '它們全都會連到資料庫，所以會一起讓探針失敗。'],
+  ] },
+  { q: '新的執行個體需要 40 秒載入快取，才能快速回應。哪一種檢查能避免歌迷太早打到它？', opts: [
+    ['存活探針', false, '存活探針會因為它太慢而重新啟動它，可能永無止境。'],
+    ['就緒探針', true, '它會一直待在負載平衡器之外，直到回報就緒。不會重新啟動，也不會出錯。'],
+    ['在瀏覽器裡放斷路器', false, '斷路器是用來保護呼叫端免受相依服務影響的。把流量送到對的執行個體，是平台的工作。'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'circuit-breakers-health-checks');
+})();
+</script>
+</body>
+</html>

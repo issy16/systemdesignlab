@@ -79,6 +79,12 @@ const FLOWS = {
     ['click', seg('keySeg', 2), 100], ['click', seg('netSeg', 1), 100], ['click', '#dbl', 1700],
     ['click', seg('netSeg', 2), 100], ['click', '#pay', 2800],
   ],
+  'circuit-breakers-health-checks': [
+    ['click', '#player .btn.primary', 2500],
+    ['click', seg('svcSeg', 2), 4500],
+    ['click', seg('brSeg', 2), 6500],
+    ['click', seg('svcSeg', 1), 7500],
+  ],
 };
 
 (async () => {

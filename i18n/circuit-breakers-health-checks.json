@@ -1,0 +1,825 @@
+{
+ "page": "circuit-breakers-health-checks",
+ "segments": [
+  {
+   "kind": "attr",
+   "en": "width=device-width, initial-scale=1, viewport-fit=cover",
+   "zh": "="
+  },
+  {
+   "kind": "attr",
+   "en": "Break a dependency and watch it take the whole page down, then add a circuit breaker and health checks that contain the damage.",
+   "zh": "弄壞一個相依服務，看它拖垮整個頁面，再加上斷路器和健康檢查，把損害控制住。"
+  },
+  {
+   "kind": "attr",
+   "en": "Sections",
+   "zh": "章節"
+  },
+  {
+   "kind": "attr",
+   "en": "Circuit breaker state",
+   "zh": "斷路器狀態"
+  },
+  {
+   "kind": "attr",
+   "en": "API instances",
+   "zh": "API 執行個體"
+  },
+  {
+   "kind": "attr",
+   "en": "Example circuit breaker code and Kubernetes probes",
+   "zh": "斷路器程式碼與 Kubernetes 探針範例"
+  },
+  {
+   "kind": "attr",
+   "en": "Pages",
+   "zh": "頁面"
+  },
+  {
+   "kind": "html",
+   "en": "Circuit Breakers and Health Checks · System Design Lab",
+   "zh": "斷路器與健康檢查 · System Design Lab"
+  },
+  {
+   "kind": "html",
+   "en": "system<b>.design.lab</b>",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "Lab",
+   "zh": "實驗室"
+  },
+  {
+   "kind": "html",
+   "en": "Health checks",
+   "zh": "健康檢查"
+  },
+  {
+   "kind": "html",
+   "en": "The config",
+   "zh": "設定檔"
+  },
+  {
+   "kind": "html",
+   "en": "Recap",
+   "zh": "重點整理"
+  },
+  {
+   "kind": "html",
+   "en": "page 11 · stage 3 · survive failures",
+   "zh": "第 11 頁 · 階段 3 · 在故障中存活"
+  },
+  {
+   "kind": "html",
+   "en": "Circuit breakers, health checks, liveness and readiness probes",
+   "zh": "斷路器、健康檢查、存活與就緒探針"
+  },
+  {
+   "kind": "html",
+   "en": "A broken recommendation box <em>shouldn't break the whole page.</em>",
+   "zh": "一個壞掉的推薦區塊，<em>不該弄壞整個頁面。</em>"
+  },
+  {
+   "kind": "html",
+   "en": "<b>Encore</b>The concert page shows “Fans also bought…” from a recommendations service. That service hangs. Every page now waits for it to time out, Encore's servers run out of threads, and fans can't even see the concert. A box nobody needs took everything down.",
+   "zh": "<b>Encore</b>演唱會頁面會顯示來自推薦服務的「買了這場的人也買了……」。那個服務卡住了。現在每個頁面都在等它逾時，Encore 的伺服器用光了執行緒，歌迷連演唱會資訊都看不到。一個沒人需要的區塊，拖垮了一切。"
+  },
+  {
+   "kind": "html",
+   "en": "Open the lab ↓",
+   "zh": "打開實驗室 ↓"
+  },
+  {
+   "kind": "html",
+   "en": "lab · break it, then fix it",
+   "zh": "實驗室 · 先弄壞，再修好"
+  },
+  {
+   "kind": "html",
+   "en": "no breaker",
+   "zh": "沒有斷路器"
+  },
+  {
+   "kind": "html",
+   "en": "20 page views a second, one flaky dependency",
+   "zh": "每秒 20 次頁面瀏覽，一個不穩定的相依服務"
+  },
+  {
+   "kind": "html",
+   "en": "Each page view calls the recommendations service. When it works, the call takes 50 ms. When it's broken, the call hangs until a <b>2 s timeout</b>. Encore's server has <b>30 threads</b>, and each call holds one. Simulated numbers.",
+   "zh": "每次頁面瀏覽都會呼叫推薦服務。正常時呼叫花 50 毫秒；壞掉時呼叫會一直卡到 <b>2 秒逾時</b>。Encore 的伺服器有 <b>30 條執行緒</b>，每次呼叫佔一條。數字是模擬的。"
+  },
+  {
+   "kind": "html",
+   "en": "Recommendations service",
+   "zh": "推薦服務"
+  },
+  {
+   "kind": "html",
+   "en": "Circuit breaker",
+   "zh": "斷路器（circuit breaker）"
+  },
+  {
+   "kind": "html",
+   "en": "Simulation",
+   "zh": "模擬"
+  },
+  {
+   "kind": "html",
+   "en": "Closed",
+   "zh": "關閉（Closed）"
+  },
+  {
+   "kind": "html",
+   "en": "calls go through",
+   "zh": "呼叫照常通過"
+  },
+  {
+   "kind": "html",
+   "en": "Open",
+   "zh": "開啟（Open）"
+  },
+  {
+   "kind": "html",
+   "en": "skip the call",
+   "zh": "跳過呼叫"
+  },
+  {
+   "kind": "html",
+   "en": "Half-open",
+   "zh": "半開（Half-open）"
+  },
+  {
+   "kind": "html",
+   "en": "one test call",
+   "zh": "一次測試呼叫"
+  },
+  {
+   "kind": "html",
+   "en": "Page load",
+   "zh": "頁面載入"
+  },
+  {
+   "kind": "html",
+   "en": "0 ms",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "average, last 2 s",
+   "zh": "平均，最近 2 秒"
+  },
+  {
+   "kind": "html",
+   "en": "Pages failing",
+   "zh": "失敗的頁面"
+  },
+  {
+   "kind": "html",
+   "en": "no threads left",
+   "zh": "沒有執行緒可用"
+  },
+  {
+   "kind": "html",
+   "en": "Threads busy",
+   "zh": "忙碌的執行緒"
+  },
+  {
+   "kind": "html",
+   "en": "held by waiting calls",
+   "zh": "被等待中的呼叫佔住"
+  },
+  {
+   "kind": "html",
+   "en": "Recommendations",
+   "zh": "推薦內容"
+  },
+  {
+   "kind": "html",
+   "en": "shown",
+   "zh": "有顯示"
+  },
+  {
+   "kind": "html",
+   "en": "on every page",
+   "zh": "每個頁面都有"
+  },
+  {
+   "kind": "html",
+   "en": "Press Play to start the traffic.",
+   "zh": "按「播放」開始送出流量。"
+  },
+  {
+   "kind": "html",
+   "en": "Try this",
+   "zh": "試試看"
+  },
+  {
+   "kind": "html",
+   "en": "The one difference",
+   "zh": "關鍵差別"
+  },
+  {
+   "kind": "html",
+   "en": "Without a breaker, every request <b>keeps calling</b> a dependency that's known to be broken, and waits the full timeout each time. A <b>circuit breaker</b> counts failures. After a few in a row it <b>opens</b>: calls are skipped instantly and a fallback is used. After a cooldown it lets <b>one test call</b> through, and closes again if that works.",
+   "zh": "沒有斷路器時，每個請求都會<b>持續呼叫</b>一個明知壞掉的相依服務，而且每次都等滿逾時。<b>斷路器</b>會計算失敗次數；連續失敗幾次後它就<b>開啟</b>：呼叫立刻被跳過，改用備援方案（fallback）。冷卻一段時間後，它會放<b>一次測試呼叫</b>通過，成功的話就再度關閉。"
+  },
+  {
+   "kind": "html",
+   "en": "act 2 · health checks",
+   "zh": "第 2 幕 · 健康檢查"
+  },
+  {
+   "kind": "html",
+   "en": "Three instances, two kinds of “are you OK?”",
+   "zh": "三個執行個體，兩種「你還好嗎？」"
+  },
+  {
+   "kind": "html",
+   "en": "The load balancer sends traffic to three copies of Encore's API. <b>api-2</b> just started and is still loading its cache. <b>api-3</b> is stuck in a deadlock: the process is running, but it never answers. Pick which checks the platform runs, then move time forward.",
+   "zh": "負載平衡器把流量送到 Encore API 的三份副本。<b>api-2</b> 剛啟動，還在載入快取。<b>api-3</b> 卡在死結裡：行程還在跑，卻永遠不回應。選擇平台要執行哪些檢查，然後讓時間往前走。"
+  },
+  {
+   "kind": "html",
+   "en": "Advance 10 s →",
+   "zh": "前進 10 秒 →"
+  },
+  {
+   "kind": "html",
+   "en": "↺ Reset",
+   "zh": "↺ 重設"
+  },
+  {
+   "kind": "html",
+   "en": "Liveness probe",
+   "zh": "存活探針（Liveness probe）"
+  },
+  {
+   "kind": "html",
+   "en": "“Is this process stuck?” If it fails several times, <b>restart</b> it. That fixes deadlocks and hangs.",
+   "zh": "「這個行程卡住了嗎？」連續失敗幾次就<b>重新啟動</b>它。這能修好死結和卡死。"
+  },
+  {
+   "kind": "html",
+   "en": "Readiness probe",
+   "zh": "就緒探針（Readiness probe）"
+  },
+  {
+   "kind": "html",
+   "en": "“Can it take traffic <i>right now</i>?” If not, <b>stop sending it requests</b>, but don't restart it. For startup, warm-up, or a lost database connection.",
+   "zh": "「它<i>現在</i>能接流量嗎？」不能的話就<b>停止送請求給它</b>，但不要重新啟動。用於啟動中、暖機中，或資料庫連線中斷時。"
+  },
+  {
+   "kind": "html",
+   "en": "act 3 · the real thing",
+   "zh": "第 3 幕 · 真實世界"
+  },
+  {
+   "kind": "html",
+   "en": "code + yaml",
+   "zh": "程式碼＋YAML"
+  },
+  {
+   "kind": "html",
+   "en": "A breaker in a few lines, probes in a few more",
+   "zh": "幾行就是一個斷路器，再幾行就是探針"
+  },
+  {
+   "kind": "html",
+   "en": "The breaker uses",
+   "zh": "斷路器使用"
+  },
+  {
+   "kind": "html",
+   "en": "opossum",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": ", a common Node.js library. The probes are Kubernetes settings. <b>Hover or tap a line.</b>",
+   "zh": "，一個常見的 Node.js 函式庫。探針則是 Kubernetes 的設定。<b>把滑鼠移到某一行上，或點一下。</b>"
+  },
+  {
+   "kind": "html",
+   "en": "👆 pick a line",
+   "zh": "👆 選一行"
+  },
+  {
+   "kind": "html",
+   "en": "Each highlighted line maps to the lab.",
+   "zh": "每一行反白後，都會對應到實驗室。"
+  },
+  {
+   "kind": "html",
+   "en": "recap · keep this",
+   "zh": "重點整理 · 帶走這些"
+  },
+  {
+   "kind": "html",
+   "en": "The whole page on one screen",
+   "zh": "整頁濃縮在一個畫面"
+  },
+  {
+   "kind": "html",
+   "en": "Stop calling",
+   "zh": "停止呼叫"
+  },
+  {
+   "kind": "html",
+   "en": "After repeated failures, skip the call and use a fallback. Test now and then, and resume when it works.",
+   "zh": "連續失敗後，跳過呼叫並改用備援方案。偶爾測試一下，恢復正常時再繼續呼叫。"
+  },
+  {
+   "kind": "html",
+   "en": "Restart",
+   "zh": "重新啟動"
+  },
+  {
+   "kind": "html",
+   "en": "Liveness",
+   "zh": "存活探針"
+  },
+  {
+   "kind": "html",
+   "en": "Detects a process that's stuck, and restarts it. Keep it simple: don't fail it because a dependency is down.",
+   "zh": "偵測卡住的行程並重新啟動它。保持簡單：不要因為相依服務掛了就讓它失敗。"
+  },
+  {
+   "kind": "html",
+   "en": "Route around",
+   "zh": "繞道而行"
+  },
+  {
+   "kind": "html",
+   "en": "Readiness",
+   "zh": "就緒探針"
+  },
+  {
+   "kind": "html",
+   "en": "Detects an instance that can't serve yet, and takes it out of the load balancer until it can.",
+   "zh": "偵測還不能服務的執行個體，把它從負載平衡器中移除，直到它準備好。"
+  },
+  {
+   "kind": "html",
+   "en": "The tradeoff",
+   "zh": "取捨"
+  },
+  {
+   "kind": "html",
+   "en": "A breaker turns a slow failure into a fast, partial one: fans get the page without recommendations. That only works if you design a fallback. Thresholds that are too sensitive open on small blips; too lax, and they open after the damage is done.",
+   "zh": "斷路器把緩慢的失敗變成快速的、局部的失敗：歌迷看到的是沒有推薦內容的頁面。前提是你設計了備援方案。門檻太敏感，小小波動就會開啟；太寬鬆，等它開啟時傷害已經造成了。"
+  },
+  {
+   "kind": "html",
+   "en": "Check it",
+   "zh": "考考自己"
+  },
+  {
+   "kind": "js",
+   "en": "'Press <b>Play</b> with the service healthy and no breaker.'",
+   "zh": "'在服務健康、沒有斷路器的情況下按<b>播放</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Calls take 50 ms. Only one thread is busy at a time.'",
+   "zh": "'呼叫只要 50 毫秒。同一時間只有一條執行緒在忙。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Set the service to <b>Broken</b>.'",
+   "zh": "'把服務設成<b>壞掉</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Every page now waits 2 s for the timeout. Threads fill up, and soon pages fail entirely.'",
+   "zh": "'現在每個頁面都要等 2 秒逾時。執行緒被佔滿，很快頁面就完全失敗了。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Turn the <b>circuit breaker On</b>.'",
+   "zh": "'把<b>斷路器開啟</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'After 5 failures in a row it opens. Pages load in 80 ms again, just without recommendations.'",
+   "zh": "'連續失敗 5 次後它就開啟。頁面又能在 80 毫秒內載入，只是沒有推薦內容。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Set the service back to <b>Healthy</b> and wait.'",
+   "zh": "'把服務設回<b>健康</b>，然後等一下。'"
+  },
+  {
+   "kind": "js",
+   "en": "'After a 5 s cooldown the breaker goes half-open, sends one test call, sees it work, and closes.'",
+   "zh": "'冷卻 5 秒後，斷路器進入半開狀態，送出一次測試呼叫，看到成功就關閉。'"
+  },
+  {
+   "kind": "js",
+   "en": "'breaker: '",
+   "zh": "'斷路器：'"
+  },
+  {
+   "kind": "js",
+   "en": "'no breaker'",
+   "zh": "'沒有斷路器'"
+  },
+  {
+   "kind": "js",
+   "en": "'● now'",
+   "zh": "'● 目前'"
+  },
+  {
+   "kind": "js",
+   "en": "' ms'",
+   "zh": "' 毫秒'"
+  },
+  {
+   "kind": "js",
+   "en": "`${m.thr} / ${THREADS}`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'on every page'",
+   "zh": "'每個頁面都有'"
+  },
+  {
+   "kind": "js",
+   "en": "'page works without them'",
+   "zh": "'頁面在沒有推薦內容時也能運作'"
+  },
+  {
+   "kind": "js",
+   "en": "'Press Play to start the traffic.'",
+   "zh": "'按「播放」開始送出流量。'"
+  },
+  {
+   "kind": "js",
+   "en": "`✕ All ${THREADS} threads are stuck waiting on the broken service, so ${Math.round(m.err * 100)}% of page views fail completely, even though the concert info itself is fine.`",
+   "zh": "`✕ ${THREADS} 條執行緒全都卡在等那個壞掉的服務，所以 ${Math.round(m.err * 100)}% 的頁面瀏覽完全失敗，即使演唱會資訊本身一點問題都沒有。`"
+  },
+  {
+   "kind": "js",
+   "en": "'⚠ Every page waits the full 2 s timeout for recommendations that never come.'",
+   "zh": "'⚠ 每個頁面都要等滿 2 秒逾時，等一份永遠不會來的推薦內容。'"
+  },
+  {
+   "kind": "js",
+   "en": "`✓ Breaker open: the call is skipped, and pages load in ${BASE} ms without recommendations. Next test call in ${Math.max(0, Math.ceil((S.openUntil - S.t) / 1000))} s.`",
+   "zh": "`✓ 斷路器開啟：呼叫被跳過，頁面在 ${BASE} 毫秒內載入，只是沒有推薦內容。${Math.max(0, Math.ceil((S.openUntil - S.t) / 1000))} 秒後進行下一次測試呼叫。`"
+  },
+  {
+   "kind": "js",
+   "en": "'⏸ Half-open: one test call is going through. Everyone else still gets the fallback.'",
+   "zh": "'⏸ 半開：一次測試呼叫正在進行。其他人仍然拿到備援方案。'"
+  },
+  {
+   "kind": "js",
+   "en": "'✓ Healthy: pages load quickly, with recommendations.'",
+   "zh": "'✓ 健康：頁面載入很快，而且有推薦內容。'"
+  },
+  {
+   "kind": "js",
+   "en": "`t = ${(S.t / 1000).toFixed(1)} s`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Healthy'",
+   "zh": "'健康'"
+  },
+  {
+   "kind": "js",
+   "en": "'Broken (hangs)'",
+   "zh": "'壞掉（卡住）'"
+  },
+  {
+   "kind": "js",
+   "en": "'Off'",
+   "zh": "'關閉'"
+  },
+  {
+   "kind": "js",
+   "en": "'On'",
+   "zh": "'開啟'"
+  },
+  {
+   "kind": "js",
+   "en": "'loading cache'",
+   "zh": "'載入快取中'"
+  },
+  {
+   "kind": "js",
+   "en": "'never answers'",
+   "zh": "'永遠不回應'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"pill ok\">ready</span>'",
+   "zh": "'<span class=\"pill ok\">就緒</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"pill bad\">stuck</span>'",
+   "zh": "'<span class=\"pill bad\">卡住</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"pill wait\">starting</span>'",
+   "zh": "'<span class=\"pill wait\">啟動中</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "`<div class=\"nm\"><span>${p.n}</span>${pill}</div>\n      <div class=\"mono\">${p.proc === 'restarted' ? '↻ restarted by liveness' : p.proc}${p.note ? ' · ' + p.note : ''}</div>\n      <div class=\"mono\">${gets(p) ? (p.ready ? '✓ gets traffic' : '✕ gets traffic, fails it') : '– no traffic (not ready)'}</div>`",
+   "zh": "`<div class=\"nm\"><span>${p.n}</span>${pill}</div>\n      <div class=\"mono\">${p.proc === 'restarted' ? '↻ 已由存活探針重新啟動' : p.proc === 'deadlocked' ? '死結' : '執行中'}${p.note ? ' · ' + p.note : ''}</div>\n      <div class=\"mono\">${gets(p) ? (p.ready ? '✓ 有接到流量' : '✕ 有接到流量，但處理失敗') : '– 沒有流量（尚未就緒）'}</div>`"
+  },
+  {
+   "kind": "js",
+   "en": "`t = ${step * 10} s`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "`✕ ${pct}% of requests go to an instance that can't answer. ${mode === 0 ? 'With no checks, nobody notices api-3 is stuck, ever.' : mode === 1 ? 'Liveness restarted api-3, but instances still get traffic while they\\'re warming up.' : ''}`",
+   "zh": "`✕ ${pct}% 的請求被送到無法回應的執行個體。${mode === 0 ? '沒有任何檢查，永遠沒人發現 api-3 卡住了。' : mode === 1 ? '存活探針重新啟動了 api-3，但執行個體在暖機時仍然會接到流量。' : ''}`"
+  },
+  {
+   "kind": "js",
+   "en": "`✓ Every request lands on an instance that's ready. ${mode === 2 && step < 3 ? 'Warming instances are skipped until their readiness probe passes.' : ''}`",
+   "zh": "`✓ 每個請求都落在已就緒的執行個體上。${mode === 2 && step < 3 ? '暖機中的執行個體會被跳過，直到它的就緒探針通過。' : ''}`"
+  },
+  {
+   "kind": "js",
+   "en": "'No health checks'",
+   "zh": "'沒有健康檢查'"
+  },
+  {
+   "kind": "js",
+   "en": "'Liveness only'",
+   "zh": "'只有存活探針'"
+  },
+  {
+   "kind": "js",
+   "en": "'Liveness + readiness'",
+   "zh": "'存活＋就緒探針'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">const</span> breaker = <span class=\"key\">new</span> CircuitBreaker(getRecommendations, {'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  timeout: <span class=\"s\">2000</span>,'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  errorThresholdPercentage: <span class=\"s\">50</span>,'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  resetTimeout: <span class=\"s\">5000</span>,'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'breaker.<span class=\"key\">fallback</span>(() =&gt; []);  <span class=\"c\">// render the page without recommendations</span>'",
+   "zh": "'breaker.<span class=\"key\">fallback</span>(() =&gt; []);  <span class=\"c\">// 在沒有推薦內容的情況下呈現頁面</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">const</span> recs = <span class=\"key\">await</span> breaker.fire(concertId);'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\"># Kubernetes container spec</span>'",
+   "zh": "'<span class=\"c\"># Kubernetes 容器設定</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">livenessProbe</span>:'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  httpGet: { path: <span class=\"s\">/healthz</span>, port: <span class=\"s\">3000</span> }'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  periodSeconds: <span class=\"s\">10</span>'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  failureThreshold: <span class=\"s\">3</span>'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">readinessProbe</span>:'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  httpGet: { path: <span class=\"s\">/ready</span>, port: <span class=\"s\">3000</span> }'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  periodSeconds: <span class=\"s\">5</span>'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Wrap the call'",
+   "zh": "'包住這次呼叫'"
+  },
+  {
+   "kind": "js",
+   "en": "'The breaker sits between your code and the dependency, and counts how calls go.'",
+   "zh": "'斷路器位於你的程式碼和相依服務之間，記錄每次呼叫的結果。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Timeout'",
+   "zh": "'逾時'"
+  },
+  {
+   "kind": "js",
+   "en": "'A call that takes longer than 2 s counts as a failure. You still need timeouts; the breaker builds on them.'",
+   "zh": "'超過 2 秒的呼叫就算失敗。你仍然需要逾時；斷路器是建立在逾時之上的。'"
+  },
+  {
+   "kind": "js",
+   "en": "'When to open'",
+   "zh": "'何時開啟'"
+  },
+  {
+   "kind": "js",
+   "en": "'opossum opens when half of the recent calls fail, measured over a rolling window. The lab uses a simpler rule: 5 failures in a row.'",
+   "zh": "'opossum 會在最近的呼叫有一半失敗時開啟，以滾動時間窗計算。實驗室用的是更簡單的規則：連續失敗 5 次。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Cooldown'",
+   "zh": "'冷卻時間'"
+  },
+  {
+   "kind": "js",
+   "en": "'How long to stay open before trying a test call (half-open). The lab uses 5 s.'",
+   "zh": "'開啟後要等多久才嘗試測試呼叫（半開）。實驗室用的是 5 秒。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Fallback'",
+   "zh": "'備援方案'"
+  },
+  {
+   "kind": "js",
+   "en": "'What to return while open. Here, an empty list, so the page renders without the box. Without a fallback, a breaker just fails faster.'",
+   "zh": "'開啟時要回傳什麼。這裡是空的清單，所以頁面會在沒有那個區塊的情況下呈現。沒有備援方案，斷路器只是讓失敗來得更快。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Call through the breaker'",
+   "zh": "'透過斷路器呼叫'"
+  },
+  {
+   "kind": "js",
+   "en": "'Closed: calls the service. Open: returns the fallback instantly, without touching the network.'",
+   "zh": "'關閉時：呼叫服務。開啟時：立刻回傳備援方案，完全不碰網路。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Liveness'",
+   "zh": "'存活探針'"
+  },
+  {
+   "kind": "js",
+   "en": "'Kubernetes calls <code>/healthz</code> every 10 s. After 3 failures it restarts the container. That\\'s what fixed the stuck api-3. Keep this endpoint dumb: “the process can answer”.'",
+   "zh": "'Kubernetes 每 10 秒呼叫一次 <code>/healthz</code>，失敗 3 次就重新啟動容器。這就是修好卡住的 api-3 的東西。讓這個端點保持單純：「行程能回應」就好。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Readiness'",
+   "zh": "'就緒探針'"
+  },
+  {
+   "kind": "js",
+   "en": "'While <code>/ready</code> fails, the instance is removed from the load balancer, but not restarted. That\\'s what kept traffic away from warming instances.'",
+   "zh": "'<code>/ready</code> 失敗期間，執行個體會被移出負載平衡器，但不會被重新啟動。這就是讓流量遠離暖機中執行個體的東西。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The reviews service is down. With a 3 s timeout, every concert page takes 3 s and some fail. What helps most?'",
+   "zh": "'評論服務掛了。逾時設 3 秒，每個演唱會頁面都要 3 秒，有些還會失敗。什麼最有幫助？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Raise the timeout to 30 s so calls have time to finish'",
+   "zh": "'把逾時提高到 30 秒，讓呼叫有時間完成'"
+  },
+  {
+   "kind": "js",
+   "en": "'The service is down. A longer timeout just makes every page wait longer and holds threads longer.'",
+   "zh": "'服務掛了。更長的逾時只會讓每個頁面等更久、佔住執行緒更久。'"
+  },
+  {
+   "kind": "js",
+   "en": "'A circuit breaker with a fallback that renders the page without reviews'",
+   "zh": "'加上斷路器，並提供在沒有評論時呈現頁面的備援方案'"
+  },
+  {
+   "kind": "js",
+   "en": "'After a few failures, skip the call entirely and show the page without that section. Fast and still useful.'",
+   "zh": "'失敗幾次後就完全跳過呼叫，顯示沒有那個區塊的頁面。又快又仍然有用。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Retry each failed call 3 times'",
+   "zh": "'每次失敗的呼叫重試 3 次'"
+  },
+  {
+   "kind": "js",
+   "en": "'Retrying a service that\\'s down multiplies the load and the waiting (see page 9).'",
+   "zh": "'重試一個掛掉的服務，只會讓負載和等待加倍（見第 9 頁）。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Dee makes the liveness probe check the database too. The database has a 1-minute blip. What happens?'",
+   "zh": "'Dee 讓存活探針也檢查資料庫。資料庫出了 1 分鐘的小狀況。會發生什麼事？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Nothing: the probe just reports the blip'",
+   "zh": "'沒事：探針只是回報這個狀況'"
+  },
+  {
+   "kind": "js",
+   "en": "'Liveness failures trigger restarts.'",
+   "zh": "'存活探針失敗會觸發重新啟動。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Every instance fails liveness and gets restarted at once, so the blip becomes a full outage'",
+   "zh": "'每個執行個體的存活探針都失敗，同時被重新啟動，小狀況變成全面停擺'"
+  },
+  {
+   "kind": "js",
+   "en": "'Liveness should only ask “is this process stuck?”. Put dependency checks in readiness, or nowhere.'",
+   "zh": "'存活探針只該問「這個行程卡住了嗎？」。相依服務的檢查放在就緒探針，或乾脆不放。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Only the instances that talk to the database restart'",
+   "zh": "'只有會連到資料庫的執行個體會重新啟動'"
+  },
+  {
+   "kind": "js",
+   "en": "'All of them talk to it, so they all fail the probe together.'",
+   "zh": "'它們全都會連到資料庫，所以會一起讓探針失敗。'"
+  },
+  {
+   "kind": "js",
+   "en": "'A new instance needs 40 s to load its cache before it can answer quickly. Which check keeps fans from hitting it too early?'",
+   "zh": "'新的執行個體需要 40 秒載入快取，才能快速回應。哪一種檢查能避免歌迷太早打到它？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Liveness probe'",
+   "zh": "'存活探針'"
+  },
+  {
+   "kind": "js",
+   "en": "'Liveness would restart it for being slow, possibly forever.'",
+   "zh": "'存活探針會因為它太慢而重新啟動它，可能永無止境。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Readiness probe'",
+   "zh": "'就緒探針'"
+  },
+  {
+   "kind": "js",
+   "en": "'It stays out of the load balancer until it reports ready. No restarts, no errors.'",
+   "zh": "'它會一直待在負載平衡器之外，直到回報就緒。不會重新啟動，也不會出錯。'"
+  },
+  {
+   "kind": "js",
+   "en": "'A circuit breaker in the browser'",
+   "zh": "'在瀏覽器裡放斷路器'"
+  },
+  {
+   "kind": "js",
+   "en": "'Breakers protect callers from a dependency. Getting traffic to the right instance is the platform\\'s job.'",
+   "zh": "'斷路器是用來保護呼叫端免受相依服務影響的。把流量送到對的執行個體，是平台的工作。'"
+  }
+ ]
+}

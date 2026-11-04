@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-Hans-CN" data-lang="zh-cn" data-slug="circuit-breakers-health-checks">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="弄坏一个相依服务，看它拖垮整个页面，再加上断路器和健康检查，把损害控制住。">
+<title>断路器与健康检查 · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/explainer.css">
+</head>
+<body>
+<!-- Plan. Stuck point: "it has a timeout, so it's fine" — but every call still waits the full timeout, and threads run out.
+     Lab: concert page → recommendations service. Break it; breaker off vs on (closed → open → half-open → closed).
+     Part 2: liveness vs readiness on three instances. Artifact: opossum breaker + Kubernetes probes. -->
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="章节"><a href="#lab">实验室</a><a href="#probes">健康检查</a><a href="#real">设置档</a><a href="#recap">重点整理</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>第 11 页 · 阶段 3 · 在故障中存活</span><span class="hot">10 · 56 · 57</span></div>
+  <div class="eyebrow">断路器、健康检查、存活与就绪探针</div>
+  <h1>一个坏掉的推荐区块，<em>不该弄坏整个页面。</em></h1>
+  <div class="scenario"><b>Encore</b>演唱会页面会显示来自推荐服务的「买了这场的人也买了……」。那个服务卡住了。现在每个页面都在等它超时，Encore 的服务器用光了线程，歌迷连演唱会信息都看不到。一个没人需要的区块，拖垮了一切。</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">打开实验室 ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>实验室 · 先弄坏，再修好</span><span class="hot" id="tag">没有断路器</span></div>
+  <h2>每秒 20 次页面浏览，一个不稳定的相依服务</h2>
+  <p>每次页面浏览都会调用推荐服务。正常时调用花 50 毫秒；坏掉时调用会一直卡到 <b>2 秒超时</b>。Encore 的服务器有 <b>30 条线程</b>，每次调用占一条。数字是模拟的。</p>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">推荐服务</span><div id="svcSeg"></div></div>
+      <div class="ctl"><span class="lab-k">断路器（circuit breaker）</span><div id="brSeg"></div></div>
+      <div class="ctl"><span class="lab-k">模拟</span><div id="player"></div></div>
+    </div>
+    <div class="pipe" id="states" style="margin:0" aria-label="断路器状态">
+      <div class="stage"><div class="chip" data-s="closed">关闭（Closed）<small>调用照常通过</small></div></div>
+      <div class="stage"><div class="chip" data-s="open">打开（Open）<small>跳过调用</small></div></div>
+      <div class="stage"><div class="chip" data-s="half">半开（Half-open）<small>一次测试调用</small></div></div>
+    </div>
+    <div class="meters" style="margin:0">
+      <div class="meter"><div class="k">页面加载</div><div class="v" id="mLat">0 ms</div><div class="d">平均，最近 2 秒</div></div>
+      <div class="meter"><div class="k">失败的页面</div><div class="v" id="mErr">0%</div><div class="d">没有线程可用</div></div>
+      <div class="meter"><div class="k">忙碌的线程</div><div class="v" id="mThr">0 / 30</div><div class="d">被等待中的调用占住</div></div>
+      <div class="meter"><div class="k">推荐内容</div><div class="v" id="mRec">有显示</div><div class="d" id="mRecD">每个页面都有</div></div>
+    </div>
+    <div class="status" id="status" role="status">按「播放」开始送出流量。</div>
+  </div>
+  <h3>试试看</h3>
+  <ol class="missions" id="missions"></ol>
+  <div class="takeaway"><div class="t">关键差别</div><p>没有断路器时，每个请求都会<b>持续调用</b>一个明知坏掉的相依服务，而且每次都等满超时。<b>断路器</b>会计算失败次数；连续失败几次后它就<b>打开</b>：调用立刻被跳过，改用备援方案（fallback）。冷却一段时间后，它会放<b>一次测试调用</b>通过，成功的话就再度关闭。</p></div>
+</section>
+
+<section class="panel" id="probes">
+  <div class="panel-label"><span>第 2 幕 · 健康检查</span><span class="hot">56 · 57</span></div>
+  <h2>三个运行个体，两种「你还好吗？」</h2>
+  <p>负载平衡器把流量送到 Encore API 的三份副本。<b>api-2</b> 刚启动，还在加载缓存。<b>api-3</b> 卡在死结里：进程还在跑，却永远不响应。选择平台要运行哪些检查，然后让时间往前走。</p>
+  <div class="row"><div id="prSeg"></div><button class="btn" id="adv" type="button">前进 10 秒 →</button><button class="btn sm" id="prReset" type="button">↺ 重置</button><span class="clock mono" id="prClock" style="color:var(--muted)">t = 0 s</span></div>
+  <div class="servers" id="pods" aria-label="API 运行个体"></div>
+  <p class="status" id="prTxt" style="margin-top:10px" role="status"></p>
+  <div class="compare">
+    <div><h3>存活探针（Liveness probe）</h3><p style="margin:0">「这个进程卡住了吗？」连续失败几次就<b>重新启动</b>它。这能修好死结和卡死。</p></div>
+    <div><h3>就绪探针（Readiness probe）</h3><p style="margin:0">「它<i>现在</i>能接流量吗？」不能的话就<b>停止送请求给它</b>，但不要重新启动。用于启动中、暖机中，或数据库连接中断时。</p></div>
+  </div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>第 3 幕 · 真实世界</span><span class="hot">代码＋YAML</span></div>
+  <h2>几行就是一个断路器，再几行就是探针</h2>
+  <p>断路器使用 <a href="https://github.com/nodeshift/opossum">opossum</a>，一个常见的 Node.js 函数库。探针则是 Kubernetes 的设置。<b>把鼠标移到某一行上，或点一下。</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="断路器代码与 Kubernetes 探针范例"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 选一行</div><p id="exP">每一行反白后，都会对应到实验室。</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>重点整理 · 带走这些</span><span class="hot">♥</span></div>
+  <h2>整页浓缩在一个画面</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">停止调用</div><div class="t">断路器（circuit breaker）</div><p>连续失败后，跳过调用并改用备援方案。偶尔测试一下，恢复正常时再继续调用。</p></div>
+    <div class="card"><div class="sub">重新启动</div><div class="t">存活探针</div><p>侦测卡住的进程并重新启动它。保持简单：不要因为相依服务挂了就让它失败。</p></div>
+    <div class="card"><div class="sub">绕道而行</div><div class="t">就绪探针</div><p>侦测还不能服务的运行个体，把它从负载平衡器中移除，直到它准备好。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">取舍</div><p>断路器把缓慢的失败变成快速的、局部的失败：歌迷看到的是没有推荐内容的页面。前提是你设计了备援方案。门槛太敏感，小小波动就会打开；太宽松，等它打开时伤害已经造成了。</p></div>
+  <h3 style="margin-top:26px">考考自己 <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="页面"></nav>
+</main>
+
+<script src="../../assets/explainer.js"></script>
+<script src="../../assets/i18n.zh-cn.js"></script>
+<script>
+(() => {
+const { $, el } = X;
+const DT = 100, RATE = 20, THREADS = 30, OK_MS = 50, TIMEOUT = 2000, BASE = 80, TRIP = 5, COOLDOWN = 5000, WIN = 2000;
+
+/* ---------- simulation: deterministic, pure state + tick ---------- */
+function init(o = {}) {
+  return Object.assign({ t: 0, broken: false, breakerOn: false, state: 'closed', fails: 0, openUntil: 0, trial: null,
+    inflight: [], ev: [], ticks: 0, seen: { open: false, half: false, closedAfter: false } }, o);
+}
+function tick(s) {
+  const t0 = s.t, t1 = t0 + DT;
+  // finish calls that were waiting
+  s.inflight = s.inflight.filter(c => {
+    if (c.end > t1) return true;
+    if (c.trial) {
+      s.trial = null;
+      if (c.ok) { s.state = 'closed'; s.fails = 0; s.seen.closedAfter = s.seen.open; }
+      else { s.state = 'open'; s.openUntil = c.end + COOLDOWN; }
+    } else if (!c.ok) { s.fails++; if (s.breakerOn && s.state === 'closed' && s.fails >= TRIP) { s.state = 'open'; s.openUntil = c.end + COOLDOWN; s.seen.open = true; } }
+    else s.fails = 0;
+    return false;
+  });
+  if (s.breakerOn && s.state === 'open' && t0 >= s.openUntil) { s.state = 'half'; s.seen.half = true; }
+  const n = RATE * DT / 1000;
+  for (let i = 0; i < n; i++) {
+    const at = t0 + (i / n) * DT;
+    const skip = s.breakerOn && (s.state === 'open' || (s.state === 'half' && s.trial));
+    if (skip) { s.ev.push({ t: at, lat: BASE, ok: 1, recs: 0 }); continue; }
+    if (s.inflight.length >= THREADS) { s.ev.push({ t: at, lat: 0, ok: 0, recs: 0 }); continue; }
+    const ms = s.broken ? TIMEOUT : OK_MS;
+    const call = { end: at + ms, ok: !s.broken };
+    if (s.breakerOn && s.state === 'half') { call.trial = true; s.trial = call; }
+    s.inflight.push(call);
+    s.ev.push({ t: at, lat: BASE + ms, ok: 1, recs: s.broken ? 0 : 1 });
+  }
+  s.t = t1; s.ticks++;
+  s.ev = s.ev.filter(e => e.t > t1 - WIN);
+  return s;
+}
+function metrics(s) {
+  const e = s.ev, served = e.filter(x => x.ok);
+  return { lat: X.avg(served.map(x => x.lat)), err: e.length ? 1 - served.length / e.length : 0, thr: s.inflight.length, recs: served.length ? served.filter(x => x.recs).length / served.length : 1 };
+}
+
+/* ---------- lab UI ---------- */
+let S = init();
+const chips = { closed: $('[data-s="closed"]'), open: $('[data-s="open"]'), half: $('[data-s="half"]') };
+const t0 = () => { S.ticks = 0; };
+const mis = X.missions($('#missions'), [
+  { text: '在服务健康、没有断路器的情况下按<b>播放</b>。', hint: '调用只要 50 毫秒。同一时间只有一条线程在忙。', check: s => s.ticks >= 20 && !s.broken },
+  { text: '把服务设成<b>坏掉</b>。', hint: '现在每个页面都要等 2 秒超时。线程被占满，很快页面就完全失败了。', check: s => s.broken && !s.breakerOn && metrics(s).err > 0.2 },
+  { text: '把<b>断路器打开</b>。', hint: '连续失败 5 次后它就打开。页面又能在 80 毫秒内加载，只是没有推荐内容。', check: s => s.broken && s.breakerOn && s.seen.open && metrics(s).err === 0 && s.ticks > 25 },
+  { text: '把服务设回<b>健康</b>，然后等一下。', hint: '冷却 5 秒后，断路器进入半开状态，送出一次测试调用，看到成功就关闭。', check: s => !s.broken && s.breakerOn && s.seen.closedAfter && s.state === 'closed' },
+]);
+function render() {
+  const m = metrics(S);
+  $('#tag').textContent = S.breakerOn ? '断路器：' + S.state.replace('half', 'half-open') : '没有断路器';
+  Object.entries(chips).forEach(([k, c]) => X.chip(c, !S.breakerOn ? '' : S.state === k ? (k === 'closed' ? 'ok' : k === 'open' ? 'fail' : 'wait') : '', !S.breakerOn ? '' : S.state === k ? '● 目前' : ''));
+  $('#states').style.opacity = S.breakerOn ? 1 : 0.45;
+  $('#mLat').textContent = X.fmt(m.lat) + ' 毫秒';
+  $('#mLat').parentElement.className = 'meter' + (m.lat > 1000 ? ' bad' : m.lat > 300 ? ' wait' : ' ok');
+  $('#mErr').textContent = Math.round(m.err * 100) + '%';
+  $('#mErr').parentElement.className = 'meter' + (m.err > 0 ? ' bad' : '');
+  $('#mThr').textContent = `${m.thr} / ${THREADS}`;
+  $('#mThr').parentElement.className = 'meter' + (m.thr >= THREADS ? ' bad' : m.thr > 10 ? ' wait' : '');
+  $('#mRec').textContent = m.recs > 0.95 ? 'shown' : m.recs < 0.05 ? 'hidden' : 'some';
+  $('#mRecD').textContent = m.recs > 0.95 ? '每个页面都有' : '页面在没有推荐内容时也能运作';
+  const st = $('#status');
+  if (!S.t) { st.className = 'status'; st.textContent = '按「播放」开始送出流量。'; }
+  else if (m.err > 0) { st.className = 'status bad'; st.textContent = `✕ ${THREADS} 条线程全都卡在等那个坏掉的服务，所以 ${Math.round(m.err * 100)}% 的页面浏览完全失败，即使演唱会信息本身一点问题都没有。`; }
+  else if (S.broken && !S.breakerOn) { st.className = 'status wait'; st.textContent = '⚠ 每个页面都要等满 2 秒超时，等一份永远不会来的推荐内容。'; }
+  else if (S.breakerOn && S.state === 'open') { st.className = 'status ok'; st.textContent = `✓ 断路器打开：调用被跳过，页面在 ${BASE} 毫秒内加载，只是没有推荐内容。${Math.max(0, Math.ceil((S.openUntil - S.t) / 1000))} 秒后进行下一次测试调用。`; }
+  else if (S.breakerOn && S.state === 'half') { st.className = 'status wait'; st.textContent = '⏸ 半开：一次测试调用正在进行。其他人仍然拿到备援方案。'; }
+  else { st.className = 'status ok'; st.textContent = '✓ 健康：页面加载很快，而且有推荐内容。'; }
+  player.clock(`t = ${(S.t / 1000).toFixed(1)} s`);
+  mis.update(S);
+}
+const player = X.player($('#player'), {
+  step: () => { tick(S); render(); }, stepTicks: 5,
+  reset: () => { S = init({ broken: S.broken, breakerOn: S.breakerOn }); mis.reset(); render(); },
+});
+X.seg($('#svcSeg'), ['健康', '坏掉（卡住）'], i => { S.broken = i === 1; t0(); render(); }, 0);
+X.seg($('#brSeg'), ['关闭', '打开'], i => { S.breakerOn = i === 1; S.state = 'closed'; S.fails = 0; S.trial = null; t0(); render(); }, 0);
+render();
+
+/* ---------- act 2: probes (stepper) ---------- */
+let mode = 0, step = 0;
+function podAt(name, k) {
+  // returns { proc: 'running'|'deadlocked'|'restarting', ready, note }
+  if (name === 'api-1') return { proc: 'running', ready: true };
+  if (name === 'api-2') return { proc: 'running', ready: k >= 2, note: k < 2 ? '加载缓存中' : '' };
+  if (mode === 0) return { proc: 'deadlocked', ready: false, note: '永远不响应' };
+  if (k === 0) return { proc: 'deadlocked', ready: false, note: '永远不响应' };
+  return k < 3 ? { proc: 'restarted', ready: false, note: '加载缓存中' } : { proc: 'running', ready: true };
+}
+function drawProbes() {
+  const pods = ['api-1', 'api-2', 'api-3'].map(n => ({ n, ...podAt(n, step) }));
+  const gets = p => (mode === 2 ? p.ready : true);
+  const traffic = pods.filter(gets);
+  const bad = traffic.filter(p => !p.ready).length;
+  const box = $('#pods'); box.innerHTML = '';
+  pods.forEach(p => {
+    const d = el('div', 'server' + (p.proc === 'deadlocked' ? ' down' : ''));
+    const pill = p.ready ? '<span class="pill ok">就绪</span>' : p.proc === 'deadlocked' ? '<span class="pill bad">卡住</span>' : '<span class="pill wait">启动中</span>';
+    d.innerHTML = `<div class="nm"><span>${p.n}</span>${pill}</div>
+      <div class="mono">${p.proc === 'restarted' ? '↻ 已由存活探针重新启动' : p.proc === 'deadlocked' ? '死结' : '运行中'}${p.note ? ' · ' + p.note : ''}</div>
+      <div class="mono">${gets(p) ? (p.ready ? '✓ 有接到流量' : '✕ 有接到流量，但处理失败') : '– 没有流量（尚未就绪）'}</div>`;
+    box.append(d);
+  });
+  $('#prClock').textContent = `t = ${step * 10} s`;
+  $('#adv').disabled = step >= 4;
+  const pct = Math.round((bad / traffic.length) * 100);
+  const t = $('#prTxt');
+  t.className = 'status ' + (pct ? 'bad' : 'ok');
+  t.textContent = pct
+    ? `✕ ${pct}% 的请求被送到无法响应的运行个体。${mode === 0 ? '没有任何检查，永远没人发现 api-3 卡住了。' : mode === 1 ? '存活探针重新启动了 api-3，但运行个体在暖机时仍然会接到流量。' : ''}`
+    : `✓ 每个请求都落在已就绪的运行个体上。${mode === 2 && step < 3 ? '暖机中的运行个体会被跳过，直到它的就绪探针通过。' : ''}`;
+}
+X.seg($('#prSeg'), ['没有健康检查', '只有存活探针', '存活＋就绪探针'], i => { mode = i; step = 0; drawProbes(); }, 0);
+$('#adv').addEventListener('click', () => { step = Math.min(4, step + 1); drawProbes(); });
+$('#prReset').addEventListener('click', () => { step = 0; drawProbes(); });
+drawProbes();
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="key">const</span> breaker = <span class="key">new</span> CircuitBreaker(getRecommendations, {', 'breaker'],
+  ['  timeout: <span class="s">2000</span>,', 'timeout'],
+  ['  errorThresholdPercentage: <span class="s">50</span>,', 'threshold'],
+  ['  resetTimeout: <span class="s">5000</span>,', 'reset'],
+  ['});', null],
+  ['breaker.<span class="key">fallback</span>(() =&gt; []);  <span class="c">// 在没有推荐内容的情况下呈现页面</span>', 'fallback'],
+  ['<span class="key">const</span> recs = <span class="key">await</span> breaker.fire(concertId);', 'fire'],
+  ['', null],
+  ['<span class="c"># Kubernetes 容器设置</span>', null],
+  ['<span class="key">livenessProbe</span>:', 'liveness'],
+  ['  httpGet: { path: <span class="s">/healthz</span>, port: <span class="s">3000</span> }', 'liveness'],
+  ['  periodSeconds: <span class="s">10</span>', 'liveness'],
+  ['  failureThreshold: <span class="s">3</span>', 'liveness'],
+  ['<span class="key">readinessProbe</span>:', 'readiness'],
+  ['  httpGet: { path: <span class="s">/ready</span>, port: <span class="s">3000</span> }', 'readiness'],
+  ['  periodSeconds: <span class="s">5</span>', 'readiness'],
+], {
+  breaker: ['包住这次调用', '断路器位于你的代码和相依服务之间，记录每次调用的结果。'],
+  timeout: ['超时', '超过 2 秒的调用就算失败。你仍然需要超时；断路器是创建在超时之上的。'],
+  threshold: ['何时打开', 'opossum 会在最近的调用有一半失败时打开，以滚动时间窗计算。实验室用的是更简单的规则：连续失败 5 次。'],
+  reset: ['冷却时间', '打开后要等多久才尝试测试调用（半开）。实验室用的是 5 秒。'],
+  fallback: ['备援方案', '打开时要返回什么。这里是空的清单，所以页面会在没有那个区块的情况下呈现。没有备援方案，断路器只是让失败来得更快。'],
+  fire: ['通过断路器调用', '关闭时：调用服务。打开时：立刻返回备援方案，完全不碰网络。'],
+  liveness: ['存活探针', 'Kubernetes 每 10 秒调用一次 <code>/healthz</code>，失败 3 次就重新启动容器。这就是修好卡住的 api-3 的东西。让这个端点保持单纯：「进程能响应」就好。'],
+  readiness: ['就绪探针', '<code>/ready</code> 失败期间，运行个体会被移出负载平衡器，但不会被重新启动。这就是让流量远离暖机中运行个体的东西。'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: '评论服务挂了。超时设 3 秒，每个演唱会页面都要 3 秒，有些还会失败。什么最有帮助？', opts: [
+    ['把超时提高到 30 秒，让调用有时间完成', false, '服务挂了。更长的超时只会让每个页面等更久、占住线程更久。'],
+    ['加上断路器，并提供在没有评论时呈现页面的备援方案', true, '失败几次后就完全跳过调用，显示没有那个区块的页面。又快又仍然有用。'],
+    ['每次失败的调用重试 3 次', false, '重试一个挂掉的服务，只会让负载和等待加倍（见第 9 页）。'],
+  ] },
+  { q: 'Dee 让存活探针也检查数据库。数据库出了 1 分钟的小状况。会发生什么事？', opts: [
+    ['没事：探针只是回报这个状况', false, '存活探针失败会触发重新启动。'],
+    ['每个运行个体的存活探针都失败，同时被重新启动，小状况变成全面停摆', true, '存活探针只该问「这个进程卡住了吗？」。相依服务的检查放在就绪探针，或干脆不放。'],
+    ['只有会连到数据库的运行个体会重新启动', false, '它们全都会连到数据库，所以会一起让探针失败。'],
+  ] },
+  { q: '新的运行个体需要 40 秒加载缓存，才能快速响应。哪一种检查能避免歌迷太早打到它？', opts: [
+    ['存活探针', false, '存活探针会因为它太慢而重新启动它，可能永无止境。'],
+    ['就绪探针', true, '它会一直待在负载平衡器之外，直到回报就绪。不会重新启动，也不会出错。'],
+    ['在浏览器里放断路器', false, '断路器是用来保护调用端免受相依服务影响的。把流量送到对的运行个体，是平台的工作。'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'circuit-breakers-health-checks');
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Break a dependency and watch it take the whole page down, then add a circuit breaker and health checks that contain the damage.">
+<title>Circuit Breakers and Health Checks · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/explainer.css">
+</head>
+<body>
+<!-- Plan. Stuck point: "it has a timeout, so it's fine" — but every call still waits the full timeout, and threads run out.
+     Lab: concert page → recommendations service. Break it; breaker off vs on (closed → open → half-open → closed).
+     Part 2: liveness vs readiness on three instances. Artifact: opossum breaker + Kubernetes probes. -->
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="Sections"><a href="#lab">Lab</a><a href="#probes">Health checks</a><a href="#real">The config</a><a href="#recap">Recap</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>page 11 · stage 3 · survive failures</span><span class="hot">10 · 56 · 57</span></div>
+  <div class="eyebrow">Circuit breakers, health checks, liveness and readiness probes</div>
+  <h1>A broken recommendation box <em>shouldn't break the whole page.</em></h1>
+  <div class="scenario"><b>Encore</b>The concert page shows “Fans also bought…” from a recommendations service. That service hangs. Every page now waits for it to time out, Encore's servers run out of threads, and fans can't even see the concert. A box nobody needs took everything down.</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">Open the lab ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>lab · break it, then fix it</span><span class="hot" id="tag">no breaker</span></div>
+  <h2>20 page views a second, one flaky dependency</h2>
+  <p>Each page view calls the recommendations service. When it works, the call takes 50 ms. When it's broken, the call hangs until a <b>2 s timeout</b>. Encore's server has <b>30 threads</b>, and each call holds one. Simulated numbers.</p>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">Recommendations service</span><div id="svcSeg"></div></div>
+      <div class="ctl"><span class="lab-k">Circuit breaker</span><div id="brSeg"></div></div>
+      <div class="ctl"><span class="lab-k">Simulation</span><div id="player"></div></div>
+    </div>
+    <div class="pipe" id="states" style="margin:0" aria-label="Circuit breaker state">
+      <div class="stage"><div class="chip" data-s="closed">Closed<small>calls go through</small></div></div>
+      <div class="stage"><div class="chip" data-s="open">Open<small>skip the call</small></div></div>
+      <div class="stage"><div class="chip" data-s="half">Half-open<small>one test call</small></div></div>
+    </div>
+    <div class="meters" style="margin:0">
+      <div class="meter"><div class="k">Page load</div><div class="v" id="mLat">0 ms</div><div class="d">average, last 2 s</div></div>
+      <div class="meter"><div class="k">Pages failing</div><div class="v" id="mErr">0%</div><div class="d">no threads left</div></div>
+      <div class="meter"><div class="k">Threads busy</div><div class="v" id="mThr">0 / 30</div><div class="d">held by waiting calls</div></div>
+      <div class="meter"><div class="k">Recommendations</div><div class="v" id="mRec">shown</div><div class="d" id="mRecD">on every page</div></div>
+    </div>
+    <div class="status" id="status" role="status">Press Play to start the traffic.</div>
+  </div>
+  <h3>Try this</h3>
+  <ol class="missions" id="missions"></ol>
+  <div class="takeaway"><div class="t">The one difference</div><p>Without a breaker, every request <b>keeps calling</b> a dependency that's known to be broken, and waits the full timeout each time. A <b>circuit breaker</b> counts failures. After a few in a row it <b>opens</b>: calls are skipped instantly and a fallback is used. After a cooldown it lets <b>one test call</b> through, and closes again if that works.</p></div>
+</section>
+
+<section class="panel" id="probes">
+  <div class="panel-label"><span>act 2 · health checks</span><span class="hot">56 · 57</span></div>
+  <h2>Three instances, two kinds of “are you OK?”</h2>
+  <p>The load balancer sends traffic to three copies of Encore's API. <b>api-2</b> just started and is still loading its cache. <b>api-3</b> is stuck in a deadlock: the process is running, but it never answers. Pick which checks the platform runs, then move time forward.</p>
+  <div class="row"><div id="prSeg"></div><button class="btn" id="adv" type="button">Advance 10 s →</button><button class="btn sm" id="prReset" type="button">↺ Reset</button><span class="clock mono" id="prClock" style="color:var(--muted)">t = 0 s</span></div>
+  <div class="servers" id="pods" aria-label="API instances"></div>
+  <p class="status" id="prTxt" style="margin-top:10px" role="status"></p>
+  <div class="compare">
+    <div><h3>Liveness probe</h3><p style="margin:0">“Is this process stuck?” If it fails several times, <b>restart</b> it. That fixes deadlocks and hangs.</p></div>
+    <div><h3>Readiness probe</h3><p style="margin:0">“Can it take traffic <i>right now</i>?” If not, <b>stop sending it requests</b>, but don't restart it. For startup, warm-up, or a lost database connection.</p></div>
+  </div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>act 3 · the real thing</span><span class="hot">code + yaml</span></div>
+  <h2>A breaker in a few lines, probes in a few more</h2>
+  <p>The breaker uses <a href="https://github.com/nodeshift/opossum">opossum</a>, a common Node.js library. The probes are Kubernetes settings. <b>Hover or tap a line.</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="Example circuit breaker code and Kubernetes probes"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 pick a line</div><p id="exP">Each highlighted line maps to the lab.</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>recap · keep this</span><span class="hot">♥</span></div>
+  <h2>The whole page on one screen</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">Stop calling</div><div class="t">Circuit breaker</div><p>After repeated failures, skip the call and use a fallback. Test now and then, and resume when it works.</p></div>
+    <div class="card"><div class="sub">Restart</div><div class="t">Liveness</div><p>Detects a process that's stuck, and restarts it. Keep it simple: don't fail it because a dependency is down.</p></div>
+    <div class="card"><div class="sub">Route around</div><div class="t">Readiness</div><p>Detects an instance that can't serve yet, and takes it out of the load balancer until it can.</p></div>
+  </div>
+  <div class="takeaway"><div class="t">The tradeoff</div><p>A breaker turns a slow failure into a fast, partial one: fans get the page without recommendations. That only works if you design a fallback. Thresholds that are too sensitive open on small blips; too lax, and they open after the damage is done.</p></div>
+  <h3 style="margin-top:26px">Check it <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="Pages"></nav>
+</main>
+
+<script src="../assets/explainer.js"></script>
+<script>
+(() => {
+const { $, el } = X;
+const DT = 100, RATE = 20, THREADS = 30, OK_MS = 50, TIMEOUT = 2000, BASE = 80, TRIP = 5, COOLDOWN = 5000, WIN = 2000;
+
+/* ---------- simulation: deterministic, pure state + tick ---------- */
+function init(o = {}) {
+  return Object.assign({ t: 0, broken: false, breakerOn: false, state: 'closed', fails: 0, openUntil: 0, trial: null,
+    inflight: [], ev: [], ticks: 0, seen: { open: false, half: false, closedAfter: false } }, o);
+}
+function tick(s) {
+  const t0 = s.t, t1 = t0 + DT;
+  // finish calls that were waiting
+  s.inflight = s.inflight.filter(c => {
+    if (c.end > t1) return true;
+    if (c.trial) {
+      s.trial = null;
+      if (c.ok) { s.state = 'closed'; s.fails = 0; s.seen.closedAfter = s.seen.open; }
+      else { s.state = 'open'; s.openUntil = c.end + COOLDOWN; }
+    } else if (!c.ok) { s.fails++; if (s.breakerOn && s.state === 'closed' && s.fails >= TRIP) { s.state = 'open'; s.openUntil = c.end + COOLDOWN; s.seen.open = true; } }
+    else s.fails = 0;
+    return false;
+  });
+  if (s.breakerOn && s.state === 'open' && t0 >= s.openUntil) { s.state = 'half'; s.seen.half = true; }
+  const n = RATE * DT / 1000;
+  for (let i = 0; i < n; i++) {
+    const at = t0 + (i / n) * DT;
+    const skip = s.breakerOn && (s.state === 'open' || (s.state === 'half' && s.trial));
+    if (skip) { s.ev.push({ t: at, lat: BASE, ok: 1, recs: 0 }); continue; }
+    if (s.inflight.length >= THREADS) { s.ev.push({ t: at, lat: 0, ok: 0, recs: 0 }); continue; }
+    const ms = s.broken ? TIMEOUT : OK_MS;
+    const call = { end: at + ms, ok: !s.broken };
+    if (s.breakerOn && s.state === 'half') { call.trial = true; s.trial = call; }
+    s.inflight.push(call);
+    s.ev.push({ t: at, lat: BASE + ms, ok: 1, recs: s.broken ? 0 : 1 });
+  }
+  s.t = t1; s.ticks++;
+  s.ev = s.ev.filter(e => e.t > t1 - WIN);
+  return s;
+}
+function metrics(s) {
+  const e = s.ev, served = e.filter(x => x.ok);
+  return { lat: X.avg(served.map(x => x.lat)), err: e.length ? 1 - served.length / e.length : 0, thr: s.inflight.length, recs: served.length ? served.filter(x => x.recs).length / served.length : 1 };
+}
+
+/* ---------- lab UI ---------- */
+let S = init();
+const chips = { closed: $('[data-s="closed"]'), open: $('[data-s="open"]'), half: $('[data-s="half"]') };
+const t0 = () => { S.ticks = 0; };
+const mis = X.missions($('#missions'), [
+  { text: 'Press <b>Play</b> with the service healthy and no breaker.', hint: 'Calls take 50 ms. Only one thread is busy at a time.', check: s => s.ticks >= 20 && !s.broken },
+  { text: 'Set the service to <b>Broken</b>.', hint: 'Every page now waits 2 s for the timeout. Threads fill up, and soon pages fail entirely.', check: s => s.broken && !s.breakerOn && metrics(s).err > 0.2 },
+  { text: 'Turn the <b>circuit breaker On</b>.', hint: 'After 5 failures in a row it opens. Pages load in 80 ms again, just without recommendations.', check: s => s.broken && s.breakerOn && s.seen.open && metrics(s).err === 0 && s.ticks > 25 },
+  { text: 'Set the service back to <b>Healthy</b> and wait.', hint: 'After a 5 s cooldown the breaker goes half-open, sends one test call, sees it work, and closes.', check: s => !s.broken && s.breakerOn && s.seen.closedAfter && s.state === 'closed' },
+]);
+function render() {
+  const m = metrics(S);
+  $('#tag').textContent = S.breakerOn ? 'breaker: ' + S.state.replace('half', 'half-open') : 'no breaker';
+  Object.entries(chips).forEach(([k, c]) => X.chip(c, !S.breakerOn ? '' : S.state === k ? (k === 'closed' ? 'ok' : k === 'open' ? 'fail' : 'wait') : '', !S.breakerOn ? '' : S.state === k ? '● now' : ''));
+  $('#states').style.opacity = S.breakerOn ? 1 : 0.45;
+  $('#mLat').textContent = X.fmt(m.lat) + ' ms';
+  $('#mLat').parentElement.className = 'meter' + (m.lat > 1000 ? ' bad' : m.lat > 300 ? ' wait' : ' ok');
+  $('#mErr').textContent = Math.round(m.err * 100) + '%';
+  $('#mErr').parentElement.className = 'meter' + (m.err > 0 ? ' bad' : '');
+  $('#mThr').textContent = `${m.thr} / ${THREADS}`;
+  $('#mThr').parentElement.className = 'meter' + (m.thr >= THREADS ? ' bad' : m.thr > 10 ? ' wait' : '');
+  $('#mRec').textContent = m.recs > 0.95 ? 'shown' : m.recs < 0.05 ? 'hidden' : 'some';
+  $('#mRecD').textContent = m.recs > 0.95 ? 'on every page' : 'page works without them';
+  const st = $('#status');
+  if (!S.t) { st.className = 'status'; st.textContent = 'Press Play to start the traffic.'; }
+  else if (m.err > 0) { st.className = 'status bad'; st.textContent = `✕ All ${THREADS} threads are stuck waiting on the broken service, so ${Math.round(m.err * 100)}% of page views fail completely, even though the concert info itself is fine.`; }
+  else if (S.broken && !S.breakerOn) { st.className = 'status wait'; st.textContent = '⚠ Every page waits the full 2 s timeout for recommendations that never come.'; }
+  else if (S.breakerOn && S.state === 'open') { st.className = 'status ok'; st.textContent = `✓ Breaker open: the call is skipped, and pages load in ${BASE} ms without recommendations. Next test call in ${Math.max(0, Math.ceil((S.openUntil - S.t) / 1000))} s.`; }
+  else if (S.breakerOn && S.state === 'half') { st.className = 'status wait'; st.textContent = '⏸ Half-open: one test call is going through. Everyone else still gets the fallback.'; }
+  else { st.className = 'status ok'; st.textContent = '✓ Healthy: pages load quickly, with recommendations.'; }
+  player.clock(`t = ${(S.t / 1000).toFixed(1)} s`);
+  mis.update(S);
+}
+const player = X.player($('#player'), {
+  step: () => { tick(S); render(); }, stepTicks: 5,
+  reset: () => { S = init({ broken: S.broken, breakerOn: S.breakerOn }); mis.reset(); render(); },
+});
+X.seg($('#svcSeg'), ['Healthy', 'Broken (hangs)'], i => { S.broken = i === 1; t0(); render(); }, 0);
+X.seg($('#brSeg'), ['Off', 'On'], i => { S.breakerOn = i === 1; S.state = 'closed'; S.fails = 0; S.trial = null; t0(); render(); }, 0);
+render();
+
+/* ---------- act 2: probes (stepper) ---------- */
+let mode = 0, step = 0;
+function podAt(name, k) {
+  // returns { proc: 'running'|'deadlocked'|'restarting', ready, note }
+  if (name === 'api-1') return { proc: 'running', ready: true };
+  if (name === 'api-2') return { proc: 'running', ready: k >= 2, note: k < 2 ? 'loading cache' : '' };
+  if (mode === 0) return { proc: 'deadlocked', ready: false, note: 'never answers' };
+  if (k === 0) return { proc: 'deadlocked', ready: false, note: 'never answers' };
+  return k < 3 ? { proc: 'restarted', ready: false, note: 'loading cache' } : { proc: 'running', ready: true };
+}
+function drawProbes() {
+  const pods = ['api-1', 'api-2', 'api-3'].map(n => ({ n, ...podAt(n, step) }));
+  const gets = p => (mode === 2 ? p.ready : true);
+  const traffic = pods.filter(gets);
+  const bad = traffic.filter(p => !p.ready).length;
+  const box = $('#pods'); box.innerHTML = '';
+  pods.forEach(p => {
+    const d = el('div', 'server' + (p.proc === 'deadlocked' ? ' down' : ''));
+    const pill = p.ready ? '<span class="pill ok">ready</span>' : p.proc === 'deadlocked' ? '<span class="pill bad">stuck</span>' : '<span class="pill wait">starting</span>';
+    d.innerHTML = `<div class="nm"><span>${p.n}</span>${pill}</div>
+      <div class="mono">${p.proc === 'restarted' ? '↻ restarted by liveness' : p.proc}${p.note ? ' · ' + p.note : ''}</div>
+      <div class="mono">${gets(p) ? (p.ready ? '✓ gets traffic' : '✕ gets traffic, fails it') : '– no traffic (not ready)'}</div>`;
+    box.append(d);
+  });
+  $('#prClock').textContent = `t = ${step * 10} s`;
+  $('#adv').disabled = step >= 4;
+  const pct = Math.round((bad / traffic.length) * 100);
+  const t = $('#prTxt');
+  t.className = 'status ' + (pct ? 'bad' : 'ok');
+  t.textContent = pct
+    ? `✕ ${pct}% of requests go to an instance that can't answer. ${mode === 0 ? 'With no checks, nobody notices api-3 is stuck, ever.' : mode === 1 ? 'Liveness restarted api-3, but instances still get traffic while they\'re warming up.' : ''}`
+    : `✓ Every request lands on an instance that's ready. ${mode === 2 && step < 3 ? 'Warming instances are skipped until their readiness probe passes.' : ''}`;
+}
+X.seg($('#prSeg'), ['No health checks', 'Liveness only', 'Liveness + readiness'], i => { mode = i; step = 0; drawProbes(); }, 0);
+$('#adv').addEventListener('click', () => { step = Math.min(4, step + 1); drawProbes(); });
+$('#prReset').addEventListener('click', () => { step = 0; drawProbes(); });
+drawProbes();
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="key">const</span> breaker = <span class="key">new</span> CircuitBreaker(getRecommendations, {', 'breaker'],
+  ['  timeout: <span class="s">2000</span>,', 'timeout'],
+  ['  errorThresholdPercentage: <span class="s">50</span>,', 'threshold'],
+  ['  resetTimeout: <span class="s">5000</span>,', 'reset'],
+  ['});', null],
+  ['breaker.<span class="key">fallback</span>(() =&gt; []);  <span class="c">// render the page without recommendations</span>', 'fallback'],
+  ['<span class="key">const</span> recs = <span class="key">await</span> breaker.fire(concertId);', 'fire'],
+  ['', null],
+  ['<span class="c"># Kubernetes container spec</span>', null],
+  ['<span class="key">livenessProbe</span>:', 'liveness'],
+  ['  httpGet: { path: <span class="s">/healthz</span>, port: <span class="s">3000</span> }', 'liveness'],
+  ['  periodSeconds: <span class="s">10</span>', 'liveness'],
+  ['  failureThreshold: <span class="s">3</span>', 'liveness'],
+  ['<span class="key">readinessProbe</span>:', 'readiness'],
+  ['  httpGet: { path: <span class="s">/ready</span>, port: <span class="s">3000</span> }', 'readiness'],
+  ['  periodSeconds: <span class="s">5</span>', 'readiness'],
+], {
+  breaker: ['Wrap the call', 'The breaker sits between your code and the dependency, and counts how calls go.'],
+  timeout: ['Timeout', 'A call that takes longer than 2 s counts as a failure. You still need timeouts; the breaker builds on them.'],
+  threshold: ['When to open', 'opossum opens when half of the recent calls fail, measured over a rolling window. The lab uses a simpler rule: 5 failures in a row.'],
+  reset: ['Cooldown', 'How long to stay open before trying a test call (half-open). The lab uses 5 s.'],
+  fallback: ['Fallback', 'What to return while open. Here, an empty list, so the page renders without the box. Without a fallback, a breaker just fails faster.'],
+  fire: ['Call through the breaker', 'Closed: calls the service. Open: returns the fallback instantly, without touching the network.'],
+  liveness: ['Liveness', 'Kubernetes calls <code>/healthz</code> every 10 s. After 3 failures it restarts the container. That\'s what fixed the stuck api-3. Keep this endpoint dumb: “the process can answer”.'],
+  readiness: ['Readiness', 'While <code>/ready</code> fails, the instance is removed from the load balancer, but not restarted. That\'s what kept traffic away from warming instances.'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: 'The reviews service is down. With a 3 s timeout, every concert page takes 3 s and some fail. What helps most?', opts: [
+    ['Raise the timeout to 30 s so calls have time to finish', false, 'The service is down. A longer timeout just makes every page wait longer and holds threads longer.'],
+    ['A circuit breaker with a fallback that renders the page without reviews', true, 'After a few failures, skip the call entirely and show the page without that section. Fast and still useful.'],
+    ['Retry each failed call 3 times', false, 'Retrying a service that\'s down multiplies the load and the waiting (see page 9).'],
+  ] },
+  { q: 'Dee makes the liveness probe check the database too. The database has a 1-minute blip. What happens?', opts: [
+    ['Nothing: the probe just reports the blip', false, 'Liveness failures trigger restarts.'],
+    ['Every instance fails liveness and gets restarted at once, so the blip becomes a full outage', true, 'Liveness should only ask “is this process stuck?”. Put dependency checks in readiness, or nowhere.'],
+    ['Only the instances that talk to the database restart', false, 'All of them talk to it, so they all fail the probe together.'],
+  ] },
+  { q: 'A new instance needs 40 s to load its cache before it can answer quickly. Which check keeps fans from hitting it too early?', opts: [
+    ['Liveness probe', false, 'Liveness would restart it for being slow, possibly forever.'],
+    ['Readiness probe', true, 'It stays out of the load balancer until it reports ready. No restarts, no errors.'],
+    ['A circuit breaker in the browser', false, 'Breakers protect callers from a dependency. Getting traffic to the right instance is the platform\'s job.'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'circuit-breakers-health-checks');
+})();
+</script>
+</body>
+</html>
