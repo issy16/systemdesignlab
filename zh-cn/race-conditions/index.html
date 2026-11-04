@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-Hans-CN" data-lang="zh-cn" data-slug="race-conditions">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="一行一行带着两位歌迷抢最后一个座位，找出那个遗失的更新。">
+<title>竞态条件 · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/explainer.css">
+</head>
+<body>
+<!-- Plan. Stuck point: code that is correct line by line is wrong when two copies run at once.
+     Lab: two checkouts, one seat; step each line yourself. Read-then-write vs atomic UPDATE vs row lock.
+     One difference: check and change in one atomic step. Extra: count++ with two threads. -->
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="章节"><a href="#lab">实验室</a><a href="#threads">count++</a><a href="#real">SQL</a><a href="#recap">重点整理</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>第 12 页 · 阶段 4 · 保持数据正确</span><span class="hot">39 · 43</span></div>
+  <div class="eyebrow">竞态条件、线程安全</div>
+  <h1>只剩一个座位。两位歌迷同时按下购买。<em>两个人都拿到票。</em></h1>
+  <div class="scenario"><b>Encore</b>Ana 的结帐程序很简单：读取还剩几个座位，如果至少有一个，就拿走它。它通过了所有测试。重聚巡演售罄的那一晚，Encore 卖出了 214 张根本不存在的座位的票。</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">打开实验室 ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>实验室 · 先弄坏，再修好</span><span class="hot" id="tag">先读再写</span></div>
+  <h2>两次结帐，一个座位</h2>
+  <p>歌迷 A 和歌迷 B 在不同的服务器上运行同一段结帐程序。真正的服务器会依自己的步调运行，这里则由<b>你</b>决定下一行要跑哪一个。</p>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">结帐程序</span><div id="modeSeg"></div></div>
+      <div class="ctl"><span class="lab-k">运行</span>
+        <div class="presets"><button class="btn sm" id="stepA" type="button">单步运行歌迷 A</button><button class="btn sm" id="stepB" type="button">单步运行歌迷 B</button><button class="btn sm" id="reset" type="button">↺ 重置</button></div>
+        <div class="presets" style="margin-top:6px"><button class="btn sm primary" id="seq" type="button">先 A 再 B</button><button class="btn sm primary" id="inter" type="button">交错运行 A、B、A、B……</button></div>
+      </div>
+    </div>
+    <div class="compare" style="margin:0">
+      <div><h3>歌迷 A</h3><pre class="sqlbox" id="codeA"></pre><p class="mono" id="varA" style="font-size:13px;margin:6px 0 0"></p></div>
+      <div><h3>歌迷 B</h3><pre class="sqlbox" id="codeB"></pre><p class="mono" id="varB" style="font-size:13px;margin:6px 0 0"></p></div>
+    </div>
+    <div class="meters" style="margin:0">
+      <div class="meter"><div class="k">数据库中的 seats_left</div><div class="v" id="mSeats">1</div></div>
+      <div class="meter"><div class="k">卖出的票</div><div class="v" id="mSold">0</div><div class="d">只有 1 个真正的座位</div></div>
+      <div class="meter"><div class="k">列锁</div><div class="v" id="mLock">未锁定</div></div>
+    </div>
+    <ul class="log" id="log" aria-label="运行过的内容"><li class="mut">你运行的每一行都会出现在这里。</li></ul>
+    <div class="status" id="status" role="status">单步运行两位歌迷，或使用默认流程。</div>
+  </div>
+  <h3>试试看</h3>
+  <ol class="missions" id="missions"></ol>
+  <div class="takeaway"><div class="t">关键差别</div><p>问题出在<b>检查</b>（「还有座位吗？」）和<b>变更</b>（「拿走它」）之间的空隙。那个空隙里什么事都可能发生。修法是让检查和变更成为<b>一个不可分割的步骤</b>（有条件的 UPDATE），或是<b>锁住</b>那一列，让别人进不了那个空隙。</p></div>
+  <div class="takeaway"><div class="t">一句话说清楚竞态条件</div><p>竞态条件（race condition）是只有在多个操作以不幸的顺序重叠时才会出现的 bug。每一段单独看都正确，结果却取决于时间点。</p></div>
+</section>
+
+<section class="panel" id="threads">
+  <div class="panel-label"><span>第 2 幕 · 线程安全</span><span class="hot">43</span></div>
+  <h2>连 <code>count++</code> 都是三个步骤</h2>
+  <p>Encore 在内存里计算页面浏览次数。<code>count++</code> 其实是<b>读取</b> count、<b>加</b> 1、再<b>写回</b>。两条线程各加 1,000 次。调度器会在任意时刻切换它们。</p>
+  <div class="row"><div id="lockSeg"></div><button class="btn primary" id="runT" type="button">运行 2 条线程 × 1,000 次</button></div>
+  <div class="meters"><div class="meter"><div class="k">预期</div><div class="v">2,000</div></div><div class="meter"><div class="k">最终计数</div><div class="v" id="mCount">–</div></div><div class="meter"><div class="k">遗失的更新</div><div class="v" id="mLost">–</div></div></div>
+  <p class="status" id="tTxt" role="status">多跑几次看看。</p>
+  <p class="muted" style="font-size:14px">线程安全（thread-safe）的操作，不管线程怎么交错都保持正确。使用锁（mutex）、原子计数器，或让状态不放在共享内存里。</p>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>第 3 幕 · 真实世界</span><span class="hot">sql</span></div>
+  <h2>竞态问题和两种修法，用 SQL 写出来</h2>
+  <p><b>把鼠标移到某一行上，或点一下。</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="有竞态与安全的购位 SQL"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 选一行</div><p id="exP">每一行反白后，都会对应到实验室里的一种模式。</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>重点整理 · 带走这些</span><span class="hot">♥</span></div>
+  <h2>整页浓缩在一个画面</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">问题</div><div class="t">先检查，再行动</div><p>读一个值、做决定、根据读到的值写入。单独运行时正确，两个同时运行时就错。一次只跑一个请求的测试永远看不到它。</p></div>
+    <div class="card"><div class="sub">修法 1</div><div class="t">原子更新</div><p>把检查放进写入里：<code>UPDATE … WHERE seats_left &gt; 0</code>。数据库在一个步骤内完成两件事。</p></div>
+    <div class="card"><div class="sub">修法 2</div><div class="t">锁</div><p><code>SELECT … FOR UPDATE</code> 或 mutex：一次只让一个通过空隙。容易推理，但其他人要等（第 13 页）。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">取舍</div><p>原子更新很快，但只适用于整个决策能塞进一条语句的情况。锁能处理任何逻辑，但会让别人等待，还可能造成死结。优先使用原子操作和数据库约束，逻辑无法这样表达时才用锁。</p></div>
+  <h3 style="margin-top:26px">考考自己 <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="页面"></nav>
+</main>
+
+<script src="../../assets/explainer.js"></script>
+<script src="../../assets/i18n.zh-cn.js"></script>
+<script>
+(() => {
+const { $, el, esc } = X;
+
+/* ---------- the two checkouts: programs as lists of steps over shared state ---------- */
+const PROGS = {
+  rw: [
+    ['SELECT seats_left → seats', (s, me) => { me.seats = s.db; }],
+    ['if (seats > 0)', (s, me) => { if (!(me.seats > 0)) return 'soldout'; }],
+    ['UPDATE … SET seats_left = seats - 1', (s, me) => { s.db = me.seats - 1; }],
+    ['INSERT ticket', (s, me) => { s.sold.push(me.name); return 'done'; }],
+  ],
+  atomic: [
+    ['UPDATE … SET seats_left = seats_left - 1\n   WHERE seats_left > 0', (s, me) => { if (s.db > 0) { s.db--; me.rows = 1; } else me.rows = 0; }],
+    ['if (rowsUpdated === 1)', (s, me) => { if (me.rows !== 1) return 'soldout'; }],
+    ['INSERT ticket', (s, me) => { s.sold.push(me.name); return 'done'; }],
+  ],
+  lock: [
+    ['BEGIN; SELECT seats_left … FOR UPDATE', (s, me) => { if (s.lock && s.lock !== me.name) return 'blocked'; s.lock = me.name; me.seats = s.db; }],
+    ['if (seats > 0)', (s, me) => { if (!(me.seats > 0)) { s.lock = null; return 'soldout'; } }],
+    ['UPDATE … SET seats_left = seats - 1', (s, me) => { s.db = me.seats - 1; }],
+    ['INSERT ticket; COMMIT', (s, me) => { s.sold.push(me.name); s.lock = null; return 'done'; }],
+  ],
+};
+const MODES = ['rw', 'atomic', 'lock'];
+function init(mode) { return { mode, db: 1, sold: [], lock: null, order: [], fans: { A: { name: 'A', pc: 0, end: null }, B: { name: 'B', pc: 0, end: null } } }; }
+function step(s, who) {
+  const me = s.fans[who];
+  if (me.end) return null;
+  const [label, run] = PROGS[s.mode][me.pc];
+  const r = run(s, me);
+  if (r === 'blocked') return { who, label, blocked: true };
+  s.order.push(who);
+  if (r === 'soldout') me.end = 'sold out';
+  else if (r === 'done') me.end = 'ticket';
+  else me.pc++;
+  return { who, label };
+}
+const bothDone = s => s.fans.A.end && s.fans.B.end;
+const interleaved = s => { const firstB = s.order.indexOf('B'), lastA = s.order.lastIndexOf('A'); return firstB >= 0 && firstB < lastA; };
+
+/* ---------- UI ---------- */
+let mode = 'rw', S = init(mode);
+const runs = [];
+function log(cls, text) { const l = $('#log'); if (l.querySelector('.mut')) l.innerHTML = ''; l.append(el('li', cls, esc(text))); l.scrollTop = l.scrollHeight; }
+function drawCode(who) {
+  const me = S.fans[who];
+  $('#code' + who).innerHTML = PROGS[S.mode].map((l, i) => {
+    const cur = !me.end && i === me.pc, past = i < me.pc || (me.end && i <= me.pc);
+    return `<span style="display:block;${cur ? 'background:#24365a;' : ''}${past ? 'opacity:.55' : ''}">${cur ? '▶ ' : past ? '✓ ' : '  '}${esc(l[0])}</span>`;
+  }).join('');
+  $('#var' + who).textContent = me.end ? (me.end === 'ticket' ? '→ 拿到票了 🎟' : '→「抱歉，已售完」') : S.mode === 'atomic' ? (me.rows != null ? `rowsUpdated = ${me.rows}` : '') : (me.seats != null ? `区域变量 seats = ${me.seats}` : '');
+}
+function render() {
+  drawCode('A'); drawCode('B');
+  $('#mSeats').textContent = S.db;
+  $('#mSold').textContent = S.sold.length;
+  $('#mSold').parentElement.className = 'meter' + (S.sold.length > 1 ? ' bad' : S.sold.length === 1 ? ' ok' : '');
+  $('#mLock').textContent = S.mode !== 'lock' ? '–' : S.lock ? `由 ${S.lock} 持有` : 'free';
+  $('#tag').textContent = { rw: '先读再写', atomic: '原子更新', lock: '列锁' }[S.mode];
+  const st = $('#status');
+  if (!bothDone(S)) { st.className = 'status'; st.textContent = '单步运行两位歌迷，或使用默认流程。'; return; }
+  if (S.sold.length > 1) { st.className = 'status bad'; st.textContent = `✕ 1 个座位卖出 ${S.sold.length} 张票。两位歌迷都在对方写入之前读到 seats = 1，所以都通过了检查。一个更新覆盖了另一个：这就是遗失的更新（lost update）。`; }
+  else { st.className = 'status ok'; st.textContent = S.mode === 'rw' ? '✓ 一张票。但那只是因为 A 在 B 开始之前就跑完了。时机刚好而已。' : S.mode === 'atomic' ? '✓ 一张票。检查和变更在同一条语句内完成，所以第二位歌迷的 UPDATE 没有比对到任何一列。' : '✓ 一张票。第二位歌迷等待锁释放，然后读到真正的值：0。'; }
+}
+function finishIfDone() {
+  if (!bothDone(S) || S.recorded) return;
+  S.recorded = true;
+  runs.push({ mode: S.mode, sold: S.sold.length, inter: interleaved(S) });
+  mis.update(runs);
+}
+function doStep(who) {
+  const r = step(S, who);
+  if (!r) return false;
+  if (r.blocked) log('wait', `歌迷 ${who}：${r.label.split('\n')[0]}  ⏸ 等待中：这一列被歌迷 ${S.lock} 锁住了`);
+  else log(S.fans[who].end === 'sold out' ? 'wait' : '', `Fan ${who}: ${r.label.replace(/\n\s*/g, ' ')}${S.mode !== 'atomic' && S.fans[who].seats != null && r.label.startsWith('SELECT') || r.label.startsWith('BEGIN') ? `   (seats = ${S.fans[who].seats})` : ''}`);
+  render(); finishIfDone();
+  return !r.blocked;
+}
+async function preset(seq) {
+  S = init(mode); $('#log').innerHTML = ''; render();
+  let guard = 0;
+  while (!bothDone(S) && guard++ < 30) {
+    const who = seq(guard);
+    if (S.fans[who].end) { doStep(who === 'A' ? 'B' : 'A'); }
+    else if (!doStep(who)) doStep(who === 'A' ? 'B' : 'A');
+    await X.sleep(220);
+  }
+}
+const mis = X.missions($('#missions'), [
+  { text: '在<b>先读再写</b>模式下，按<b>先 A 再 B</b>。', hint: 'A 买到座位，B 看到 0，得到「已售完」。看起来没问题。', check: r => r.some(x => x.mode === 'rw' && !x.inter && x.sold === 1) },
+  { text: '现在按<b>交错运行</b>。', hint: '两人都在对方写入前读到 1。一个座位卖出两张票。', check: r => r.some(x => x.mode === 'rw' && x.inter && x.sold === 2) },
+  { text: '切换到<b>原子更新</b>，再交错运行一次。', hint: '不管顺序如何，都刚好一张票。', check: r => r.some(x => x.mode === 'atomic' && x.inter && x.sold === 1) },
+  { text: '试试<b>列锁</b>，再交错运行一次。', hint: '歌迷 B 必须在第一行等到 A 提交为止。', check: r => r.some(x => x.mode === 'lock' && x.sold === 1) },
+]);
+X.seg($('#modeSeg'), ['先读再写', '原子更新', '列锁'], i => { mode = MODES[i]; S = init(mode); $('#log').innerHTML = '<li class="mut">你运行的每一行都会出现在这里。</li>'; render(); }, 0);
+$('#stepA').addEventListener('click', () => doStep('A'));
+$('#stepB').addEventListener('click', () => doStep('B'));
+$('#reset').addEventListener('click', () => { S = init(mode); $('#log').innerHTML = '<li class="mut">你运行的每一行都会出现在这里。</li>'; render(); });
+$('#seq').addEventListener('click', () => preset(() => (S.fans.A.end ? 'B' : 'A')));
+$('#inter').addEventListener('click', () => preset(k => (k % 2 ? 'A' : 'B')));
+render();
+
+/* ---------- act 2: count++ with two threads (seeded scheduler) ---------- */
+let locked = false, runN = 0;
+function countRun(seed, withLock) {
+  const s = { r: seed }, th = [{ left: 1000, pc: 0, reg: 0 }, { left: 1000, pc: 0, reg: 0 }];
+  let count = 0, holder = -1;
+  while (th.some(t => t.left > 0)) {
+    let i = X.rnd(s) < 0.5 ? 0 : 1;
+    if (th[i].left === 0) i = 1 - i;
+    const t = th[i];
+    if (withLock && t.pc === 0 && holder !== -1 && holder !== i) { i = 1 - i; continue; }
+    if (t.pc === 0) { if (withLock) holder = i; t.reg = count; t.pc = 1; }
+    else if (t.pc === 1) { t.reg += 1; t.pc = 2; }
+    else { count = t.reg; t.pc = 0; t.left--; if (withLock) holder = -1; }
+  }
+  return count;
+}
+X.seg($('#lockSeg'), ['不加锁', '加锁'], i => { locked = i === 1; }, 0);
+$('#runT').addEventListener('click', () => {
+  const c = countRun(101 + runN++, locked);
+  $('#mCount').textContent = X.fmt(c); $('#mLost').textContent = X.fmt(2000 - c);
+  $('#mCount').parentElement.className = 'meter' + (c < 2000 ? ' bad' : ' ok');
+  $('#tTxt').className = 'status ' + (c < 2000 ? 'bad' : 'ok');
+  $('#tTxt').textContent = c < 2000 ? `✕ 有 ${X.fmt(2000 - c)} 次递增消失了。某条线程读了 count、被暂停，之后才写回一个过时的值，抹掉了另一条线程的成果。再跑一次：每次的数字都不一样。` : '✓ 每次都是 2,000。一次只有一条线程能处在「读取」和「写入」之间。';
+});
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="c">-- ✕ 有竞态：在 App 里检查，然后写入</span>', null],
+  ['<span class="key">SELECT</span> seats_left <span class="key">FROM</span> concerts <span class="key">WHERE</span> id = $1;', 'read'],
+  ['<span class="c">-- App：if (seats_left > 0) …</span>', 'gap'],
+  ['<span class="key">UPDATE</span> concerts <span class="key">SET</span> seats_left = $2 <span class="key">WHERE</span> id = $1;', 'write'],
+  ['', null],
+  ['<span class="c">-- ✓ 修法 1：一条原子语句</span>', null],
+  ['<span class="key">UPDATE</span> concerts <span class="key">SET</span> seats_left = seats_left - 1', 'atomic'],
+  ['<span class="key">WHERE</span> id = $1 <span class="key">AND</span> seats_left &gt; 0', 'atomic'],
+  ['<span class="key">RETURNING</span> seats_left;', 'returning'],
+  ['', null],
+  ['<span class="c">-- ✓ 修法 2：在整个交易期间锁住这一列</span>', null],
+  ['<span class="key">BEGIN</span>;', 'lock'],
+  ['<span class="key">SELECT</span> seats_left <span class="key">FROM</span> concerts <span class="key">WHERE</span> id = $1 <span class="key">FOR UPDATE</span>;', 'lock'],
+  ['<span class="c">-- … 任何逻辑 …</span>', null],
+  ['<span class="key">COMMIT</span>;', 'commit'],
+  ['', null],
+  ['<span class="c">-- ✓ 安全网：数据库拒绝不可能的数据</span>', null],
+  ['<span class="key">ALTER TABLE</span> concerts <span class="key">ADD CHECK</span> (seats_left &gt;= 0);', 'check'],
+], {
+  read: ['读取', '两位歌迷都运行了这行，都拿到 1。到这里还没出错。'],
+  gap: ['空隙', '决定是在 App 里做的，用的值可能早就过时了。读取和写入之间的一切，就是竞态窗口。'],
+  write: ['写入', '写入 App 根据过时读取算出的值。第二次写入覆盖了第一次：遗失的更新。'],
+  atomic: ['把检查放进写入里', '数据库在同一个步骤内评估 <code>seats_left &gt; 0</code> 并扣减。第二位歌迷的 UPDATE 只会比对到 0 列。'],
+  returning: ['我抢到了吗？', '返回 0 列代表已售完，1 列代表你抢到座位。不需要另外读取。'],
+  lock: ['列锁', '<code>FOR UPDATE</code> 会锁住这一列直到 COMMIT。另一个交易会卡在它自己的 SELECT，之后读到真正、已更新的值。'],
+  commit: ['释放', 'COMMIT 会释放锁。被锁住的区段要尽量短：其他人都在等。'],
+  check: ['约束', '就算某条程序路径忘了处理，数据库也会拒绝负的座位数。很好的最后一道防线。'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: 'Ana 的测试连续买最后一个座位 100 次，每次都刚好只卖出一张票。结帐安全吗？', opts: [
+    ['安全，100 次通过是很强的证据', false, '测试一次只跑一个结帐，所以竞态窗口从来没有打开过。'],
+    ['不一定：竞态只在请求重叠时才会出现，而循序测试永远不会重叠', true, '用真正的并行来测试，并在设计上让正确性不依赖时机（原子更新、锁、约束）。'],
+    ['只有在测试也跑在正式服务器上时才算', false, '跟哪台机器无关，重点是两个结帐有没有同时运行。'],
+  ] },
+  { q: '哪一种修改能消除「读取座位、检查 &gt; 0、写入座位 − 1」的竞态？', opts: [
+    ['读两次座位，确保没错', false, '值还是可能在第二次读取后立刻改变。'],
+    ['<code>UPDATE … SET seats_left = seats_left − 1 WHERE seats_left &gt; 0</code>，并检查影响的列数', true, '检查和变更在数据库内变成一个不可分割的步骤。'],
+    ['在写入前加 100 毫秒的 sleep', false, '这只会让窗口变更大，竞态更常发生。'],
+  ] },
+  { q: 'Cai 的 Node.js 服务器把页面浏览计数器放在 worker 线程共用的变量里。总数比访问日志少。为什么？', opts: [
+    ['日志重复计算了', false, '有可能，但典型的原因是计数器本身。'],
+    ['<code>count++</code> 不是原子操作：线程互相覆盖了彼此的递增', true, '使用原子计数器（例如 <code>Atomics.add</code>）、锁，或改用专门计数的地方，例如 Redis 的 <code>INCR</code>。'],
+    ['JavaScript 的数字算不到那么大', false, '它能算到大得多的数字。问题出在交错运行。'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'race-conditions');
+})();
+</script>
+</body>
+</html>

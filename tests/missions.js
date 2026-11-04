@@ -85,6 +85,13 @@ const FLOWS = {
     ['click', seg('brSeg', 2), 6500],
     ['click', seg('svcSeg', 1), 7500],
   ],
+  'race-conditions': [
+    ['click', '#seq', 2500],
+    ['click', '#inter', 2500],
+    ['click', seg('modeSeg', 2), 100], ['click', '#inter', 2000],
+    ['click', seg('modeSeg', 3), 100], ['click', '#inter', 2500],
+    ['click', '#runT', 300],
+  ],
 };
 
 (async () => {

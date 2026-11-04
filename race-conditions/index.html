@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Step two fans through buying the last seat, one line at a time, and find the update that gets lost.">
+<title>Race Conditions · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/explainer.css">
+</head>
+<body>
+<!-- Plan. Stuck point: code that is correct line by line is wrong when two copies run at once.
+     Lab: two checkouts, one seat; step each line yourself. Read-then-write vs atomic UPDATE vs row lock.
+     One difference: check and change in one atomic step. Extra: count++ with two threads. -->
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="Sections"><a href="#lab">Lab</a><a href="#threads">count++</a><a href="#real">The SQL</a><a href="#recap">Recap</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>page 12 · stage 4 · keep data correct</span><span class="hot">39 · 43</span></div>
+  <div class="eyebrow">Race conditions, thread safety</div>
+  <h1>One seat left. Two fans click Buy. <em>Both get a ticket.</em></h1>
+  <div class="scenario"><b>Encore</b>Ana's checkout code is simple: read how many seats are left, and if there's at least one, take it. It passed every test. On the night the reunion tour sold out, Encore sold 214 tickets for seats that didn't exist.</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">Open the lab ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>lab · break it, then fix it</span><span class="hot" id="tag">read, then write</span></div>
+  <h2>Two checkouts, one seat</h2>
+  <p>Fan A and Fan B each run the same checkout code on different servers. A real server would run them at its own pace. Here <b>you</b> decide which line runs next.</p>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">Checkout code</span><div id="modeSeg"></div></div>
+      <div class="ctl"><span class="lab-k">Run it</span>
+        <div class="presets"><button class="btn sm" id="stepA" type="button">Step Fan A</button><button class="btn sm" id="stepB" type="button">Step Fan B</button><button class="btn sm" id="reset" type="button">↺ Reset</button></div>
+        <div class="presets" style="margin-top:6px"><button class="btn sm primary" id="seq" type="button">A, then B</button><button class="btn sm primary" id="inter" type="button">Interleave A, B, A, B…</button></div>
+      </div>
+    </div>
+    <div class="compare" style="margin:0">
+      <div><h3>Fan A</h3><pre class="sqlbox" id="codeA"></pre><p class="mono" id="varA" style="font-size:13px;margin:6px 0 0"></p></div>
+      <div><h3>Fan B</h3><pre class="sqlbox" id="codeB"></pre><p class="mono" id="varB" style="font-size:13px;margin:6px 0 0"></p></div>
+    </div>
+    <div class="meters" style="margin:0">
+      <div class="meter"><div class="k">seats_left in the database</div><div class="v" id="mSeats">1</div></div>
+      <div class="meter"><div class="k">Tickets sold</div><div class="v" id="mSold">0</div><div class="d">for 1 real seat</div></div>
+      <div class="meter"><div class="k">Row lock</div><div class="v" id="mLock">free</div></div>
+    </div>
+    <ul class="log" id="log" aria-label="What ran"><li class="mut">Each line you run appears here.</li></ul>
+    <div class="status" id="status" role="status">Step the two fans, or use a preset.</div>
+  </div>
+  <h3>Try this</h3>
+  <ol class="missions" id="missions"></ol>
+  <div class="takeaway"><div class="t">The one difference</div><p>The bug lives in the gap between <b>checking</b> (“is there a seat?”) and <b>changing</b> (“take it”). Anything can happen in that gap. Fix it by making check-and-change <b>one atomic step</b> (a conditional UPDATE), or by <b>locking</b> the row so nobody else can enter the gap.</p></div>
+  <div class="takeaway"><div class="t">Race condition in one line</div><p>A race condition is a bug that appears only when operations overlap in an unlucky order. Each piece is correct on its own, and the result depends on timing.</p></div>
+</section>
+
+<section class="panel" id="threads">
+  <div class="panel-label"><span>act 2 · thread safety</span><span class="hot">43</span></div>
+  <h2>Even <code>count++</code> is three steps</h2>
+  <p>Encore counts page views in memory. <code>count++</code> really means <b>read</b> count, <b>add</b> 1, <b>write</b> it back. Two threads each add 1,000. The scheduler switches between them at arbitrary moments.</p>
+  <div class="row"><div id="lockSeg"></div><button class="btn primary" id="runT" type="button">Run 2 threads × 1,000</button></div>
+  <div class="meters"><div class="meter"><div class="k">Expected</div><div class="v">2,000</div></div><div class="meter"><div class="k">Final count</div><div class="v" id="mCount">–</div></div><div class="meter"><div class="k">Updates lost</div><div class="v" id="mLost">–</div></div></div>
+  <p class="status" id="tTxt" role="status">Run it a few times.</p>
+  <p class="muted" style="font-size:14px">A thread-safe operation stays correct no matter how threads interleave. Use a lock (mutex), an atomic counter, or keep the state out of shared memory.</p>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>act 3 · the real thing</span><span class="hot">sql</span></div>
+  <h2>The race and two fixes, in SQL</h2>
+  <p><b>Hover or tap a line.</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="Racy and safe SQL for buying a seat"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 pick a line</div><p id="exP">Each highlighted line maps to a mode in the lab.</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>recap · keep this</span><span class="hot">♥</span></div>
+  <h2>The whole page on one screen</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">The bug</div><div class="t">Check, then act</div><p>Read a value, decide, write based on what you read. Correct alone, wrong when two run at once. Tests that run one request at a time never see it.</p></div>
+    <div class="card"><div class="sub">Fix 1</div><div class="t">Atomic update</div><p>Put the check inside the write: <code>UPDATE … WHERE seats_left &gt; 0</code>. The database does both in one step.</p></div>
+    <div class="card"><div class="sub">Fix 2</div><div class="t">Lock</div><p><code>SELECT … FOR UPDATE</code> or a mutex: one at a time through the gap. Simple to reason about, but others wait (page 13).</p></div>
+  </div>
+  <div class="takeaway"><div class="t">The tradeoff</div><p>Atomic updates are fast but only work when the whole decision fits in one statement. Locks handle any logic, but they make others wait and can deadlock. Prefer atomic operations and database constraints, and reach for locks when the logic can't be expressed that way.</p></div>
+  <h3 style="margin-top:26px">Check it <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="Pages"></nav>
+</main>
+
+<script src="../assets/explainer.js"></script>
+<script>
+(() => {
+const { $, el, esc } = X;
+
+/* ---------- the two checkouts: programs as lists of steps over shared state ---------- */
+const PROGS = {
+  rw: [
+    ['SELECT seats_left → seats', (s, me) => { me.seats = s.db; }],
+    ['if (seats > 0)', (s, me) => { if (!(me.seats > 0)) return 'soldout'; }],
+    ['UPDATE … SET seats_left = seats - 1', (s, me) => { s.db = me.seats - 1; }],
+    ['INSERT ticket', (s, me) => { s.sold.push(me.name); return 'done'; }],
+  ],
+  atomic: [
+    ['UPDATE … SET seats_left = seats_left - 1\n   WHERE seats_left > 0', (s, me) => { if (s.db > 0) { s.db--; me.rows = 1; } else me.rows = 0; }],
+    ['if (rowsUpdated === 1)', (s, me) => { if (me.rows !== 1) return 'soldout'; }],
+    ['INSERT ticket', (s, me) => { s.sold.push(me.name); return 'done'; }],
+  ],
+  lock: [
+    ['BEGIN; SELECT seats_left … FOR UPDATE', (s, me) => { if (s.lock && s.lock !== me.name) return 'blocked'; s.lock = me.name; me.seats = s.db; }],
+    ['if (seats > 0)', (s, me) => { if (!(me.seats > 0)) { s.lock = null; return 'soldout'; } }],
+    ['UPDATE … SET seats_left = seats - 1', (s, me) => { s.db = me.seats - 1; }],
+    ['INSERT ticket; COMMIT', (s, me) => { s.sold.push(me.name); s.lock = null; return 'done'; }],
+  ],
+};
+const MODES = ['rw', 'atomic', 'lock'];
+function init(mode) { return { mode, db: 1, sold: [], lock: null, order: [], fans: { A: { name: 'A', pc: 0, end: null }, B: { name: 'B', pc: 0, end: null } } }; }
+function step(s, who) {
+  const me = s.fans[who];
+  if (me.end) return null;
+  const [label, run] = PROGS[s.mode][me.pc];
+  const r = run(s, me);
+  if (r === 'blocked') return { who, label, blocked: true };
+  s.order.push(who);
+  if (r === 'soldout') me.end = 'sold out';
+  else if (r === 'done') me.end = 'ticket';
+  else me.pc++;
+  return { who, label };
+}
+const bothDone = s => s.fans.A.end && s.fans.B.end;
+const interleaved = s => { const firstB = s.order.indexOf('B'), lastA = s.order.lastIndexOf('A'); return firstB >= 0 && firstB < lastA; };
+
+/* ---------- UI ---------- */
+let mode = 'rw', S = init(mode);
+const runs = [];
+function log(cls, text) { const l = $('#log'); if (l.querySelector('.mut')) l.innerHTML = ''; l.append(el('li', cls, esc(text))); l.scrollTop = l.scrollHeight; }
+function drawCode(who) {
+  const me = S.fans[who];
+  $('#code' + who).innerHTML = PROGS[S.mode].map((l, i) => {
+    const cur = !me.end && i === me.pc, past = i < me.pc || (me.end && i <= me.pc);
+    return `<span style="display:block;${cur ? 'background:#24365a;' : ''}${past ? 'opacity:.55' : ''}">${cur ? '▶ ' : past ? '✓ ' : '  '}${esc(l[0])}</span>`;
+  }).join('');
+  $('#var' + who).textContent = me.end ? (me.end === 'ticket' ? '→ got a ticket 🎟' : '→ “Sorry, sold out”') : S.mode === 'atomic' ? (me.rows != null ? `rowsUpdated = ${me.rows}` : '') : (me.seats != null ? `local variable seats = ${me.seats}` : '');
+}
+function render() {
+  drawCode('A'); drawCode('B');
+  $('#mSeats').textContent = S.db;
+  $('#mSold').textContent = S.sold.length;
+  $('#mSold').parentElement.className = 'meter' + (S.sold.length > 1 ? ' bad' : S.sold.length === 1 ? ' ok' : '');
+  $('#mLock').textContent = S.mode !== 'lock' ? '–' : S.lock ? `held by ${S.lock}` : 'free';
+  $('#tag').textContent = { rw: 'read, then write', atomic: 'atomic update', lock: 'row lock' }[S.mode];
+  const st = $('#status');
+  if (!bothDone(S)) { st.className = 'status'; st.textContent = 'Step the two fans, or use a preset.'; return; }
+  if (S.sold.length > 1) { st.className = 'status bad'; st.textContent = `✕ ${S.sold.length} tickets for 1 seat. Both fans read seats = 1 before either wrote, so both passed the check. One update overwrote the other: a lost update.`; }
+  else { st.className = 'status ok'; st.textContent = S.mode === 'rw' ? '✓ One ticket. But only because A finished before B started. The timing was lucky.' : S.mode === 'atomic' ? '✓ One ticket. The check and the change happened in a single statement, so the second fan\'s UPDATE matched no rows.' : '✓ One ticket. The second fan waited for the lock, then read the real value: 0.'; }
+}
+function finishIfDone() {
+  if (!bothDone(S) || S.recorded) return;
+  S.recorded = true;
+  runs.push({ mode: S.mode, sold: S.sold.length, inter: interleaved(S) });
+  mis.update(runs);
+}
+function doStep(who) {
+  const r = step(S, who);
+  if (!r) return false;
+  if (r.blocked) log('wait', `Fan ${who}: ${r.label.split('\n')[0]}  ⏸ waits: the row is locked by Fan ${S.lock}`);
+  else log(S.fans[who].end === 'sold out' ? 'wait' : '', `Fan ${who}: ${r.label.replace(/\n\s*/g, ' ')}${S.mode !== 'atomic' && S.fans[who].seats != null && r.label.startsWith('SELECT') || r.label.startsWith('BEGIN') ? `   (seats = ${S.fans[who].seats})` : ''}`);
+  render(); finishIfDone();
+  return !r.blocked;
+}
+async function preset(seq) {
+  S = init(mode); $('#log').innerHTML = ''; render();
+  let guard = 0;
+  while (!bothDone(S) && guard++ < 30) {
+    const who = seq(guard);
+    if (S.fans[who].end) { doStep(who === 'A' ? 'B' : 'A'); }
+    else if (!doStep(who)) doStep(who === 'A' ? 'B' : 'A');
+    await X.sleep(220);
+  }
+}
+const mis = X.missions($('#missions'), [
+  { text: 'With <b>Read, then write</b>, press <b>A, then B</b>.', hint: 'A buys the seat, B sees 0 and gets “sold out”. Looks correct.', check: r => r.some(x => x.mode === 'rw' && !x.inter && x.sold === 1) },
+  { text: 'Now press <b>Interleave</b>.', hint: 'Both read 1 before either writes. Two tickets for one seat.', check: r => r.some(x => x.mode === 'rw' && x.inter && x.sold === 2) },
+  { text: 'Switch to <b>Atomic update</b> and interleave again.', hint: 'Exactly one ticket, whatever the order.', check: r => r.some(x => x.mode === 'atomic' && x.inter && x.sold === 1) },
+  { text: 'Try <b>Row lock</b> and interleave once more.', hint: 'Fan B has to wait at the first line until A commits.', check: r => r.some(x => x.mode === 'lock' && x.sold === 1) },
+]);
+X.seg($('#modeSeg'), ['Read, then write', 'Atomic update', 'Row lock'], i => { mode = MODES[i]; S = init(mode); $('#log').innerHTML = '<li class="mut">Each line you run appears here.</li>'; render(); }, 0);
+$('#stepA').addEventListener('click', () => doStep('A'));
+$('#stepB').addEventListener('click', () => doStep('B'));
+$('#reset').addEventListener('click', () => { S = init(mode); $('#log').innerHTML = '<li class="mut">Each line you run appears here.</li>'; render(); });
+$('#seq').addEventListener('click', () => preset(() => (S.fans.A.end ? 'B' : 'A')));
+$('#inter').addEventListener('click', () => preset(k => (k % 2 ? 'A' : 'B')));
+render();
+
+/* ---------- act 2: count++ with two threads (seeded scheduler) ---------- */
+let locked = false, runN = 0;
+function countRun(seed, withLock) {
+  const s = { r: seed }, th = [{ left: 1000, pc: 0, reg: 0 }, { left: 1000, pc: 0, reg: 0 }];
+  let count = 0, holder = -1;
+  while (th.some(t => t.left > 0)) {
+    let i = X.rnd(s) < 0.5 ? 0 : 1;
+    if (th[i].left === 0) i = 1 - i;
+    const t = th[i];
+    if (withLock && t.pc === 0 && holder !== -1 && holder !== i) { i = 1 - i; continue; }
+    if (t.pc === 0) { if (withLock) holder = i; t.reg = count; t.pc = 1; }
+    else if (t.pc === 1) { t.reg += 1; t.pc = 2; }
+    else { count = t.reg; t.pc = 0; t.left--; if (withLock) holder = -1; }
+  }
+  return count;
+}
+X.seg($('#lockSeg'), ['No lock', 'With a lock'], i => { locked = i === 1; }, 0);
+$('#runT').addEventListener('click', () => {
+  const c = countRun(101 + runN++, locked);
+  $('#mCount').textContent = X.fmt(c); $('#mLost').textContent = X.fmt(2000 - c);
+  $('#mCount').parentElement.className = 'meter' + (c < 2000 ? ' bad' : ' ok');
+  $('#tTxt').className = 'status ' + (c < 2000 ? 'bad' : 'ok');
+  $('#tTxt').textContent = c < 2000 ? `✕ ${X.fmt(2000 - c)} increments vanished. A thread read the count, got paused, and later wrote back a stale value, erasing the other thread's work. Run it again: the number changes every time.` : '✓ 2,000 every time. Only one thread at a time can be between “read” and “write”.';
+});
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="c">-- ✕ racy: check in the app, then write</span>', null],
+  ['<span class="key">SELECT</span> seats_left <span class="key">FROM</span> concerts <span class="key">WHERE</span> id = $1;', 'read'],
+  ['<span class="c">-- app: if (seats_left > 0) …</span>', 'gap'],
+  ['<span class="key">UPDATE</span> concerts <span class="key">SET</span> seats_left = $2 <span class="key">WHERE</span> id = $1;', 'write'],
+  ['', null],
+  ['<span class="c">-- ✓ fix 1: one atomic statement</span>', null],
+  ['<span class="key">UPDATE</span> concerts <span class="key">SET</span> seats_left = seats_left - 1', 'atomic'],
+  ['<span class="key">WHERE</span> id = $1 <span class="key">AND</span> seats_left &gt; 0', 'atomic'],
+  ['<span class="key">RETURNING</span> seats_left;', 'returning'],
+  ['', null],
+  ['<span class="c">-- ✓ fix 2: lock the row for the whole transaction</span>', null],
+  ['<span class="key">BEGIN</span>;', 'lock'],
+  ['<span class="key">SELECT</span> seats_left <span class="key">FROM</span> concerts <span class="key">WHERE</span> id = $1 <span class="key">FOR UPDATE</span>;', 'lock'],
+  ['<span class="c">-- … any logic …</span>', null],
+  ['<span class="key">COMMIT</span>;', 'commit'],
+  ['', null],
+  ['<span class="c">-- ✓ safety net: the database refuses impossible data</span>', null],
+  ['<span class="key">ALTER TABLE</span> concerts <span class="key">ADD CHECK</span> (seats_left &gt;= 0);', 'check'],
+], {
+  read: ['Read', 'Both fans run this and both get 1. Nothing is wrong yet.'],
+  gap: ['The gap', 'The decision happens in the app, with a value that may already be out of date. Everything between the read and the write is the race window.'],
+  write: ['Write', 'Writes the value the app computed from its stale read. The second write overwrites the first: the lost update.'],
+  atomic: ['Check inside the write', 'The database evaluates <code>seats_left &gt; 0</code> and subtracts in one step. The second fan\'s UPDATE simply matches 0 rows.'],
+  returning: ['Did I get it?', 'Zero rows returned means sold out. One row means you got the seat. No separate read needed.'],
+  lock: ['Row lock', '<code>FOR UPDATE</code> locks the row until COMMIT. The other transaction blocks at its own SELECT, then reads the real, updated value.'],
+  commit: ['Release', 'COMMIT releases the lock. Keep locked sections short: everyone else is waiting.'],
+  check: ['Constraint', 'Even if some code path forgets, the database rejects a negative seat count. A good last line of defense.'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: 'Ana\'s tests buy the last seat 100 times in a row and always sell exactly one ticket. Is the checkout safe?', opts: [
+    ['Yes, 100 passing runs is strong evidence', false, 'The tests run one checkout at a time, so the race window never opens.'],
+    ['Not necessarily: races only show up when requests overlap, which sequential tests never do', true, 'Test with real concurrency, and design so correctness doesn\'t depend on timing (atomic updates, locks, constraints).'],
+    ['Only if the tests also run on production servers', false, 'The machine doesn\'t matter. What matters is whether two checkouts run at once.'],
+  ] },
+  { q: 'Which change removes the race in “read seats, check &gt; 0, write seats − 1”?', opts: [
+    ['Read the seats twice to be sure', false, 'The value can still change right after the second read.'],
+    ['<code>UPDATE … SET seats_left = seats_left − 1 WHERE seats_left &gt; 0</code> and check the row count', true, 'The check and the change become one atomic step inside the database.'],
+    ['Add a 100 ms sleep before the write', false, 'It just makes the window wider, so the race happens more often.'],
+  ] },
+  { q: 'Cai\'s Node.js server keeps a page-view counter in a variable shared by worker threads. The totals are lower than the access logs. Why?', opts: [
+    ['The logs double-count', false, 'Possible, but the classic cause is the counter itself.'],
+    ['<code>count++</code> isn\'t atomic: threads overwrite each other\'s increments', true, 'Use an atomic counter (like <code>Atomics.add</code>), a lock, or count somewhere built for it, such as Redis <code>INCR</code>.'],
+    ['JavaScript numbers can\'t count that high', false, 'They can count far higher. The problem is the interleaving.'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'race-conditions');
+})();
+</script>
+</body>
+</html>
