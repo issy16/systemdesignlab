@@ -256,7 +256,7 @@
     [11, 3, 'circuit-breakers-health-checks', 'Circuit breakers and health checks', [10, 56, 57], 'built'],
     [12, 4, 'race-conditions', 'Race conditions', [39, 43], 'built'],
     [13, 4, 'locking-deadlocks', 'Locking and deadlocks', [36, 37, 40], 'built'],
-    [14, 4, 'replication-failover', 'Replication and failover', [29, 32, 35, 85], 'planned'],
+    [14, 4, 'replication-failover', 'Replication and failover', [29, 32, 35, 85], 'built'],
     [15, 4, 'sharding', 'Sharding and partitioning', [30, 31], 'planned'],
     [16, 4, 'cap-theorem', 'CAP theorem', [34, 95], 'planned'],
     [17, 5, 'ci-cd', 'CI/CD and safe deployments', [6, 51, 52, 53, 54, 55], 'partial'],

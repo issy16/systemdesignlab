@@ -1,0 +1,710 @@
+{
+ "page": "replication-failover",
+ "segments": [
+  {
+   "kind": "attr",
+   "en": "width=device-width, initial-scale=1, viewport-fit=cover",
+   "zh": "="
+  },
+  {
+   "kind": "attr",
+   "en": "Add read replicas, read stale data because of replication lag, then kill the primary and compare manual and automatic failover.",
+   "zh": "加上唯讀副本，因為複製延遲而讀到過期資料，再讓主資料庫掛掉，比較手動與自動故障轉移。"
+  },
+  {
+   "kind": "attr",
+   "en": "Sections",
+   "zh": "章節"
+  },
+  {
+   "kind": "attr",
+   "en": "Database servers",
+   "zh": "資料庫伺服器"
+  },
+  {
+   "kind": "attr",
+   "en": "Example replication config and query routing",
+   "zh": "複製設定與查詢路由範例"
+  },
+  {
+   "kind": "attr",
+   "en": "Pages",
+   "zh": "頁面"
+  },
+  {
+   "kind": "html",
+   "en": "Replication and Failover · System Design Lab",
+   "zh": "複製與故障轉移 · System Design Lab"
+  },
+  {
+   "kind": "html",
+   "en": "system<b>.design.lab</b>",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "Lab",
+   "zh": "實驗室"
+  },
+  {
+   "kind": "html",
+   "en": "The config",
+   "zh": "設定檔"
+  },
+  {
+   "kind": "html",
+   "en": "Recap",
+   "zh": "重點整理"
+  },
+  {
+   "kind": "html",
+   "en": "page 14 · stage 4 · keep data correct",
+   "zh": "第 14 頁 · 階段 4 · 保持資料正確"
+  },
+  {
+   "kind": "html",
+   "en": "Read replicas, replication, eventual consistency, failover",
+   "zh": "唯讀副本、複製、最終一致性、故障轉移"
+  },
+  {
+   "kind": "html",
+   "en": "“I just bought a ticket. <em>Why isn't it in My tickets?”</em>",
+   "zh": "「我剛買了一張票。<em>為什麼『我的票券』裡沒有？」</em>"
+  },
+  {
+   "kind": "html",
+   "en": "<b>Encore</b>To take load off the main database, Ana adds two read replicas: copies that receive every change a moment later. Pages get faster. Then fans start reporting tickets that vanish and reappear, and one night the main database dies.",
+   "zh": "<b>Encore</b>為了減輕主資料庫的負擔，Ana 加了兩個唯讀副本（read replica）：會在片刻之後收到每一筆變更的資料庫副本。頁面變快了。接著歌迷開始回報票券忽隱忽現，然後某天晚上，主資料庫掛了。"
+  },
+  {
+   "kind": "html",
+   "en": "Open the lab ↓",
+   "zh": "打開實驗室 ↓"
+  },
+  {
+   "kind": "html",
+   "en": "lab · break it, then fix it",
+   "zh": "實驗室 · 先弄壞，再修好"
+  },
+  {
+   "kind": "html",
+   "en": "async",
+   "zh": "非同步"
+  },
+  {
+   "kind": "html",
+   "en": "One primary, two replicas",
+   "zh": "一個主資料庫，兩個副本"
+  },
+  {
+   "kind": "html",
+   "en": "All <b>writes</b> go to the primary. It streams each change to the replicas, which apply it after a delay: the <b>replication lag</b>. A fan buys a ticket every 0.5 s and checks “My tickets” 0.3 s later. Simulated numbers.",
+   "zh": "所有<b>寫入</b>都送到主資料庫（primary）。它把每筆變更串流給副本，副本在一段延遲後套用：這就是<b>複製延遲（replication lag）</b>。每 0.5 秒有一位歌迷買票，並在 0.3 秒後查看「我的票券」。數字是模擬的。"
+  },
+  {
+   "kind": "html",
+   "en": "Replication lag: <b id=\"lagV\">0.1 s</b>",
+   "zh": "複製延遲：<b id=\"lagV\">0.1 s</b>"
+  },
+  {
+   "kind": "html",
+   "en": "“My tickets” reads from",
+   "zh": "「我的票券」讀取自"
+  },
+  {
+   "kind": "html",
+   "en": "Replication",
+   "zh": "複製方式"
+  },
+  {
+   "kind": "html",
+   "en": "When the primary dies",
+   "zh": "主資料庫掛掉時"
+  },
+  {
+   "kind": "html",
+   "en": "✕ Kill the primary",
+   "zh": "✕ 讓主資料庫掛掉"
+  },
+  {
+   "kind": "html",
+   "en": "Simulation",
+   "zh": "模擬"
+  },
+  {
+   "kind": "html",
+   "en": "“My tickets” missing the purchase",
+   "zh": "「我的票券」少了剛買的票"
+  },
+  {
+   "kind": "html",
+   "en": "last 5 s",
+   "zh": "最近 5 秒"
+  },
+  {
+   "kind": "html",
+   "en": "Purchases failing",
+   "zh": "失敗的購買"
+  },
+  {
+   "kind": "html",
+   "en": "Write time",
+   "zh": "寫入時間"
+  },
+  {
+   "kind": "html",
+   "en": "5 ms",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "per purchase",
+   "zh": "每次購買"
+  },
+  {
+   "kind": "html",
+   "en": "Purchases lost",
+   "zh": "遺失的購買"
+  },
+  {
+   "kind": "html",
+   "en": "in failovers",
+   "zh": "故障轉移時"
+  },
+  {
+   "kind": "html",
+   "en": "Press Play to start.",
+   "zh": "按「播放」開始。"
+  },
+  {
+   "kind": "html",
+   "en": "Try this",
+   "zh": "試試看"
+  },
+  {
+   "kind": "html",
+   "en": "Eventual consistency",
+   "zh": "最終一致性（Eventual consistency）"
+  },
+  {
+   "kind": "html",
+   "en": "Replicas are always a little behind. If writes stop, they catch up and agree with the primary <i>eventually</i>. Until then, a read can return old data. That's fine for a concert list, not for “did my purchase go through?”.",
+   "zh": "副本總是落後一點點。如果寫入停止，它們會追上，最終<i>和主資料庫一致</i>。在那之前，讀取可能拿到舊資料。演唱會清單沒關係，「我的購買成功了嗎？」就不行。"
+  },
+  {
+   "kind": "html",
+   "en": "Failover",
+   "zh": "故障轉移（Failover）"
+  },
+  {
+   "kind": "html",
+   "en": "When the primary dies, promote a replica to be the new primary. Done by a person, it takes minutes and writes fail meanwhile. Done automatically, it takes seconds, but any writes the replica hadn't received yet are gone.",
+   "zh": "主資料庫掛掉時，把一個副本升級成新的主資料庫。由人來做要花好幾分鐘，期間寫入全部失敗。自動做只要幾秒，但副本還沒收到的寫入就會遺失。"
+  },
+  {
+   "kind": "html",
+   "en": "The one difference",
+   "zh": "關鍵差別"
+  },
+  {
+   "kind": "html",
+   "en": "With <b>async</b> replication the primary confirms a write right away and sends it to the replicas later: fast, but if the primary dies, its last moments of writes die with it. With <b>sync</b> replication the primary waits until a replica has the write: every write is slower, but a failover loses nothing.",
+   "zh": "<b>非同步（async）</b>複製時，主資料庫會立刻確認寫入，之後才送給副本：很快，但如果主資料庫掛了，它最後那段時間的寫入也跟著消失。<b>同步（sync）</b>複製時，主資料庫會等到某個副本拿到寫入才確認：每次寫入都比較慢，但故障轉移時什麼都不會遺失。"
+  },
+  {
+   "kind": "html",
+   "en": "act 2 · the real thing",
+   "zh": "第 2 幕 · 真實世界"
+  },
+  {
+   "kind": "html",
+   "en": "postgres + app",
+   "zh": "Postgres＋App"
+  },
+  {
+   "kind": "html",
+   "en": "Where these choices live",
+   "zh": "這些選擇設定在哪裡"
+  },
+  {
+   "kind": "html",
+   "en": "Postgres settings, and the app code that routes queries. Managed databases (AWS RDS, Cloud SQL, Neon) expose the same choices as checkboxes. <b>Hover or tap a line.</b>",
+   "zh": "Postgres 的設定，以及負責路由查詢的 App 程式碼。託管資料庫（AWS RDS、Cloud SQL、Neon）會把同樣的選擇做成勾選框。<b>把滑鼠移到某一行上，或點一下。</b>"
+  },
+  {
+   "kind": "html",
+   "en": "👆 pick a line",
+   "zh": "👆 選一行"
+  },
+  {
+   "kind": "html",
+   "en": "Each highlighted line maps to a control in the lab.",
+   "zh": "每一行反白後，都會對應到實驗室裡的一個控制項。"
+  },
+  {
+   "kind": "html",
+   "en": "recap · keep this",
+   "zh": "重點整理 · 帶走這些"
+  },
+  {
+   "kind": "html",
+   "en": "The whole page on one screen",
+   "zh": "整頁濃縮在一個畫面"
+  },
+  {
+   "kind": "html",
+   "en": "Copies",
+   "zh": "副本"
+  },
+  {
+   "kind": "html",
+   "en": "The primary streams every change to replicas. Gives you spare copies for failover, and extra servers for reads.",
+   "zh": "主資料庫把每筆變更串流給副本。你因此有了能接手的備用副本，以及能分擔讀取的額外伺服器。"
+  },
+  {
+   "kind": "html",
+   "en": "Behind",
+   "zh": "落後"
+  },
+  {
+   "kind": "html",
+   "en": "Read replicas + lag",
+   "zh": "唯讀副本＋延遲"
+  },
+  {
+   "kind": "html",
+   "en": "Reads from replicas take load off the primary but may be stale. Send “read your own write” queries to the primary.",
+   "zh": "從副本讀取能減輕主資料庫的負擔，但可能是過期的。「讀取自己剛寫入的資料」要送到主資料庫。"
+  },
+  {
+   "kind": "html",
+   "en": "Take over",
+   "zh": "接手"
+  },
+  {
+   "kind": "html",
+   "en": "Promote a replica when the primary dies. Automatic is fast. Async replication can lose the last writes; sync can't.",
+   "zh": "主資料庫掛掉時升級一個副本。自動的很快。非同步複製可能遺失最後的寫入；同步不會。"
+  },
+  {
+   "kind": "html",
+   "en": "The tradeoff",
+   "zh": "取捨"
+  },
+  {
+   "kind": "html",
+   "en": "Replicas buy read capacity and survival at the cost of consistency. Async: fast writes, stale reads, a small chance of losing recent writes. Sync: slower writes and no loss. Many teams use one sync replica (no loss) plus async ones for reads.",
+   "zh": "副本用一致性換來讀取容量和存活能力。非同步：寫入快、會讀到過期資料、有小機率遺失最近的寫入。同步：寫入較慢、不會遺失。很多團隊會用一個同步副本（不遺失）加上幾個負責讀取的非同步副本。"
+  },
+  {
+   "kind": "html",
+   "en": "Check it",
+   "zh": "考考自己"
+  },
+  {
+   "kind": "js",
+   "en": "'Press <b>Play</b> with 0.1 s of lag and reads from a replica.'",
+   "zh": "'在延遲 0.1 秒、從副本讀取的設定下按<b>播放</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The replicas are only 0.1 s behind, so the purchase is always there 0.3 s later.'",
+   "zh": "'副本只落後 0.1 秒，所以 0.3 秒後去看時，購買紀錄一定已經在了。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Raise the lag to <b>2 s</b>.'",
+   "zh": "'把延遲提高到 <b>2 秒</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Now “My tickets” is read from a replica that hasn\\'t received the purchase yet. The ticket seems to be missing.'",
+   "zh": "'現在「我的票券」是從還沒收到這筆購買的副本讀取的。票好像不見了。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Switch “My tickets” to <b>Primary (read your own writes)</b>.'",
+   "zh": "'把「我的票券」切換成<b>主資料庫（讀取自己的寫入）</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Right after buying, read from the primary, which always has it. Other pages can keep using replicas.'",
+   "zh": "'剛買完就從主資料庫讀取，它一定有這筆資料。其他頁面可以繼續用副本。'"
+  },
+  {
+   "kind": "js",
+   "en": "'With <b>Manual</b> failover, <b>kill the primary</b>.'",
+   "zh": "'在<b>手動</b>故障轉移的設定下，<b>讓主資料庫掛掉</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Every purchase fails until someone notices and promotes a replica: 12 s here, often 20 minutes or more at 3 a.m.'",
+   "zh": "'在有人發現並升級副本之前，每一筆購買都會失敗：這裡是 12 秒，凌晨 3 點常常是 20 分鐘以上。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Switch to <b>Automatic</b> failover (keep 2 s lag, Async) and kill the new primary.'",
+   "zh": "'切換到<b>自動</b>故障轉移（維持 2 秒延遲、非同步），讓新的主資料庫掛掉。'"
+  },
+  {
+   "kind": "js",
+   "en": "'A replica takes over in 3 s. But the purchases from the last 2 s never reached it: they\\'re lost.'",
+   "zh": "'副本在 3 秒內接手。但最後 2 秒的購買從來沒有送到它那裡：它們遺失了。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Switch replication to <b>Sync</b> and kill the primary once more.'",
+   "zh": "'把複製方式切換成<b>同步</b>，再讓主資料庫掛掉一次。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Each write now waits for a replica, so it\\'s slower. But this failover loses nothing.'",
+   "zh": "'現在每次寫入都要等副本，所以比較慢。但這次故障轉移什麼都沒有遺失。'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"pill bad\">down</span>'",
+   "zh": "'<span class=\"pill bad\">掛了</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"pill ok\">primary</span>'",
+   "zh": "'<span class=\"pill ok\">主資料庫</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"pill\">replica</span>'",
+   "zh": "'<span class=\"pill\">副本</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'not responding'",
+   "zh": "'沒有回應'"
+  },
+  {
+   "kind": "js",
+   "en": "'takes all writes'",
+   "zh": "'接收所有寫入'"
+  },
+  {
+   "kind": "js",
+   "en": "'in sync'",
+   "zh": "'已同步'"
+  },
+  {
+   "kind": "js",
+   "en": "`behind by ${m.behind} purchase${m.behind === 1 ? '' : 's'}`",
+   "zh": "`落後 ${m.behind} 筆購買`"
+  },
+  {
+   "kind": "js",
+   "en": "`<div class=\"nm\"><span>${n.name}</span>${pill}</div><div class=\"mono\">${line}</div>`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "' ms'",
+   "zh": "' 毫秒'"
+  },
+  {
+   "kind": "js",
+   "en": "'Press Play to start.'",
+   "zh": "'按「播放」開始。'"
+  },
+  {
+   "kind": "js",
+   "en": "`✕ The primary is down. Purchases fail. ${S.auto ? `Automatic failover in ${Math.max(0, Math.ceil((AUTO - (S.t - S.downAt)) / 1000))} s.` : `Waiting for a person to promote a replica (${Math.max(0, Math.ceil((MANUAL - (S.t - S.downAt)) / 1000))} s).`}`",
+   "zh": "`✕ 主資料庫掛了。購買全部失敗。${S.auto ? `${Math.max(0, Math.ceil((AUTO - (S.t - S.downAt)) / 1000))} 秒後自動故障轉移。` : `等待有人升級副本（${Math.max(0, Math.ceil((MANUAL - (S.t - S.downAt)) / 1000))} 秒）。`}`"
+  },
+  {
+   "kind": "js",
+   "en": "`✕ ${Math.round(m.stale * 100)}% of fans don't see the ticket they just bought: the replica is ${S.lag / 1000} s behind, and they looked after 0.3 s.`",
+   "zh": "`✕ ${Math.round(m.stale * 100)}% 的歌迷看不到自己剛買的票：副本落後 ${S.lag / 1000} 秒，而他們在 0.3 秒後就去看了。`"
+  },
+  {
+   "kind": "js",
+   "en": "`✓ Running. Last failover took ${(f.took / 1000).toFixed(0)} s and lost ${f.lost} purchase${f.lost === 1 ? '' : 's'}${f.lost ? ' (charged, but not in the database)' : ''}.`",
+   "zh": "`✓ 運作中。上一次故障轉移花了 ${(f.took / 1000).toFixed(0)} 秒，遺失了 ${f.lost} 筆購買${f.lost ? '（已扣款，但不在資料庫裡）' : ''}。`"
+  },
+  {
+   "kind": "js",
+   "en": "'✓ Healthy: every fan sees their purchase.'",
+   "zh": "'✓ 健康：每位歌迷都看得到自己的購買。'"
+  },
+  {
+   "kind": "js",
+   "en": "`t = ${(S.t / 1000).toFixed(1)} s`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'A replica'",
+   "zh": "'副本'"
+  },
+  {
+   "kind": "js",
+   "en": "'Primary (read your own writes)'",
+   "zh": "'主資料庫（讀取自己的寫入）'"
+  },
+  {
+   "kind": "js",
+   "en": "'Async'",
+   "zh": "'非同步'"
+  },
+  {
+   "kind": "js",
+   "en": "'Sync'",
+   "zh": "'同步'"
+  },
+  {
+   "kind": "js",
+   "en": "'Manual'",
+   "zh": "'手動'"
+  },
+  {
+   "kind": "js",
+   "en": "'Automatic'",
+   "zh": "'自動'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\"># postgresql.conf on the primary</span>'",
+   "zh": "'<span class=\"c\"># 主資料庫上的 postgresql.conf</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">wal_level</span> = replica'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">synchronous_standby_names</span> = <span class=\"s\">\\'\\'</span>  <span class=\"c\"># async</span>'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\"># synchronous_standby_names = \\'ANY 1 (db2, db3)\\'  # sync</span>'",
+   "zh": "'<span class=\"c\"># synchronous_standby_names = \\'ANY 1 (db2, db3)\\'  # 同步</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\">// app: writes to the primary, most reads to a replica</span>'",
+   "zh": "'<span class=\"c\">// App：寫入送主資料庫，大部分讀取送副本</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">const</span> primary = pool(<span class=\"s\">\"db-1\"</span>), replica = pool(<span class=\"s\">\"db-2\"</span>);'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">await</span> primary.query(<span class=\"s\">\"INSERT INTO tickets …\"</span>);'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">const</span> concerts = <span class=\"key\">await</span> replica.query(<span class=\"s\">\"SELECT * FROM concerts\"</span>);'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\">// read your own writes: right after buying, ask the primary</span>'",
+   "zh": "'<span class=\"c\">// 讀取自己的寫入：剛買完就問主資料庫</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">const</span> mine = <span class=\"key\">await</span> primary.query(<span class=\"s\">\"SELECT … WHERE fan = $1\"</span>, [fan]);'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\"># failover: a tool watches the primary and promotes a replica</span>'",
+   "zh": "'<span class=\"c\"># 故障轉移：由工具監看主資料庫並升級副本</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\"># (Patroni, pg_auto_failover, or a managed service\\'s Multi-AZ option)</span>'",
+   "zh": "'<span class=\"c\"># （Patroni、pg_auto_failover，或託管服務的 Multi-AZ 選項）</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'Stream every change'",
+   "zh": "'串流每一筆變更'"
+  },
+  {
+   "kind": "js",
+   "en": "'Postgres writes every change to its write-ahead log (WAL) and streams it to the replicas, which replay it.'",
+   "zh": "'Postgres 會把每筆變更寫進預寫式日誌（WAL），並串流給副本重播。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Async (the default)'",
+   "zh": "'非同步（預設）'"
+  },
+  {
+   "kind": "js",
+   "en": "'Commit as soon as the primary has the write. Fast, and the replicas catch up when they can. This is the lab\\'s “Async”.'",
+   "zh": "'主資料庫一拿到寫入就提交。很快，副本有空時再追上。這就是實驗室的「非同步」。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Wait until at least one replica confirms each commit. Slower writes, but a promoted replica has everything. The lab\\'s “Sync”.'",
+   "zh": "'等到至少一個副本確認每次提交。寫入較慢，但被升級的副本擁有一切。這就是實驗室的「同步」。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Two connection pools'",
+   "zh": "'兩個連線池'"
+  },
+  {
+   "kind": "js",
+   "en": "'One for the primary, one for replicas. Many ORMs and drivers can route automatically.'",
+   "zh": "'一個給主資料庫，一個給副本。很多 ORM 和驅動程式能自動路由。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Writes'",
+   "zh": "'寫入'"
+  },
+  {
+   "kind": "js",
+   "en": "'Always to the primary. Replicas are read-only.'",
+   "zh": "'一律送到主資料庫。副本是唯讀的。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Reads that can be a bit stale'",
+   "zh": "'可以稍微過期的讀取'"
+  },
+  {
+   "kind": "js",
+   "en": "'Concert lists, search, venue pages. Moving these to replicas is where the capacity win comes from.'",
+   "zh": "'演唱會清單、搜尋、場館頁面。把這些移到副本，就是容量提升的來源。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Read your own writes'",
+   "zh": "'讀取自己的寫入'"
+  },
+  {
+   "kind": "js",
+   "en": "'For a fan who just changed something, read from the primary (or wait for the replica to catch up). That\\'s the fix for the “missing ticket”.'",
+   "zh": "'對剛修改了東西的歌迷，從主資料庫讀取（或等副本追上）。這就是「票不見了」的修法。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Automatic failover'",
+   "zh": "'自動故障轉移'"
+  },
+  {
+   "kind": "js",
+   "en": "'Something has to notice the primary is gone and promote a replica in seconds. Doing it by hand is the lab\\'s 12-second “Manual” setting, and real people usually take much longer.'",
+   "zh": "'必須有東西察覺主資料庫不見了，並在幾秒內升級副本。用人手來做，就是實驗室裡 12 秒的「手動」設定，而真人通常要花更久。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Fans sometimes edit their profile, reload, and see the old version for a second. Profile pages read from a replica. What\\'s the simplest fix?'",
+   "zh": "'歌迷有時修改個人資料、重新整理後，會看到舊版本一秒鐘。個人資料頁是從副本讀取的。最簡單的修法是什麼？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Remove the replicas'",
+   "zh": "'把副本拿掉'"
+  },
+  {
+   "kind": "js",
+   "en": "'That throws away the read capacity for every page to fix one flow.'",
+   "zh": "'為了修一個流程，就丟掉所有頁面的讀取容量。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Read the profile from the primary for a short time after the fan edits it'",
+   "zh": "'在歌迷修改後的短時間內，從主資料庫讀取個人資料'"
+  },
+  {
+   "kind": "js",
+   "en": "'Read-your-writes routing: only the person who just wrote needs fresh data. Everyone else can read from replicas.'",
+   "zh": "'「讀取自己的寫入」路由：只有剛寫入的人需要最新資料，其他人都可以從副本讀取。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Make replication lag zero'",
+   "zh": "'把複製延遲降到零'"
+  },
+  {
+   "kind": "js",
+   "en": "'With async replication, lag can be small but never guaranteed zero.'",
+   "zh": "'非同步複製的延遲可以很小，但永遠無法保證是零。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Encore uses async replication with automatic failover. The primary crashes. What can be lost?'",
+   "zh": "'Encore 使用非同步複製加自動故障轉移。主資料庫當機了。可能遺失什麼？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Nothing: replicas have everything'",
+   "zh": "'什麼都不會：副本擁有一切'"
+  },
+  {
+   "kind": "js",
+   "en": "'With async replication, the newest writes may not have reached any replica yet.'",
+   "zh": "'非同步複製時，最新的寫入可能還沒送到任何副本。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Writes from the last moments before the crash that hadn\\'t reached the replica'",
+   "zh": "'當機前最後那段時間、還沒送到副本的寫入'"
+  },
+  {
+   "kind": "js",
+   "en": "'Roughly the replication lag\\'s worth of writes. Sync replication to at least one replica closes that gap.'",
+   "zh": "'大約是一段複製延遲的寫入量。對至少一個副本使用同步複製，就能補上這個缺口。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The whole database'",
+   "zh": "'整個資料庫'"
+  },
+  {
+   "kind": "js",
+   "en": "'The promoted replica has everything except the last, unreplicated writes.'",
+   "zh": "'被升級的副本擁有一切，除了最後那些還沒複製過去的寫入。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Why not make every replica synchronous?'",
+   "zh": "'為什麼不讓每個副本都同步？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Sync replication doesn\\'t work with Postgres'",
+   "zh": "'Postgres 不支援同步複製'"
+  },
+  {
+   "kind": "js",
+   "en": "'It does, with <code>synchronous_standby_names</code>.'",
+   "zh": "'它支援，用 <code>synchronous_standby_names</code>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Every write waits for the slowest required replica, and a down replica can stall writes'",
+   "zh": "'每次寫入都要等最慢的那個必要副本，而一個掛掉的副本可能讓寫入卡住'"
+  },
+  {
+   "kind": "js",
+   "en": "'That\\'s why a common setup is one sync replica for safety plus async replicas for reads.'",
+   "zh": "'這就是為什麼常見的做法是一個同步副本負責安全，再加幾個非同步副本負責讀取。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Sync replicas can\\'t serve reads'",
+   "zh": "'同步副本不能處理讀取'"
+  },
+  {
+   "kind": "js",
+   "en": "'They can. The cost is on the write side.'",
+   "zh": "'可以。成本在寫入那一端。'"
+  }
+ ]
+}

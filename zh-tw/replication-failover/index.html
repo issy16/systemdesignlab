@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW" data-lang="zh-tw" data-slug="replication-failover">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="加上唯讀副本，因為複製延遲而讀到過期資料，再讓主資料庫掛掉，比較手動與自動故障轉移。">
+<title>複製與故障轉移 · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/explainer.css">
+</head>
+<body>
+<!-- Plan. Stuck point: replicas sound like "free extra copies"; people miss lag (stale reads) and what async replication loses on failover.
+     Lab: purchases every 0.5 s, each fan checks "My tickets" 0.3 s later. Lag slider, read routing, kill the primary, manual vs automatic failover, async vs sync.
+     One difference: async (fast writes, may lose the last ones) vs sync (slower writes, nothing lost). -->
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="章節"><a href="#lab">實驗室</a><a href="#real">設定檔</a><a href="#recap">重點整理</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>第 14 頁 · 階段 4 · 保持資料正確</span><span class="hot">29 · 32 · 35 · 85</span></div>
+  <div class="eyebrow">唯讀副本、複製、最終一致性、故障轉移</div>
+  <h1>「我剛買了一張票。<em>為什麼『我的票券』裡沒有？」</em></h1>
+  <div class="scenario"><b>Encore</b>為了減輕主資料庫的負擔，Ana 加了兩個唯讀副本（read replica）：會在片刻之後收到每一筆變更的資料庫副本。頁面變快了。接著歌迷開始回報票券忽隱忽現，然後某天晚上，主資料庫掛了。</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">打開實驗室 ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>實驗室 · 先弄壞，再修好</span><span class="hot" id="tag">非同步</span></div>
+  <h2>一個主資料庫，兩個副本</h2>
+  <p>所有<b>寫入</b>都送到主資料庫（primary）。它把每筆變更串流給副本，副本在一段延遲後套用：這就是<b>複製延遲（replication lag）</b>。每 0.5 秒有一位歌迷買票，並在 0.3 秒後查看「我的票券」。數字是模擬的。</p>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl">
+        <label for="lag">複製延遲：<b id="lagV">0.1 s</b></label>
+        <input type="range" id="lag" min="0" max="4" step="1" value="0">
+      </div>
+      <div class="ctl"><span class="lab-k">「我的票券」讀取自</span><div id="readSeg"></div></div>
+      <div class="ctl"><span class="lab-k">複製方式</span><div id="syncSeg"></div></div>
+      <div class="ctl"><span class="lab-k">主資料庫掛掉時</span><div id="foSeg"></div>
+        <button class="btn sm bad" id="kill" type="button" style="margin-top:6px">✕ 讓主資料庫掛掉</button></div>
+      <div class="ctl"><span class="lab-k">模擬</span><div id="player"></div></div>
+    </div>
+    <div class="servers" id="nodes" aria-label="資料庫伺服器"></div>
+    <div class="meters" style="margin:0">
+      <div class="meter"><div class="k">「我的票券」少了剛買的票</div><div class="v" id="mStale">0%</div><div class="d">最近 5 秒</div></div>
+      <div class="meter"><div class="k">失敗的購買</div><div class="v" id="mFail">0</div><div class="d">最近 5 秒</div></div>
+      <div class="meter"><div class="k">寫入時間</div><div class="v" id="mW">5 ms</div><div class="d">每次購買</div></div>
+      <div class="meter"><div class="k">遺失的購買</div><div class="v" id="mLost">0</div><div class="d">故障轉移時</div></div>
+    </div>
+    <div class="status" id="status" role="status">按「播放」開始。</div>
+  </div>
+  <h3>試試看</h3>
+  <ol class="missions" id="missions"></ol>
+  <div class="compare">
+    <div><h3>最終一致性（Eventual consistency）</h3><p style="margin:0">副本總是落後一點點。如果寫入停止，它們會追上，最終<i>和主資料庫一致</i>。在那之前，讀取可能拿到舊資料。演唱會清單沒關係，「我的購買成功了嗎？」就不行。</p></div>
+    <div><h3>故障轉移（Failover）</h3><p style="margin:0">主資料庫掛掉時，把一個副本升級成新的主資料庫。由人來做要花好幾分鐘，期間寫入全部失敗。自動做只要幾秒，但副本還沒收到的寫入就會遺失。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">關鍵差別</div><p><b>非同步（async）</b>複製時，主資料庫會立刻確認寫入，之後才送給副本：很快，但如果主資料庫掛了，它最後那段時間的寫入也跟著消失。<b>同步（sync）</b>複製時，主資料庫會等到某個副本拿到寫入才確認：每次寫入都比較慢，但故障轉移時什麼都不會遺失。</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>第 2 幕 · 真實世界</span><span class="hot">Postgres＋App</span></div>
+  <h2>這些選擇設定在哪裡</h2>
+  <p>Postgres 的設定，以及負責路由查詢的 App 程式碼。託管資料庫（AWS RDS、Cloud SQL、Neon）會把同樣的選擇做成勾選框。<b>把滑鼠移到某一行上，或點一下。</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="複製設定與查詢路由範例"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 選一行</div><p id="exP">每一行反白後，都會對應到實驗室裡的一個控制項。</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>重點整理 · 帶走這些</span><span class="hot">♥</span></div>
+  <h2>整頁濃縮在一個畫面</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">副本</div><div class="t">複製方式</div><p>主資料庫把每筆變更串流給副本。你因此有了能接手的備用副本，以及能分擔讀取的額外伺服器。</p></div>
+    <div class="card"><div class="sub">落後</div><div class="t">唯讀副本＋延遲</div><p>從副本讀取能減輕主資料庫的負擔，但可能是過期的。「讀取自己剛寫入的資料」要送到主資料庫。</p></div>
+    <div class="card"><div class="sub">接手</div><div class="t">故障轉移（Failover）</div><p>主資料庫掛掉時升級一個副本。自動的很快。非同步複製可能遺失最後的寫入；同步不會。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">取捨</div><p>副本用一致性換來讀取容量和存活能力。非同步：寫入快、會讀到過期資料、有小機率遺失最近的寫入。同步：寫入較慢、不會遺失。很多團隊會用一個同步副本（不遺失）加上幾個負責讀取的非同步副本。</p></div>
+  <h3 style="margin-top:26px">考考自己 <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="頁面"></nav>
+</main>
+
+<script src="../../assets/explainer.js"></script>
+<script src="../../assets/i18n.zh-tw.js"></script>
+<script>
+(() => {
+const { $, el } = X;
+const DT = 100, LAGS = [100, 300, 1000, 2000, 5000], BUY_EVERY = 500, CHECK_AFTER = 300, MANUAL = 12000, AUTO = 3000, WIN = 5000;
+
+/* ---------- simulation: deterministic, pure state + tick ---------- */
+function init(o = {}) {
+  return Object.assign({ t: 0, lag: 100, ryw: false, sync: false, auto: false, nodes: [{ name: 'db-1', role: 'primary' }, { name: 'db-2', role: 'replica' }, { name: 'db-3', role: 'replica' }],
+    next: 4, writes: [], reads: [], ev: [], downAt: -1, lost: 0, failovers: [], ticks: 0 }, o);
+}
+const appliedAt = (s, w) => w.t + (s.sync ? 0 : s.lag);
+function failover(s) {
+  const lostNow = s.sync ? 0 : s.writes.filter(w => appliedAt(s, w) > s.downAt).length;
+  s.writes = s.writes.filter(w => s.sync || appliedAt(s, w) <= s.downAt);
+  s.lost += lostNow;
+  s.nodes = s.nodes.filter(n => n.role !== 'dead');
+  s.nodes[0].role = 'primary';
+  s.nodes.push({ name: 'db-' + s.next++, role: 'replica', fresh: true });
+  s.failovers.push({ auto: s.auto, sync: s.sync, lost: lostNow, took: s.t - s.downAt });
+  s.downAt = -1;
+}
+function tick(s) {
+  const t1 = s.t + DT;
+  const down = s.downAt >= 0;
+  if (down && s.t - s.downAt >= (s.auto ? AUTO : MANUAL)) failover(s);
+  if (s.t % BUY_EVERY === 0) {
+    if (s.downAt >= 0) s.ev.push({ t: s.t, kind: 'fail' });
+    else { const w = { id: s.writes.length + 1, t: s.t }; s.writes.push(w); s.reads.push({ at: s.t + CHECK_AFTER, w }); s.ev.push({ t: s.t, kind: 'ok' }); }
+  }
+  s.reads = s.reads.filter(r => {
+    if (r.at > s.t) return true;
+    if (!s.writes.includes(r.w)) return false; // lost in a failover
+    const fromPrimary = s.ryw;
+    const stale = fromPrimary ? s.downAt >= 0 : appliedAt(s, r.w) > r.at;
+    s.ev.push({ t: s.t, kind: stale ? 'stale' : 'fresh' });
+    return false;
+  });
+  s.t = t1; s.ticks++;
+  s.ev = s.ev.filter(e => e.t > t1 - WIN);
+  if (s.writes.length > 400) s.writes = s.writes.slice(-200);
+  return s;
+}
+function metrics(s) {
+  const reads = s.ev.filter(e => e.kind === 'stale' || e.kind === 'fresh');
+  return { stale: reads.length ? reads.filter(e => e.kind === 'stale').length / reads.length : 0, fail: s.ev.filter(e => e.kind === 'fail').length,
+    behind: s.sync ? 0 : s.writes.filter(w => appliedAt(s, w) > s.t).length };
+}
+
+/* ---------- UI ---------- */
+let S = init();
+const flags = { stale: false, failed: false };
+const mis = X.missions($('#missions'), [
+  { text: '在延遲 0.1 秒、從副本讀取的設定下按<b>播放</b>。', hint: '副本只落後 0.1 秒，所以 0.3 秒後去看時，購買紀錄一定已經在了。', check: s => s.ticks >= 30 },
+  { text: '把延遲提高到 <b>2 秒</b>。', hint: '現在「我的票券」是從還沒收到這筆購買的副本讀取的。票好像不見了。', check: s => { if (s.lag >= 1000 && !s.ryw && metrics(s).stale > 0.5) flags.stale = true; return flags.stale; } },
+  { text: '把「我的票券」切換成<b>主資料庫（讀取自己的寫入）</b>。', hint: '剛買完就從主資料庫讀取，它一定有這筆資料。其他頁面可以繼續用副本。', check: s => s.ryw && s.lag >= 1000 && metrics(s).stale === 0 && s.ticks > 50 },
+  { text: '在<b>手動</b>故障轉移的設定下，<b>讓主資料庫掛掉</b>。', hint: '在有人發現並升級副本之前，每一筆購買都會失敗：這裡是 12 秒，凌晨 3 點常常是 20 分鐘以上。', check: s => { if (!s.auto && s.downAt >= 0 && metrics(s).fail >= 4) flags.failed = true; return flags.failed; } },
+  { text: '切換到<b>自動</b>故障轉移（維持 2 秒延遲、非同步），讓新的主資料庫掛掉。', hint: '副本在 3 秒內接手。但最後 2 秒的購買從來沒有送到它那裡：它們遺失了。', check: s => s.failovers.some(f => f.auto && !f.sync && f.lost > 0) },
+  { text: '把複製方式切換成<b>同步</b>，再讓主資料庫掛掉一次。', hint: '現在每次寫入都要等副本，所以比較慢。但這次故障轉移什麼都沒有遺失。', check: s => s.failovers.some(f => f.auto && f.sync && f.lost === 0) },
+]);
+function render() {
+  const m = metrics(S);
+  $('#lagV').textContent = S.lag / 1000 + ' s';
+  $('#tag').textContent = S.sync ? 'sync' : 'async';
+  const box = $('#nodes'); box.innerHTML = '';
+  const down = S.downAt >= 0;
+  S.nodes.forEach((n, i) => {
+    const dead = n.role === 'dead';
+    const d = el('div', 'server' + (dead ? ' down' : ''));
+    const pill = dead ? '<span class="pill bad">掛了</span>' : n.role === 'primary' ? '<span class="pill ok">主資料庫</span>' : '<span class="pill">副本</span>';
+    const line = dead ? '沒有回應' : n.role === 'primary' ? '接收所有寫入' : S.sync ? '已同步' : `落後 ${m.behind} 筆購買`;
+    d.innerHTML = `<div class="nm"><span>${n.name}</span>${pill}</div><div class="mono">${line}</div>`;
+    box.append(d);
+  });
+  $('#mStale').textContent = Math.round(m.stale * 100) + '%';
+  $('#mStale').parentElement.className = 'meter' + (m.stale > 0 ? ' bad' : '');
+  $('#mFail').textContent = m.fail;
+  $('#mFail').parentElement.className = 'meter' + (m.fail ? ' bad' : '');
+  $('#mW').textContent = (S.sync ? 35 : 5) + ' 毫秒';
+  $('#mW').parentElement.className = 'meter' + (S.sync ? ' wait' : '');
+  $('#mLost').textContent = S.lost;
+  $('#mLost').parentElement.className = 'meter' + (S.lost ? ' bad' : '');
+  $('#kill').disabled = down;
+  const st = $('#status');
+  if (!S.t) { st.className = 'status'; st.textContent = '按「播放」開始。'; }
+  else if (down) { st.className = 'status bad'; st.textContent = `✕ 主資料庫掛了。購買全部失敗。${S.auto ? `${Math.max(0, Math.ceil((AUTO - (S.t - S.downAt)) / 1000))} 秒後自動故障轉移。` : `等待有人升級副本（${Math.max(0, Math.ceil((MANUAL - (S.t - S.downAt)) / 1000))} 秒）。`}`; }
+  else if (m.stale > 0) { st.className = 'status bad'; st.textContent = `✕ ${Math.round(m.stale * 100)}% 的歌迷看不到自己剛買的票：副本落後 ${S.lag / 1000} 秒，而他們在 0.3 秒後就去看了。`; }
+  else { const f = S.failovers[S.failovers.length - 1]; st.className = 'status ok'; st.textContent = f ? `✓ 運作中。上一次故障轉移花了 ${(f.took / 1000).toFixed(0)} 秒，遺失了 ${f.lost} 筆購買${f.lost ? '（已扣款，但不在資料庫裡）' : ''}。` : '✓ 健康：每位歌迷都看得到自己的購買。'; }
+  player.clock(`t = ${(S.t / 1000).toFixed(1)} s`);
+  mis.update(S);
+}
+const player = X.player($('#player'), {
+  step: () => { tick(S); render(); }, stepTicks: 5,
+  reset: () => { S = init({ lag: S.lag, ryw: S.ryw, sync: S.sync, auto: S.auto }); Object.keys(flags).forEach(k => (flags[k] = false)); mis.reset(); render(); },
+});
+$('#lag').addEventListener('input', e => { S.lag = LAGS[+e.target.value]; render(); });
+X.seg($('#readSeg'), ['副本', '主資料庫（讀取自己的寫入）'], i => { S.ryw = i === 1; render(); }, 0);
+X.seg($('#syncSeg'), ['非同步', '同步'], i => { S.sync = i === 1; render(); }, 0);
+X.seg($('#foSeg'), ['手動', '自動'], i => { S.auto = i === 1; render(); }, 0);
+$('#kill').addEventListener('click', () => { S.nodes.find(n => n.role === 'primary').role = 'dead'; S.downAt = S.t; if (!player.running) player.play(); render(); });
+render();
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="c"># 主資料庫上的 postgresql.conf</span>', null],
+  ['<span class="key">wal_level</span> = replica', 'wal'],
+  ['<span class="key">synchronous_standby_names</span> = <span class="s">\'\'</span>  <span class="c"># async</span>', 'async'],
+  ['<span class="c"># synchronous_standby_names = \'ANY 1 (db2, db3)\'  # 同步</span>', 'sync'],
+  ['', null],
+  ['<span class="c">// App：寫入送主資料庫，大部分讀取送副本</span>', null],
+  ['<span class="key">const</span> primary = pool(<span class="s">"db-1"</span>), replica = pool(<span class="s">"db-2"</span>);', 'pools'],
+  ['<span class="key">await</span> primary.query(<span class="s">"INSERT INTO tickets …"</span>);', 'write'],
+  ['<span class="key">const</span> concerts = <span class="key">await</span> replica.query(<span class="s">"SELECT * FROM concerts"</span>);', 'read'],
+  ['<span class="c">// 讀取自己的寫入：剛買完就問主資料庫</span>', 'ryw'],
+  ['<span class="key">const</span> mine = <span class="key">await</span> primary.query(<span class="s">"SELECT … WHERE fan = $1"</span>, [fan]);', 'ryw'],
+  ['', null],
+  ['<span class="c"># 故障轉移：由工具監看主資料庫並升級副本</span>', null],
+  ['<span class="c"># （Patroni、pg_auto_failover，或託管服務的 Multi-AZ 選項）</span>', 'failover'],
+], {
+  wal: ['串流每一筆變更', 'Postgres 會把每筆變更寫進預寫式日誌（WAL），並串流給副本重播。'],
+  async: ['非同步（預設）', '主資料庫一拿到寫入就提交。很快，副本有空時再追上。這就是實驗室的「非同步」。'],
+  sync: ['同步', '等到至少一個副本確認每次提交。寫入較慢，但被升級的副本擁有一切。這就是實驗室的「同步」。'],
+  pools: ['兩個連線池', '一個給主資料庫，一個給副本。很多 ORM 和驅動程式能自動路由。'],
+  write: ['寫入', '一律送到主資料庫。副本是唯讀的。'],
+  read: ['可以稍微過期的讀取', '演唱會清單、搜尋、場館頁面。把這些移到副本，就是容量提升的來源。'],
+  ryw: ['讀取自己的寫入', '對剛修改了東西的歌迷，從主資料庫讀取（或等副本追上）。這就是「票不見了」的修法。'],
+  failover: ['自動故障轉移', '必須有東西察覺主資料庫不見了，並在幾秒內升級副本。用人手來做，就是實驗室裡 12 秒的「手動」設定，而真人通常要花更久。'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: '歌迷有時修改個人資料、重新整理後，會看到舊版本一秒鐘。個人資料頁是從副本讀取的。最簡單的修法是什麼？', opts: [
+    ['把副本拿掉', false, '為了修一個流程，就丟掉所有頁面的讀取容量。'],
+    ['在歌迷修改後的短時間內，從主資料庫讀取個人資料', true, '「讀取自己的寫入」路由：只有剛寫入的人需要最新資料，其他人都可以從副本讀取。'],
+    ['把複製延遲降到零', false, '非同步複製的延遲可以很小，但永遠無法保證是零。'],
+  ] },
+  { q: 'Encore 使用非同步複製加自動故障轉移。主資料庫當機了。可能遺失什麼？', opts: [
+    ['什麼都不會：副本擁有一切', false, '非同步複製時，最新的寫入可能還沒送到任何副本。'],
+    ['當機前最後那段時間、還沒送到副本的寫入', true, '大約是一段複製延遲的寫入量。對至少一個副本使用同步複製，就能補上這個缺口。'],
+    ['整個資料庫', false, '被升級的副本擁有一切，除了最後那些還沒複製過去的寫入。'],
+  ] },
+  { q: '為什麼不讓每個副本都同步？', opts: [
+    ['Postgres 不支援同步複製', false, '它支援，用 <code>synchronous_standby_names</code>。'],
+    ['每次寫入都要等最慢的那個必要副本，而一個掛掉的副本可能讓寫入卡住', true, '這就是為什麼常見的做法是一個同步副本負責安全，再加幾個非同步副本負責讀取。'],
+    ['同步副本不能處理讀取', false, '可以。成本在寫入那一端。'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'replication-failover');
+})();
+</script>
+</body>
+</html>

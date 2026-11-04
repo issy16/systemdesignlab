@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Add read replicas, read stale data because of replication lag, then kill the primary and compare manual and automatic failover.">
+<title>Replication and Failover · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/explainer.css">
+</head>
+<body>
+<!-- Plan. Stuck point: replicas sound like "free extra copies"; people miss lag (stale reads) and what async replication loses on failover.
+     Lab: purchases every 0.5 s, each fan checks "My tickets" 0.3 s later. Lag slider, read routing, kill the primary, manual vs automatic failover, async vs sync.
+     One difference: async (fast writes, may lose the last ones) vs sync (slower writes, nothing lost). -->
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="Sections"><a href="#lab">Lab</a><a href="#real">The config</a><a href="#recap">Recap</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>page 14 · stage 4 · keep data correct</span><span class="hot">29 · 32 · 35 · 85</span></div>
+  <div class="eyebrow">Read replicas, replication, eventual consistency, failover</div>
+  <h1>“I just bought a ticket. <em>Why isn't it in My tickets?”</em></h1>
+  <div class="scenario"><b>Encore</b>To take load off the main database, Ana adds two read replicas: copies that receive every change a moment later. Pages get faster. Then fans start reporting tickets that vanish and reappear, and one night the main database dies.</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">Open the lab ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>lab · break it, then fix it</span><span class="hot" id="tag">async</span></div>
+  <h2>One primary, two replicas</h2>
+  <p>All <b>writes</b> go to the primary. It streams each change to the replicas, which apply it after a delay: the <b>replication lag</b>. A fan buys a ticket every 0.5 s and checks “My tickets” 0.3 s later. Simulated numbers.</p>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl">
+        <label for="lag">Replication lag: <b id="lagV">0.1 s</b></label>
+        <input type="range" id="lag" min="0" max="4" step="1" value="0">
+      </div>
+      <div class="ctl"><span class="lab-k">“My tickets” reads from</span><div id="readSeg"></div></div>
+      <div class="ctl"><span class="lab-k">Replication</span><div id="syncSeg"></div></div>
+      <div class="ctl"><span class="lab-k">When the primary dies</span><div id="foSeg"></div>
+        <button class="btn sm bad" id="kill" type="button" style="margin-top:6px">✕ Kill the primary</button></div>
+      <div class="ctl"><span class="lab-k">Simulation</span><div id="player"></div></div>
+    </div>
+    <div class="servers" id="nodes" aria-label="Database servers"></div>
+    <div class="meters" style="margin:0">
+      <div class="meter"><div class="k">“My tickets” missing the purchase</div><div class="v" id="mStale">0%</div><div class="d">last 5 s</div></div>
+      <div class="meter"><div class="k">Purchases failing</div><div class="v" id="mFail">0</div><div class="d">last 5 s</div></div>
+      <div class="meter"><div class="k">Write time</div><div class="v" id="mW">5 ms</div><div class="d">per purchase</div></div>
+      <div class="meter"><div class="k">Purchases lost</div><div class="v" id="mLost">0</div><div class="d">in failovers</div></div>
+    </div>
+    <div class="status" id="status" role="status">Press Play to start.</div>
+  </div>
+  <h3>Try this</h3>
+  <ol class="missions" id="missions"></ol>
+  <div class="compare">
+    <div><h3>Eventual consistency</h3><p style="margin:0">Replicas are always a little behind. If writes stop, they catch up and agree with the primary <i>eventually</i>. Until then, a read can return old data. That's fine for a concert list, not for “did my purchase go through?”.</p></div>
+    <div><h3>Failover</h3><p style="margin:0">When the primary dies, promote a replica to be the new primary. Done by a person, it takes minutes and writes fail meanwhile. Done automatically, it takes seconds, but any writes the replica hadn't received yet are gone.</p></div>
+  </div>
+  <div class="takeaway"><div class="t">The one difference</div><p>With <b>async</b> replication the primary confirms a write right away and sends it to the replicas later: fast, but if the primary dies, its last moments of writes die with it. With <b>sync</b> replication the primary waits until a replica has the write: every write is slower, but a failover loses nothing.</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>act 2 · the real thing</span><span class="hot">postgres + app</span></div>
+  <h2>Where these choices live</h2>
+  <p>Postgres settings, and the app code that routes queries. Managed databases (AWS RDS, Cloud SQL, Neon) expose the same choices as checkboxes. <b>Hover or tap a line.</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="Example replication config and query routing"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 pick a line</div><p id="exP">Each highlighted line maps to a control in the lab.</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>recap · keep this</span><span class="hot">♥</span></div>
+  <h2>The whole page on one screen</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">Copies</div><div class="t">Replication</div><p>The primary streams every change to replicas. Gives you spare copies for failover, and extra servers for reads.</p></div>
+    <div class="card"><div class="sub">Behind</div><div class="t">Read replicas + lag</div><p>Reads from replicas take load off the primary but may be stale. Send “read your own write” queries to the primary.</p></div>
+    <div class="card"><div class="sub">Take over</div><div class="t">Failover</div><p>Promote a replica when the primary dies. Automatic is fast. Async replication can lose the last writes; sync can't.</p></div>
+  </div>
+  <div class="takeaway"><div class="t">The tradeoff</div><p>Replicas buy read capacity and survival at the cost of consistency. Async: fast writes, stale reads, a small chance of losing recent writes. Sync: slower writes and no loss. Many teams use one sync replica (no loss) plus async ones for reads.</p></div>
+  <h3 style="margin-top:26px">Check it <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="Pages"></nav>
+</main>
+
+<script src="../assets/explainer.js"></script>
+<script>
+(() => {
+const { $, el } = X;
+const DT = 100, LAGS = [100, 300, 1000, 2000, 5000], BUY_EVERY = 500, CHECK_AFTER = 300, MANUAL = 12000, AUTO = 3000, WIN = 5000;
+
+/* ---------- simulation: deterministic, pure state + tick ---------- */
+function init(o = {}) {
+  return Object.assign({ t: 0, lag: 100, ryw: false, sync: false, auto: false, nodes: [{ name: 'db-1', role: 'primary' }, { name: 'db-2', role: 'replica' }, { name: 'db-3', role: 'replica' }],
+    next: 4, writes: [], reads: [], ev: [], downAt: -1, lost: 0, failovers: [], ticks: 0 }, o);
+}
+const appliedAt = (s, w) => w.t + (s.sync ? 0 : s.lag);
+function failover(s) {
+  const lostNow = s.sync ? 0 : s.writes.filter(w => appliedAt(s, w) > s.downAt).length;
+  s.writes = s.writes.filter(w => s.sync || appliedAt(s, w) <= s.downAt);
+  s.lost += lostNow;
+  s.nodes = s.nodes.filter(n => n.role !== 'dead');
+  s.nodes[0].role = 'primary';
+  s.nodes.push({ name: 'db-' + s.next++, role: 'replica', fresh: true });
+  s.failovers.push({ auto: s.auto, sync: s.sync, lost: lostNow, took: s.t - s.downAt });
+  s.downAt = -1;
+}
+function tick(s) {
+  const t1 = s.t + DT;
+  const down = s.downAt >= 0;
+  if (down && s.t - s.downAt >= (s.auto ? AUTO : MANUAL)) failover(s);
+  if (s.t % BUY_EVERY === 0) {
+    if (s.downAt >= 0) s.ev.push({ t: s.t, kind: 'fail' });
+    else { const w = { id: s.writes.length + 1, t: s.t }; s.writes.push(w); s.reads.push({ at: s.t + CHECK_AFTER, w }); s.ev.push({ t: s.t, kind: 'ok' }); }
+  }
+  s.reads = s.reads.filter(r => {
+    if (r.at > s.t) return true;
+    if (!s.writes.includes(r.w)) return false; // lost in a failover
+    const fromPrimary = s.ryw;
+    const stale = fromPrimary ? s.downAt >= 0 : appliedAt(s, r.w) > r.at;
+    s.ev.push({ t: s.t, kind: stale ? 'stale' : 'fresh' });
+    return false;
+  });
+  s.t = t1; s.ticks++;
+  s.ev = s.ev.filter(e => e.t > t1 - WIN);
+  if (s.writes.length > 400) s.writes = s.writes.slice(-200);
+  return s;
+}
+function metrics(s) {
+  const reads = s.ev.filter(e => e.kind === 'stale' || e.kind === 'fresh');
+  return { stale: reads.length ? reads.filter(e => e.kind === 'stale').length / reads.length : 0, fail: s.ev.filter(e => e.kind === 'fail').length,
+    behind: s.sync ? 0 : s.writes.filter(w => appliedAt(s, w) > s.t).length };
+}
+
+/* ---------- UI ---------- */
+let S = init();
+const flags = { stale: false, failed: false };
+const mis = X.missions($('#missions'), [
+  { text: 'Press <b>Play</b> with 0.1 s of lag and reads from a replica.', hint: 'The replicas are only 0.1 s behind, so the purchase is always there 0.3 s later.', check: s => s.ticks >= 30 },
+  { text: 'Raise the lag to <b>2 s</b>.', hint: 'Now “My tickets” is read from a replica that hasn\'t received the purchase yet. The ticket seems to be missing.', check: s => { if (s.lag >= 1000 && !s.ryw && metrics(s).stale > 0.5) flags.stale = true; return flags.stale; } },
+  { text: 'Switch “My tickets” to <b>Primary (read your own writes)</b>.', hint: 'Right after buying, read from the primary, which always has it. Other pages can keep using replicas.', check: s => s.ryw && s.lag >= 1000 && metrics(s).stale === 0 && s.ticks > 50 },
+  { text: 'With <b>Manual</b> failover, <b>kill the primary</b>.', hint: 'Every purchase fails until someone notices and promotes a replica: 12 s here, often 20 minutes or more at 3 a.m.', check: s => { if (!s.auto && s.downAt >= 0 && metrics(s).fail >= 4) flags.failed = true; return flags.failed; } },
+  { text: 'Switch to <b>Automatic</b> failover (keep 2 s lag, Async) and kill the new primary.', hint: 'A replica takes over in 3 s. But the purchases from the last 2 s never reached it: they\'re lost.', check: s => s.failovers.some(f => f.auto && !f.sync && f.lost > 0) },
+  { text: 'Switch replication to <b>Sync</b> and kill the primary once more.', hint: 'Each write now waits for a replica, so it\'s slower. But this failover loses nothing.', check: s => s.failovers.some(f => f.auto && f.sync && f.lost === 0) },
+]);
+function render() {
+  const m = metrics(S);
+  $('#lagV').textContent = S.lag / 1000 + ' s';
+  $('#tag').textContent = S.sync ? 'sync' : 'async';
+  const box = $('#nodes'); box.innerHTML = '';
+  const down = S.downAt >= 0;
+  S.nodes.forEach((n, i) => {
+    const dead = n.role === 'dead';
+    const d = el('div', 'server' + (dead ? ' down' : ''));
+    const pill = dead ? '<span class="pill bad">down</span>' : n.role === 'primary' ? '<span class="pill ok">primary</span>' : '<span class="pill">replica</span>';
+    const line = dead ? 'not responding' : n.role === 'primary' ? 'takes all writes' : S.sync ? 'in sync' : `behind by ${m.behind} purchase${m.behind === 1 ? '' : 's'}`;
+    d.innerHTML = `<div class="nm"><span>${n.name}</span>${pill}</div><div class="mono">${line}</div>`;
+    box.append(d);
+  });
+  $('#mStale').textContent = Math.round(m.stale * 100) + '%';
+  $('#mStale').parentElement.className = 'meter' + (m.stale > 0 ? ' bad' : '');
+  $('#mFail').textContent = m.fail;
+  $('#mFail').parentElement.className = 'meter' + (m.fail ? ' bad' : '');
+  $('#mW').textContent = (S.sync ? 35 : 5) + ' ms';
+  $('#mW').parentElement.className = 'meter' + (S.sync ? ' wait' : '');
+  $('#mLost').textContent = S.lost;
+  $('#mLost').parentElement.className = 'meter' + (S.lost ? ' bad' : '');
+  $('#kill').disabled = down;
+  const st = $('#status');
+  if (!S.t) { st.className = 'status'; st.textContent = 'Press Play to start.'; }
+  else if (down) { st.className = 'status bad'; st.textContent = `✕ The primary is down. Purchases fail. ${S.auto ? `Automatic failover in ${Math.max(0, Math.ceil((AUTO - (S.t - S.downAt)) / 1000))} s.` : `Waiting for a person to promote a replica (${Math.max(0, Math.ceil((MANUAL - (S.t - S.downAt)) / 1000))} s).`}`; }
+  else if (m.stale > 0) { st.className = 'status bad'; st.textContent = `✕ ${Math.round(m.stale * 100)}% of fans don't see the ticket they just bought: the replica is ${S.lag / 1000} s behind, and they looked after 0.3 s.`; }
+  else { const f = S.failovers[S.failovers.length - 1]; st.className = 'status ok'; st.textContent = f ? `✓ Running. Last failover took ${(f.took / 1000).toFixed(0)} s and lost ${f.lost} purchase${f.lost === 1 ? '' : 's'}${f.lost ? ' (charged, but not in the database)' : ''}.` : '✓ Healthy: every fan sees their purchase.'; }
+  player.clock(`t = ${(S.t / 1000).toFixed(1)} s`);
+  mis.update(S);
+}
+const player = X.player($('#player'), {
+  step: () => { tick(S); render(); }, stepTicks: 5,
+  reset: () => { S = init({ lag: S.lag, ryw: S.ryw, sync: S.sync, auto: S.auto }); Object.keys(flags).forEach(k => (flags[k] = false)); mis.reset(); render(); },
+});
+$('#lag').addEventListener('input', e => { S.lag = LAGS[+e.target.value]; render(); });
+X.seg($('#readSeg'), ['A replica', 'Primary (read your own writes)'], i => { S.ryw = i === 1; render(); }, 0);
+X.seg($('#syncSeg'), ['Async', 'Sync'], i => { S.sync = i === 1; render(); }, 0);
+X.seg($('#foSeg'), ['Manual', 'Automatic'], i => { S.auto = i === 1; render(); }, 0);
+$('#kill').addEventListener('click', () => { S.nodes.find(n => n.role === 'primary').role = 'dead'; S.downAt = S.t; if (!player.running) player.play(); render(); });
+render();
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="c"># postgresql.conf on the primary</span>', null],
+  ['<span class="key">wal_level</span> = replica', 'wal'],
+  ['<span class="key">synchronous_standby_names</span> = <span class="s">\'\'</span>  <span class="c"># async</span>', 'async'],
+  ['<span class="c"># synchronous_standby_names = \'ANY 1 (db2, db3)\'  # sync</span>', 'sync'],
+  ['', null],
+  ['<span class="c">// app: writes to the primary, most reads to a replica</span>', null],
+  ['<span class="key">const</span> primary = pool(<span class="s">"db-1"</span>), replica = pool(<span class="s">"db-2"</span>);', 'pools'],
+  ['<span class="key">await</span> primary.query(<span class="s">"INSERT INTO tickets …"</span>);', 'write'],
+  ['<span class="key">const</span> concerts = <span class="key">await</span> replica.query(<span class="s">"SELECT * FROM concerts"</span>);', 'read'],
+  ['<span class="c">// read your own writes: right after buying, ask the primary</span>', 'ryw'],
+  ['<span class="key">const</span> mine = <span class="key">await</span> primary.query(<span class="s">"SELECT … WHERE fan = $1"</span>, [fan]);', 'ryw'],
+  ['', null],
+  ['<span class="c"># failover: a tool watches the primary and promotes a replica</span>', null],
+  ['<span class="c"># (Patroni, pg_auto_failover, or a managed service\'s Multi-AZ option)</span>', 'failover'],
+], {
+  wal: ['Stream every change', 'Postgres writes every change to its write-ahead log (WAL) and streams it to the replicas, which replay it.'],
+  async: ['Async (the default)', 'Commit as soon as the primary has the write. Fast, and the replicas catch up when they can. This is the lab\'s “Async”.'],
+  sync: ['Sync', 'Wait until at least one replica confirms each commit. Slower writes, but a promoted replica has everything. The lab\'s “Sync”.'],
+  pools: ['Two connection pools', 'One for the primary, one for replicas. Many ORMs and drivers can route automatically.'],
+  write: ['Writes', 'Always to the primary. Replicas are read-only.'],
+  read: ['Reads that can be a bit stale', 'Concert lists, search, venue pages. Moving these to replicas is where the capacity win comes from.'],
+  ryw: ['Read your own writes', 'For a fan who just changed something, read from the primary (or wait for the replica to catch up). That\'s the fix for the “missing ticket”.'],
+  failover: ['Automatic failover', 'Something has to notice the primary is gone and promote a replica in seconds. Doing it by hand is the lab\'s 12-second “Manual” setting, and real people usually take much longer.'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: 'Fans sometimes edit their profile, reload, and see the old version for a second. Profile pages read from a replica. What\'s the simplest fix?', opts: [
+    ['Remove the replicas', false, 'That throws away the read capacity for every page to fix one flow.'],
+    ['Read the profile from the primary for a short time after the fan edits it', true, 'Read-your-writes routing: only the person who just wrote needs fresh data. Everyone else can read from replicas.'],
+    ['Make replication lag zero', false, 'With async replication, lag can be small but never guaranteed zero.'],
+  ] },
+  { q: 'Encore uses async replication with automatic failover. The primary crashes. What can be lost?', opts: [
+    ['Nothing: replicas have everything', false, 'With async replication, the newest writes may not have reached any replica yet.'],
+    ['Writes from the last moments before the crash that hadn\'t reached the replica', true, 'Roughly the replication lag\'s worth of writes. Sync replication to at least one replica closes that gap.'],
+    ['The whole database', false, 'The promoted replica has everything except the last, unreplicated writes.'],
+  ] },
+  { q: 'Why not make every replica synchronous?', opts: [
+    ['Sync replication doesn\'t work with Postgres', false, 'It does, with <code>synchronous_standby_names</code>.'],
+    ['Every write waits for the slowest required replica, and a down replica can stall writes', true, 'That\'s why a common setup is one sync replica for safety plus async replicas for reads.'],
+    ['Sync replicas can\'t serve reads', false, 'They can. The cost is on the write side.'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'replication-failover');
+})();
+</script>
+</body>
+</html>

@@ -99,6 +99,15 @@ const FLOWS = {
     ['click', '#i2', 3000],
     ['click', seg('ordSeg', 2), 100], ['click', '#i2', 3000],
   ],
+  'replication-failover': [
+    ['click', '#player .btn.primary', 3500],
+    ['fill', ['#lag', '3'], 4000],
+    ['click', seg('readSeg', 2), 6000],
+    ['click', '#kill', 3000],
+    ['wait', null, 10000],
+    ['click', seg('foSeg', 2), 100], ['click', '#kill', 4500],
+    ['click', seg('syncSeg', 2), 100], ['click', '#kill', 4500],
+  ],
 };
 
 (async () => {

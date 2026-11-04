@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-Hans-CN" data-lang="zh-cn" data-slug="replication-failover">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="加上唯读副本，因为拷贝延迟而读到过期数据，再让主数据库挂掉，比较手动与自动故障转移。">
+<title>拷贝与故障转移 · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/explainer.css">
+</head>
+<body>
+<!-- Plan. Stuck point: replicas sound like "free extra copies"; people miss lag (stale reads) and what async replication loses on failover.
+     Lab: purchases every 0.5 s, each fan checks "My tickets" 0.3 s later. Lag slider, read routing, kill the primary, manual vs automatic failover, async vs sync.
+     One difference: async (fast writes, may lose the last ones) vs sync (slower writes, nothing lost). -->
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="章节"><a href="#lab">实验室</a><a href="#real">设置档</a><a href="#recap">重点整理</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>第 14 页 · 阶段 4 · 保持数据正确</span><span class="hot">29 · 32 · 35 · 85</span></div>
+  <div class="eyebrow">唯读副本、拷贝、最终一致性、故障转移</div>
+  <h1>「我刚买了一张票。<em>为什么『我的票券』里没有？」</em></h1>
+  <div class="scenario"><b>Encore</b>为了减轻主数据库的负担，Ana 加了两个唯读副本（read replica）：会在片刻之后收到每一笔变更的数据库副本。页面变快了。接着歌迷开始回报票券忽隐忽现，然后某天晚上，主数据库挂了。</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">打开实验室 ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>实验室 · 先弄坏，再修好</span><span class="hot" id="tag">异步</span></div>
+  <h2>一个主数据库，两个副本</h2>
+  <p>所有<b>写入</b>都送到主数据库（primary）。它把每笔变更串流给副本，副本在一段延迟后套用：这就是<b>拷贝延迟（replication lag）</b>。每 0.5 秒有一位歌迷买票，并在 0.3 秒后查看「我的票券」。数字是模拟的。</p>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl">
+        <label for="lag">拷贝延迟：<b id="lagV">0.1 s</b></label>
+        <input type="range" id="lag" min="0" max="4" step="1" value="0">
+      </div>
+      <div class="ctl"><span class="lab-k">「我的票券」读取自</span><div id="readSeg"></div></div>
+      <div class="ctl"><span class="lab-k">拷贝方式</span><div id="syncSeg"></div></div>
+      <div class="ctl"><span class="lab-k">主数据库挂掉时</span><div id="foSeg"></div>
+        <button class="btn sm bad" id="kill" type="button" style="margin-top:6px">✕ 让主数据库挂掉</button></div>
+      <div class="ctl"><span class="lab-k">模拟</span><div id="player"></div></div>
+    </div>
+    <div class="servers" id="nodes" aria-label="数据库服务器"></div>
+    <div class="meters" style="margin:0">
+      <div class="meter"><div class="k">「我的票券」少了刚买的票</div><div class="v" id="mStale">0%</div><div class="d">最近 5 秒</div></div>
+      <div class="meter"><div class="k">失败的购买</div><div class="v" id="mFail">0</div><div class="d">最近 5 秒</div></div>
+      <div class="meter"><div class="k">写入时间</div><div class="v" id="mW">5 ms</div><div class="d">每次购买</div></div>
+      <div class="meter"><div class="k">遗失的购买</div><div class="v" id="mLost">0</div><div class="d">故障转移时</div></div>
+    </div>
+    <div class="status" id="status" role="status">按「播放」开始。</div>
+  </div>
+  <h3>试试看</h3>
+  <ol class="missions" id="missions"></ol>
+  <div class="compare">
+    <div><h3>最终一致性（Eventual consistency）</h3><p style="margin:0">副本总是落后一点点。如果写入停止，它们会追上，最终<i>和主数据库一致</i>。在那之前，读取可能拿到旧数据。演唱会清单没关系，「我的购买成功了吗？」就不行。</p></div>
+    <div><h3>故障转移（Failover）</h3><p style="margin:0">主数据库挂掉时，把一个副本升级成新的主数据库。由人来做要花好几分钟，期间写入全部失败。自动做只要几秒，但副本还没收到的写入就会遗失。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">关键差别</div><p><b>异步（async）</b>拷贝时，主数据库会立刻确认写入，之后才送给副本：很快，但如果主数据库挂了，它最后那段时间的写入也跟着消失。<b>同步（sync）</b>拷贝时，主数据库会等到某个副本拿到写入才确认：每次写入都比较慢，但故障转移时什么都不会遗失。</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>第 2 幕 · 真实世界</span><span class="hot">Postgres＋App</span></div>
+  <h2>这些选择设置在哪里</h2>
+  <p>Postgres 的设置，以及负责路由查找的 App 代码。托管数据库（AWS RDS、Cloud SQL、Neon）会把同样的选择做成勾选框。<b>把鼠标移到某一行上，或点一下。</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="拷贝设置与查找路由范例"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 选一行</div><p id="exP">每一行反白后，都会对应到实验室里的一个控制项。</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>重点整理 · 带走这些</span><span class="hot">♥</span></div>
+  <h2>整页浓缩在一个画面</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">副本</div><div class="t">拷贝方式</div><p>主数据库把每笔变更串流给副本。你因此有了能接手的备用副本，以及能分担读取的额外服务器。</p></div>
+    <div class="card"><div class="sub">落后</div><div class="t">唯读副本＋延迟</div><p>从副本读取能减轻主数据库的负担，但可能是过期的。「读取自己刚写入的数据」要送到主数据库。</p></div>
+    <div class="card"><div class="sub">接手</div><div class="t">故障转移（Failover）</div><p>主数据库挂掉时升级一个副本。自动的很快。异步拷贝可能遗失最后的写入；同步不会。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">取舍</div><p>副本用一致性换来读取容量和存活能力。异步：写入快、会读到过期数据、有小概率遗失最近的写入。同步：写入较慢、不会遗失。很多团队会用一个同步副本（不遗失）加上几个负责读取的异步副本。</p></div>
+  <h3 style="margin-top:26px">考考自己 <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="页面"></nav>
+</main>
+
+<script src="../../assets/explainer.js"></script>
+<script src="../../assets/i18n.zh-cn.js"></script>
+<script>
+(() => {
+const { $, el } = X;
+const DT = 100, LAGS = [100, 300, 1000, 2000, 5000], BUY_EVERY = 500, CHECK_AFTER = 300, MANUAL = 12000, AUTO = 3000, WIN = 5000;
+
+/* ---------- simulation: deterministic, pure state + tick ---------- */
+function init(o = {}) {
+  return Object.assign({ t: 0, lag: 100, ryw: false, sync: false, auto: false, nodes: [{ name: 'db-1', role: 'primary' }, { name: 'db-2', role: 'replica' }, { name: 'db-3', role: 'replica' }],
+    next: 4, writes: [], reads: [], ev: [], downAt: -1, lost: 0, failovers: [], ticks: 0 }, o);
+}
+const appliedAt = (s, w) => w.t + (s.sync ? 0 : s.lag);
+function failover(s) {
+  const lostNow = s.sync ? 0 : s.writes.filter(w => appliedAt(s, w) > s.downAt).length;
+  s.writes = s.writes.filter(w => s.sync || appliedAt(s, w) <= s.downAt);
+  s.lost += lostNow;
+  s.nodes = s.nodes.filter(n => n.role !== 'dead');
+  s.nodes[0].role = 'primary';
+  s.nodes.push({ name: 'db-' + s.next++, role: 'replica', fresh: true });
+  s.failovers.push({ auto: s.auto, sync: s.sync, lost: lostNow, took: s.t - s.downAt });
+  s.downAt = -1;
+}
+function tick(s) {
+  const t1 = s.t + DT;
+  const down = s.downAt >= 0;
+  if (down && s.t - s.downAt >= (s.auto ? AUTO : MANUAL)) failover(s);
+  if (s.t % BUY_EVERY === 0) {
+    if (s.downAt >= 0) s.ev.push({ t: s.t, kind: 'fail' });
+    else { const w = { id: s.writes.length + 1, t: s.t }; s.writes.push(w); s.reads.push({ at: s.t + CHECK_AFTER, w }); s.ev.push({ t: s.t, kind: 'ok' }); }
+  }
+  s.reads = s.reads.filter(r => {
+    if (r.at > s.t) return true;
+    if (!s.writes.includes(r.w)) return false; // lost in a failover
+    const fromPrimary = s.ryw;
+    const stale = fromPrimary ? s.downAt >= 0 : appliedAt(s, r.w) > r.at;
+    s.ev.push({ t: s.t, kind: stale ? 'stale' : 'fresh' });
+    return false;
+  });
+  s.t = t1; s.ticks++;
+  s.ev = s.ev.filter(e => e.t > t1 - WIN);
+  if (s.writes.length > 400) s.writes = s.writes.slice(-200);
+  return s;
+}
+function metrics(s) {
+  const reads = s.ev.filter(e => e.kind === 'stale' || e.kind === 'fresh');
+  return { stale: reads.length ? reads.filter(e => e.kind === 'stale').length / reads.length : 0, fail: s.ev.filter(e => e.kind === 'fail').length,
+    behind: s.sync ? 0 : s.writes.filter(w => appliedAt(s, w) > s.t).length };
+}
+
+/* ---------- UI ---------- */
+let S = init();
+const flags = { stale: false, failed: false };
+const mis = X.missions($('#missions'), [
+  { text: '在延迟 0.1 秒、从副本读取的设置下按<b>播放</b>。', hint: '副本只落后 0.1 秒，所以 0.3 秒后去看时，购买纪录一定已经在了。', check: s => s.ticks >= 30 },
+  { text: '把延迟提高到 <b>2 秒</b>。', hint: '现在「我的票券」是从还没收到这笔购买的副本读取的。票好像不见了。', check: s => { if (s.lag >= 1000 && !s.ryw && metrics(s).stale > 0.5) flags.stale = true; return flags.stale; } },
+  { text: '把「我的票券」切换成<b>主数据库（读取自己的写入）</b>。', hint: '刚买完就从主数据库读取，它一定有这笔数据。其他页面可以继续用副本。', check: s => s.ryw && s.lag >= 1000 && metrics(s).stale === 0 && s.ticks > 50 },
+  { text: '在<b>手动</b>故障转移的设置下，<b>让主数据库挂掉</b>。', hint: '在有人发现并升级副本之前，每一笔购买都会失败：这里是 12 秒，凌晨 3 点常常是 20 分钟以上。', check: s => { if (!s.auto && s.downAt >= 0 && metrics(s).fail >= 4) flags.failed = true; return flags.failed; } },
+  { text: '切换到<b>自动</b>故障转移（维持 2 秒延迟、异步），让新的主数据库挂掉。', hint: '副本在 3 秒内接手。但最后 2 秒的购买从来没有送到它那里：它们遗失了。', check: s => s.failovers.some(f => f.auto && !f.sync && f.lost > 0) },
+  { text: '把拷贝方式切换成<b>同步</b>，再让主数据库挂掉一次。', hint: '现在每次写入都要等副本，所以比较慢。但这次故障转移什么都没有遗失。', check: s => s.failovers.some(f => f.auto && f.sync && f.lost === 0) },
+]);
+function render() {
+  const m = metrics(S);
+  $('#lagV').textContent = S.lag / 1000 + ' s';
+  $('#tag').textContent = S.sync ? 'sync' : 'async';
+  const box = $('#nodes'); box.innerHTML = '';
+  const down = S.downAt >= 0;
+  S.nodes.forEach((n, i) => {
+    const dead = n.role === 'dead';
+    const d = el('div', 'server' + (dead ? ' down' : ''));
+    const pill = dead ? '<span class="pill bad">挂了</span>' : n.role === 'primary' ? '<span class="pill ok">主数据库</span>' : '<span class="pill">副本</span>';
+    const line = dead ? '没有响应' : n.role === 'primary' ? '接收所有写入' : S.sync ? '已同步' : `落后 ${m.behind} 笔购买`;
+    d.innerHTML = `<div class="nm"><span>${n.name}</span>${pill}</div><div class="mono">${line}</div>`;
+    box.append(d);
+  });
+  $('#mStale').textContent = Math.round(m.stale * 100) + '%';
+  $('#mStale').parentElement.className = 'meter' + (m.stale > 0 ? ' bad' : '');
+  $('#mFail').textContent = m.fail;
+  $('#mFail').parentElement.className = 'meter' + (m.fail ? ' bad' : '');
+  $('#mW').textContent = (S.sync ? 35 : 5) + ' 毫秒';
+  $('#mW').parentElement.className = 'meter' + (S.sync ? ' wait' : '');
+  $('#mLost').textContent = S.lost;
+  $('#mLost').parentElement.className = 'meter' + (S.lost ? ' bad' : '');
+  $('#kill').disabled = down;
+  const st = $('#status');
+  if (!S.t) { st.className = 'status'; st.textContent = '按「播放」开始。'; }
+  else if (down) { st.className = 'status bad'; st.textContent = `✕ 主数据库挂了。购买全部失败。${S.auto ? `${Math.max(0, Math.ceil((AUTO - (S.t - S.downAt)) / 1000))} 秒后自动故障转移。` : `等待有人升级副本（${Math.max(0, Math.ceil((MANUAL - (S.t - S.downAt)) / 1000))} 秒）。`}`; }
+  else if (m.stale > 0) { st.className = 'status bad'; st.textContent = `✕ ${Math.round(m.stale * 100)}% 的歌迷看不到自己刚买的票：副本落后 ${S.lag / 1000} 秒，而他们在 0.3 秒后就去看了。`; }
+  else { const f = S.failovers[S.failovers.length - 1]; st.className = 'status ok'; st.textContent = f ? `✓ 运作中。上一次故障转移花了 ${(f.took / 1000).toFixed(0)} 秒，遗失了 ${f.lost} 笔购买${f.lost ? '（已扣款，但不在数据库里）' : ''}。` : '✓ 健康：每位歌迷都看得到自己的购买。'; }
+  player.clock(`t = ${(S.t / 1000).toFixed(1)} s`);
+  mis.update(S);
+}
+const player = X.player($('#player'), {
+  step: () => { tick(S); render(); }, stepTicks: 5,
+  reset: () => { S = init({ lag: S.lag, ryw: S.ryw, sync: S.sync, auto: S.auto }); Object.keys(flags).forEach(k => (flags[k] = false)); mis.reset(); render(); },
+});
+$('#lag').addEventListener('input', e => { S.lag = LAGS[+e.target.value]; render(); });
+X.seg($('#readSeg'), ['副本', '主数据库（读取自己的写入）'], i => { S.ryw = i === 1; render(); }, 0);
+X.seg($('#syncSeg'), ['异步', '同步'], i => { S.sync = i === 1; render(); }, 0);
+X.seg($('#foSeg'), ['手动', '自动'], i => { S.auto = i === 1; render(); }, 0);
+$('#kill').addEventListener('click', () => { S.nodes.find(n => n.role === 'primary').role = 'dead'; S.downAt = S.t; if (!player.running) player.play(); render(); });
+render();
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="c"># 主数据库上的 postgresql.conf</span>', null],
+  ['<span class="key">wal_level</span> = replica', 'wal'],
+  ['<span class="key">synchronous_standby_names</span> = <span class="s">\'\'</span>  <span class="c"># async</span>', 'async'],
+  ['<span class="c"># synchronous_standby_names = \'ANY 1 (db2, db3)\'  # 同步</span>', 'sync'],
+  ['', null],
+  ['<span class="c">// App：写入送主数据库，大部分读取送副本</span>', null],
+  ['<span class="key">const</span> primary = pool(<span class="s">"db-1"</span>), replica = pool(<span class="s">"db-2"</span>);', 'pools'],
+  ['<span class="key">await</span> primary.query(<span class="s">"INSERT INTO tickets …"</span>);', 'write'],
+  ['<span class="key">const</span> concerts = <span class="key">await</span> replica.query(<span class="s">"SELECT * FROM concerts"</span>);', 'read'],
+  ['<span class="c">// 读取自己的写入：刚买完就问主数据库</span>', 'ryw'],
+  ['<span class="key">const</span> mine = <span class="key">await</span> primary.query(<span class="s">"SELECT … WHERE fan = $1"</span>, [fan]);', 'ryw'],
+  ['', null],
+  ['<span class="c"># 故障转移：由工具监看主数据库并升级副本</span>', null],
+  ['<span class="c"># （Patroni、pg_auto_failover，或托管服务的 Multi-AZ 选项）</span>', 'failover'],
+], {
+  wal: ['串流每一笔变更', 'Postgres 会把每笔变更写进预写式日志（WAL），并串流给副本重播。'],
+  async: ['异步（默认）', '主数据库一拿到写入就提交。很快，副本有空时再追上。这就是实验室的「异步」。'],
+  sync: ['同步', '等到至少一个副本确认每次提交。写入较慢，但被升级的副本拥有一切。这就是实验室的「同步」。'],
+  pools: ['两个连接池', '一个给主数据库，一个给副本。很多 ORM 和驱动程序能自动路由。'],
+  write: ['写入', '一律送到主数据库。副本是唯读的。'],
+  read: ['可以稍微过期的读取', '演唱会清单、搜索、场馆页面。把这些移到副本，就是容量提升的来源。'],
+  ryw: ['读取自己的写入', '对刚修改了东西的歌迷，从主数据库读取（或等副本追上）。这就是「票不见了」的修法。'],
+  failover: ['自动故障转移', '必须有东西察觉主数据库不见了，并在几秒内升级副本。用人手来做，就是实验室里 12 秒的「手动」设置，而真人通常要花更久。'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: '歌迷有时修改个人数据、刷新后，会看到旧版本一秒钟。个人数据页是从副本读取的。最简单的修法是什么？', opts: [
+    ['把副本拿掉', false, '为了修一个流程，就丢掉所有页面的读取容量。'],
+    ['在歌迷修改后的短时间内，从主数据库读取个人数据', true, '「读取自己的写入」路由：只有刚写入的人需要最新数据，其他人都可以从副本读取。'],
+    ['把拷贝延迟降到零', false, '异步拷贝的延迟可以很小，但永远无法保证是零。'],
+  ] },
+  { q: 'Encore 使用异步拷贝加自动故障转移。主数据库当机了。可能遗失什么？', opts: [
+    ['什么都不会：副本拥有一切', false, '异步拷贝时，最新的写入可能还没送到任何副本。'],
+    ['当机前最后那段时间、还没送到副本的写入', true, '大约是一段拷贝延迟的写入量。对至少一个副本使用同步拷贝，就能补上这个缺口。'],
+    ['整个数据库', false, '被升级的副本拥有一切，除了最后那些还没拷贝过去的写入。'],
+  ] },
+  { q: '为什么不让每个副本都同步？', opts: [
+    ['Postgres 不支持同步拷贝', false, '它支持，用 <code>synchronous_standby_names</code>。'],
+    ['每次写入都要等最慢的那个必要副本，而一个挂掉的副本可能让写入卡住', true, '这就是为什么常见的做法是一个同步副本负责安全，再加几个异步副本负责读取。'],
+    ['同步副本不能处理读取', false, '可以。成本在写入那一端。'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'replication-failover');
+})();
+</script>
+</body>
+</html>
