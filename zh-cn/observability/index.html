@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-Hans-CN" data-lang="zh-cn" data-slug="observability">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="用指针、日志和追踪找出 Encore 结帐中一个隐藏的变慢问题，再写一条本来可以抓到它的告警。">
+<title>可观测性 · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/explainer.css">
+</head>
+<body>
+<!-- Plan. Stuck point: logs, metrics and traces sound like three names for "data"; people don't know which question each answers.
+     Sandbox: checkout got slow at 14:05. Metrics show WHAT and WHEN, logs show a clue, a trace shows WHERE. Then tune an alert.
+     One difference: monitoring answers questions you planned for; observability lets you ask new ones. -->
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="章节"><a href="#lab">开始调查</a><a href="#real">代码</a><a href="#recap">重点整理</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>第 18 页 · 阶段 5 · 上线与维运</span><span class="hot">58 · 59 · 60 · 61 · 62 · 66</span></div>
+  <div class="eyebrow">监控、日志、分布式追踪、指针、告警、可观测性</div>
+  <h1>「结帐好像变慢了。」<em>没有东西挂掉，也没有人改过东西。你要从哪里查起？</em></h1>
+  <div class="scenario"><b>Encore</b>现在是 14:30。客服说从午餐时间开始结帐就很慢。没有错误、没有告警，每台服务器都正常。Dee 打开每个正式系统都需要的三种工具：指针、日志和追踪。</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">开始调查 ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>实验室 · 找出原因，下次及早抓到</span><span class="hot" id="tag">指针</span></div>
+  <h2>Encore，14:00 到 14:30</h2>
+  <div id="toolSeg" style="margin:6px 0 14px"></div>
+  <div class="lab">
+    <div id="tMetrics">
+      <p style="margin:0 0 10px"><b>指针（metrics）</b>是随时间变化的数字：保存成本低，最适合看出<i>什么</i>改变了、<i>何时</i>改变。各端点的 P99 延迟：</p>
+      <div class="compare" style="margin:0" id="charts"></div>
+      <div class="row" style="margin:10px 0 0"><span class="lab-k" style="font-weight:500">哪个端点变慢了？</span><div id="epSeg"></div></div>
+    </div>
+    <div id="tLogs" hidden>
+      <p style="margin:0 0 10px"><b>日志（logs）</b>是一笔笔带有细节的事件。多到读不完，所以要用搜索的。</p>
+      <div class="ctl" style="max-width:420px"><label for="q">搜索日志</label><input class="input" id="q" placeholder="试试：checkout、slow、deploy" autocomplete="off" spellcheck="false"></div>
+      <ul class="log" id="logs" style="max-height:260px;margin-top:10px" aria-label="日志行"></ul>
+      <p class="muted" id="logCount" style="font-size:13px;margin:6px 0 0"></p>
+    </div>
+    <div id="tTraces" hidden>
+      <p style="margin:0 0 10px"><b>追踪（trace）</b>会记录一个请求经过的每一个服务。这是 14:21 一次很慢的结帐。点一个 span 看看。</p>
+      <div id="trace" style="display:grid;gap:6px"></div>
+      <div class="status" id="spanInfo" style="margin-top:10px">点击花最多时间的那条长条。</div>
+    </div>
+    <div id="tAlerts" hidden>
+      <p style="margin:0 0 10px"><b>告警（alert）</b>会盯着一个指针，越过门槛时就调用值班的人。替结帐的 P99 设置门槛。正常情况下结帐 P99 在 250 到 420 毫秒之间摆荡。</p>
+      <div class="ctl" style="max-width:460px"><label for="thr">结帐 P99 &gt; <b id="thrV">2500 ms</b> 持续 5 分钟时调用 Dee</label><input type="range" id="thr" min="200" max="3000" step="50" value="2500"></div>
+      <div class="meters"><div class="meter"><div class="k">今天的变慢</div><div class="v" id="aHit">–</div></div><div class="meter"><div class="k">误报</div><div class="v" id="aNoise">–</div><div class="d">在平常的一天</div></div></div>
+      <div class="status" id="aTxt" role="status"></div>
+    </div>
+  </div>
+  <h3>试试看</h3>
+  <ol class="missions" id="missions"></ol>
+  <div class="cards">
+    <div class="card"><div class="sub">什么与何时</div><div class="t">指针</div><p>汇总后的数字：请求率、错误率、延迟百分位数、CPU。便宜、查找快，最适合做仪表板和告警。</p></div>
+    <div class="card"><div class="sub">为什么</div><div class="t">日志</div><p>每个事件一行，附带细节。结构化日志（有字段的 JSON）可以被搜索和筛选。</p></div>
+    <div class="card"><div class="sub">在哪里</div><div class="t">追踪</div><p>一个请求跨越各服务的路径，以及在每个服务花的时间。能准确指出哪一段很慢。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">关键差别</div><p><b>监控（monitoring）</b>检查的是你预料得到的问题：针对已知指针的仪表板与告警。<b>可观测性（observability）</b>则是能回答你没预料到的问题，例如「为什么从 14:05 开始，有些歌迷结帐变慢？」，方法是把共用相同 id 和标签的指针、日志与追踪结合起来。</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>第 2 幕 · 真实世界</span><span class="hot">opentelemetry</span></div>
+  <h2>一个请求，三种遥测数据</h2>
+  <p>OpenTelemetry 是产生这三种数据的开放标准。告警规则用的是 Prometheus。<b>把鼠标移到某一行上，或点一下。</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="追踪、指针、日志与告警规则范例"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 选一行</div><p id="exP">每一行反白后，都会对应到实验室里的一种工具。</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>重点整理 · 带走这些</span><span class="hot">♥</span></div>
+  <h2>整页浓缩在一个画面</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">察觉</div><div class="t">指针＋告警</div><p>替每个端点画出延迟、错误和流量。针对用户感受到的东西（P99、错误率）设告警，而不是 CPU。</p></div>
+    <div class="card"><div class="sub">解释</div><div class="t">日志</div><p>结构化、可搜索，每一行都带着请求或追踪 id，让你能从日志直接跳到它的追踪。</p></div>
+    <div class="card"><div class="sub">精准定位</div><div class="t">追踪</div><p>在每次服务调用中传递追踪 id。瀑布图会显示时间花在哪里。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">取舍</div><p>遥测要花钱，也要花注意力：保存每一笔日志和追踪很昂贵，吵杂的告警则会让人学会忽略它们。所有东西都要有指针、追踪做抽样、日志保持结构化，而且只对必须有人处理的症状发出告警。</p></div>
+  <h3 style="margin-top:26px">考考自己 <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="页面"></nav>
+</main>
+
+<script src="../../assets/explainer.js"></script>
+<script src="../../assets/i18n.zh-cn.js"></script>
+<script>
+(() => {
+const { $, el, esc } = X;
+const flags = { endpoint: false, logs: false, span: false, alert: false };
+
+/* ---------- data: 30 minutes of metrics (seeded), logs, one trace ---------- */
+const s = { r: 18 };
+const series = (base, jitter, from, to) => Array.from({ length: 31 }, (_, m) => (m >= from ? to : base) + (X.rnd(s) - 0.5) * jitter);
+const EPS = [
+  { name: '/concerts', data: series(140, 40, 99, 0) },
+  { name: '/seats', data: series(210, 60, 99, 0) },
+  { name: '/checkout', data: series(330, 120, 5, 1850) },
+];
+const LOGS = [
+  ['14:00:12', 'INFO', 'api', 'GET /concerts 200 132ms'],
+  ['14:01:40', 'INFO', 'api', 'POST /checkout 200 341ms order=8812'],
+  ['14:02:03', 'INFO', 'deploy', 'payments v2.31 rolled out to 6/6 instances (adds fraud-check before charging)'],
+  ['14:03:15', 'INFO', 'api', 'GET /seats 200 198ms'],
+  ['14:05:22', 'WARN', 'payments', 'fraud-check slow: 1702ms order=8840'],
+  ['14:05:23', 'INFO', 'api', 'POST /checkout 200 1893ms order=8840'],
+  ['14:06:01', 'INFO', 'api', 'GET /concerts 200 151ms'],
+  ['14:08:47', 'WARN', 'payments', 'fraud-check slow: 1766ms order=8861'],
+  ['14:08:48', 'INFO', 'api', 'POST /checkout 200 1920ms order=8861'],
+  ['14:11:30', 'INFO', 'api', 'GET /seats 200 224ms'],
+  ['14:14:05', 'WARN', 'payments', 'fraud-check slow: 1731ms order=8899'],
+  ['14:14:06', 'INFO', 'api', 'POST /checkout 200 1874ms order=8899'],
+  ['14:17:52', 'INFO', 'api', 'GET /concerts 200 128ms'],
+  ['14:21:09', 'WARN', 'payments', 'fraud-check slow: 1720ms order=8930 trace=7f3c9a'],
+  ['14:21:10', 'INFO', 'api', 'POST /checkout 200 1889ms order=8930 trace=7f3c9a'],
+  ['14:24:40', 'INFO', 'api', 'GET /seats 200 205ms'],
+  ['14:27:18', 'WARN', 'payments', 'fraud-check slow: 1748ms order=8961'],
+];
+const SPANS = [
+  ['POST /checkout', 'api', 0, 1889, 0],
+  ['auth.verify', 'auth', 8, 20, 1],
+  ['seats.reserve', 'inventory', 30, 45, 1],
+  ['payments.charge', 'payments', 80, 1795, 1],
+  ['fraud-check.score', 'fraud-check', 85, 1720, 2],
+  ['bank.authorize', 'bank-gateway', 1810, 62, 2],
+  ['email.enqueue', 'queue', 1876, 6, 1],
+];
+
+/* ---------- tools ---------- */
+const PANES = ['tMetrics', 'tLogs', 'tTraces', 'tAlerts'];
+X.seg($('#toolSeg'), ['📈 指针', '📜 日志', '🧵 追踪', '🔔 告警'], i => {
+  PANES.forEach((p, j) => ($('#' + p).hidden = i !== j));
+  $('#tag').textContent = ['metrics', 'logs', 'traces', 'alerts'][i];
+  if (i === 0) drawCharts();
+}, 0);
+function drawCharts() {
+  const box = $('#charts'); box.innerHTML = '';
+  EPS.forEach(ep => {
+    const d = el('div', '', `<h3>${ep.name} · P99</h3><canvas class="chart" style="height:120px" aria-label="${ep.name} 在 14:00 到 14:30 的 P99 延迟"></canvas><p class="muted" style="font-size:12px;margin:4px 0 0">14:00 → 14:30 · 目前 ${X.fmt(ep.data[30])} 毫秒</p>`);
+    box.append(d);
+  });
+  // draw after all cards exist, so each canvas has its final width
+  EPS.forEach((ep, i) => X.lineChart(box.children[i].querySelector('canvas'), [{ data: ep.data, token: ep.name === '/checkout' ? '--bad' : '--accent' }], { max: 2000, unit: 'ms' }));
+}
+const epSeg = X.seg($('#epSeg'), EPS.map(e => e.name), i => {
+  const ok = EPS[i].name === '/checkout';
+  if (ok) flags.endpoint = true;
+  $('#epSeg').title = ok ? '答对' : '不对';
+  mis.update(flags);
+  showMetricHint(ok, EPS[i].name);
+}, -1);
+function showMetricHint(ok, name) {
+  let h = $('#mHint');
+  if (!h) { h = el('div', 'status'); h.id = 'mHint'; h.style.marginTop = '10px'; $('#tMetrics').append(h); }
+  h.className = 'status ' + (ok ? 'ok' : 'wait');
+  h.textContent = ok ? '✓ /checkout 的 P99 在 14:05 从大约 330 毫秒跳到大约 1,850 毫秒，而且一直维持在那里。其他端点都很平稳。指针告诉你什么、什么时候，但没告诉你为什么。' : `⚠ ${name} 看起来很平稳。找那条突然跳上去的线。`;
+}
+function drawLogs() {
+  const q = $('#q').value.trim().toLowerCase();
+  const rows = LOGS.filter(l => !q || l.join(' ').toLowerCase().includes(q));
+  const ul = $('#logs'); ul.innerHTML = '';
+  rows.forEach(([t, lvl, svc, msg]) => ul.append(el('li', lvl === 'WARN' ? 'wait' : svc === 'deploy' ? 'ok' : '', esc(`${t}  ${lvl.padEnd(4)}  ${svc.padEnd(8)}  ${msg}`))));
+  $('#logCount').textContent = `${LOGS.length} 行中的 ${rows.length} 行（真实系统会有好几百万行）`;
+  if (q && rows.length && rows.every(l => /fraud|deploy|slow/.test(l[3])) && rows.length <= 7) { flags.logs = true; mis.update(flags); }
+}
+$('#q').addEventListener('input', drawLogs);
+function drawTrace() {
+  const box = $('#trace'); box.innerHTML = '';
+  const total = SPANS[0][3];
+  SPANS.forEach(([name, svc, start, dur, depth], i) => {
+    const b = el('button', 'opt');
+    b.type = 'button';
+    b.style.cssText = 'display:grid;grid-template-columns:minmax(120px,34%) 1fr;gap:8px;align-items:center;padding:4px 8px;font-family:var(--mono);font-size:12px;text-align:left';
+    b.innerHTML = `<span style="padding-left:${depth * 12}px">${esc(name)}</span><span style="position:relative;height:14px;background:var(--panel-2)"><i style="position:absolute;top:0;bottom:0;left:${(start / total) * 100}%;width:${Math.max(0.8, (dur / total) * 100)}%;background:var(${svc === 'fraud-check' ? '--bad' : '--accent'})"></i></span>`;
+    b.setAttribute('aria-label', `${name}，${dur} 毫秒`);
+    b.addEventListener('click', () => {
+      const info = $('#spanInfo');
+      if (svc === 'fraud-check') {
+        flags.span = true; mis.update(flags);
+        info.className = 'status ok';
+        info.textContent = `✓ fraud-check.score：${total} 毫秒中占了 ${dur} 毫秒。调用它的是 payments，而 payments 在 14:02 重新部署过（v2.31）。找到了：新加的诈骗检查很慢。下一步：询问 fraud-check 团队、加上超时，或改成平行调用。`;
+      } else {
+        info.className = 'status';
+        info.textContent = `${name}（${svc}）：${dur} 毫秒。${name === 'payments.charge' ? '很慢，但大部分时间都花在它的子 span 里。再往下看一层。' : ''}`;
+      }
+    });
+    box.append(b);
+  });
+}
+drawTrace();
+const normalPeak = 420, incident = 1850;
+function drawAlert() {
+  const thr = +$('#thr').value;
+  $('#thrV').textContent = X.fmt(thr) + ' 毫秒';
+  const hit = incident > thr, noisy = thr < normalPeak;
+  $('#aHit').textContent = hit ? '14:10 抓到' : 'missed';
+  $('#aHit').parentElement.className = 'meter' + (hit ? ' ok' : ' bad');
+  const noise = noisy ? Math.round((normalPeak - thr) / 6) + 4 : 0;
+  $('#aNoise').textContent = noise ? `每天约 ${noise} 次` : '0';
+  $('#aNoise').parentElement.className = 'meter' + (noise ? ' bad' : ' ok');
+  const t = $('#aTxt');
+  if (!hit) { t.className = 'status bad'; t.textContent = `✕ 这次变慢的峰值大约是 1,850 毫秒，低于你设置的 ${X.fmt(thr)} 毫秒，所以没有人被调用。今天发生的就是这样。`; }
+  else if (noisy) { t.className = 'status bad'; t.textContent = `✕ 它会抓到这次变慢，但正常流量每天都会超过 ${X.fmt(thr)} 毫秒。Dee 会一直被调用，最后开始忽略它。`; }
+  else { t.className = 'status ok'; t.textContent = '✓ 平常的日子很安静，而且它会在 14:10 调用 Dee，比客服发现早了 20 分钟。'; flags.alert = true; mis.update(flags); }
+}
+$('#thr').addEventListener('input', drawAlert);
+
+const mis = X.missions($('#missions'), [
+  { text: '<b>指针</b>：哪个端点变慢了？', hint: '比较三张 P99 图，选出那张突然跳上去的。', check: f => f.endpoint },
+  { text: '<b>日志</b>：搜索线索。', hint: '试试「slow」、「fraud」或「deploy」。注意 14:02 发生了什么事。', check: f => f.logs },
+  { text: '<b>追踪</b>：点击花最多时间的 span。', hint: '父 span 很慢是因为某个子 span。找出那个子 span。', check: f => f.span },
+  { text: '<b>告警</b>：设置一个门槛，既能抓到这次问题，平常又不会乱叫。', hint: '高于平常 420 毫秒的峰值，低于今天的 1,850 毫秒。', check: f => f.alert },
+]);
+drawLogs(); drawAlert(); requestAnimationFrame(drawCharts);
+addEventListener('resize', () => { if (!$('#tMetrics').hidden) drawCharts(); });
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="c">// 追踪：每个工作单位一个 span，跨服务串在一起</span>', null],
+  ['<span class="key">const</span> span = tracer.startSpan(<span class="s">"fraud-check.score"</span>, { attributes: { <span class="s">"order.id"</span>: id } });', 'span'],
+  ['<span class="key">try</span> { score = <span class="key">await</span> fraud.score(order); } <span class="key">finally</span> { span.end(); }', 'span'],
+  ['', null],
+  ['<span class="c">// 指针：依路由标记的耗时直方图</span>', null],
+  ['duration.record(ms, { route: <span class="s">"/checkout"</span>, status: 200 });', 'metric'],
+  ['', null],
+  ['<span class="c">// 日志：结构化，并带上追踪 id</span>', null],
+  ['logger.warn({ msg: <span class="s">"fraud-check slow"</span>, ms, orderId: id, traceId });', 'log'],
+  ['', null],
+  ['<span class="c"># 告警规则（Prometheus）</span>', null],
+  ['- alert: <span class="key">CheckoutSlow</span>', 'alert'],
+  ['  expr: histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{route="/checkout"}[5m]))) &gt; <span class="s">1</span>', 'expr'],
+  ['  for: <span class="s">5m</span>', 'for'],
+], {
+  span: ['Span', '一段计时的工作。span 共用一个通过请求标头（<code>traceparent</code>）传递的追踪 id，所以后端能画出「追踪」分页里的瀑布图。'],
+  metric: ['指针', '每个请求一个数字，依路由汇总成直方图。「指针」分页里的 P99 图就是这样来的。标签要保持低基数：路由可以，用户 id 不行。'],
+  log: ['结构化日志', '用字段而不是一句话。你可以搜索 <code>msg = "fraud-check slow"</code>，而 <code>traceId</code> 能带你直接跳到追踪。'],
+  alert: ['告警', '要有名字，让调用消息说出问题是什么：「CheckoutSlow」，而不是「指针 47 过高」。'],
+  expr: ['门槛', '结帐 P99 超过 1 秒，也就是你在「告警」分页设置的那条线。针对歌迷感受得到的症状（延迟、错误）设告警，而不是 CPU 这类原因。'],
+  for: ['持续 5 分钟', '短暂的尖峰不会调用任何人。必须一直维持在门槛之上。'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: '歌迷说某一个特定的演唱会页面很慢，但整体的 P99 仪表板看起来很正常。最好的下一步是什么？', opts: [
+    ['等仪表板显示出来再说', false, '平均过的仪表板可能会把只影响一个页面的问题藏起来。'],
+    ['找出那个演唱会页面的追踪，看看时间花在哪里', true, '这就是「新问题」的情况：依页面或演唱会 id 筛选追踪（或结构化日志），看看有什么不一样。'],
+    ['替每台服务器加 CPU', false, '目前没有任何迹象指向 CPU。先找出慢的部分。'],
+  ] },
+  { q: 'Dee 的告警设在「CPU &gt; 70%」。它几乎每晚都响，但从来没出过问题。该怎么改？', opts: [
+    ['保险起见，降到 60%', false, '这只会让它更吵，而吵杂的告警会被忽略。'],
+    ['针对用户感受得到的症状设告警，例如结帐 P99 和错误率，CPU 则留在仪表板上', true, '为用户感受得到的事情调用人。CPU 高但用户很开心，不是紧急状况。'],
+    ['删掉所有告警', false, '那下一个真正的问题就只能等客服工单了。'],
+  ] },
+  { q: '为什么要在每一行日志里放追踪 id？', opts: [
+    ['让日志变短', false, '它会让日志稍微变长。'],
+    ['让你能从一行可疑的日志跳到那个请求的完整追踪，再跳回来', true, '用共用的 id 把三种遥测数据连起来，正是把各自独立的工具变成可观测性的关键。'],
+    ['日志保存系统要求这样做', false, '没有东西要求它。这是一个在事故时会得到回报的选择。'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'observability');
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Use metrics, logs and traces to find a hidden slowdown in Encore's checkout, then write an alert that would have caught it.">
+<title>Observability · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/explainer.css">
+</head>
+<body>
+<!-- Plan. Stuck point: logs, metrics and traces sound like three names for "data"; people don't know which question each answers.
+     Sandbox: checkout got slow at 14:05. Metrics show WHAT and WHEN, logs show a clue, a trace shows WHERE. Then tune an alert.
+     One difference: monitoring answers questions you planned for; observability lets you ask new ones. -->
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="Sections"><a href="#lab">Investigate</a><a href="#real">The code</a><a href="#recap">Recap</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>page 18 · stage 5 · ship and operate it</span><span class="hot">58 · 59 · 60 · 61 · 62 · 66</span></div>
+  <div class="eyebrow">Monitoring, logging, distributed tracing, metrics, alerts, observability</div>
+  <h1>“Checkout feels slow.” <em>Nothing is down. Nothing changed. Where do you look?</em></h1>
+  <div class="scenario"><b>Encore</b>It's 14:30. Support says checkout has been slow since lunch. No errors, no alerts, every server is up. Dee opens the three tools every production system needs: metrics, logs and traces.</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">Start investigating ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>lab · find it, then catch it next time</span><span class="hot" id="tag">metrics</span></div>
+  <h2>Encore, 14:00 to 14:30</h2>
+  <div id="toolSeg" style="margin:6px 0 14px"></div>
+  <div class="lab">
+    <div id="tMetrics">
+      <p style="margin:0 0 10px"><b>Metrics</b> are numbers over time: cheap to keep, great for spotting <i>what</i> changed and <i>when</i>. P99 latency per endpoint:</p>
+      <div class="compare" style="margin:0" id="charts"></div>
+      <div class="row" style="margin:10px 0 0"><span class="lab-k" style="font-weight:500">Which endpoint got slower?</span><div id="epSeg"></div></div>
+    </div>
+    <div id="tLogs" hidden>
+      <p style="margin:0 0 10px"><b>Logs</b> are individual events with details. Too many to read; you search them.</p>
+      <div class="ctl" style="max-width:420px"><label for="q">Search logs</label><input class="input" id="q" placeholder="try: checkout, slow, deploy" autocomplete="off" spellcheck="false"></div>
+      <ul class="log" id="logs" style="max-height:260px;margin-top:10px" aria-label="Log lines"></ul>
+      <p class="muted" id="logCount" style="font-size:13px;margin:6px 0 0"></p>
+    </div>
+    <div id="tTraces" hidden>
+      <p style="margin:0 0 10px"><b>A trace</b> follows one request through every service it touched. This is one slow checkout from 14:21. Click a span.</p>
+      <div id="trace" style="display:grid;gap:6px"></div>
+      <div class="status" id="spanInfo" style="margin-top:10px">Click the bar that takes the most time.</div>
+    </div>
+    <div id="tAlerts" hidden>
+      <p style="margin:0 0 10px"><b>An alert</b> watches a metric and pages a human when it crosses a line. Set the line for checkout P99. Normal checkout P99 swings between 250 and 420 ms.</p>
+      <div class="ctl" style="max-width:460px"><label for="thr">Page Dee when checkout P99 &gt; <b id="thrV">2500 ms</b> for 5 minutes</label><input type="range" id="thr" min="200" max="3000" step="50" value="2500"></div>
+      <div class="meters"><div class="meter"><div class="k">Today's slowdown</div><div class="v" id="aHit">–</div></div><div class="meter"><div class="k">False alarms</div><div class="v" id="aNoise">–</div><div class="d">on a normal day</div></div></div>
+      <div class="status" id="aTxt" role="status"></div>
+    </div>
+  </div>
+  <h3>Try this</h3>
+  <ol class="missions" id="missions"></ol>
+  <div class="cards">
+    <div class="card"><div class="sub">What &amp; when</div><div class="t">Metrics</div><p>Aggregated numbers: request rate, error rate, latency percentiles, CPU. Cheap, fast to query, perfect for dashboards and alerts.</p></div>
+    <div class="card"><div class="sub">Why</div><div class="t">Logs</div><p>One line per event, with details. Structured logs (JSON with fields) can be searched and filtered.</p></div>
+    <div class="card"><div class="sub">Where</div><div class="t">Traces</div><p>The path of one request across services, with the time spent in each. Shows exactly which hop is slow.</p></div>
+  </div>
+  <div class="takeaway"><div class="t">The one difference</div><p><b>Monitoring</b> checks for problems you predicted: dashboards and alerts on known metrics. <b>Observability</b> is being able to answer questions you didn't predict, like “why is checkout slow for some fans since 14:05?”, by combining metrics, logs and traces that share the same ids and labels.</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>act 2 · the real thing</span><span class="hot">opentelemetry</span></div>
+  <h2>One request, three kinds of telemetry</h2>
+  <p>OpenTelemetry is the open standard for producing all three. The alert rule is Prometheus. <b>Hover or tap a line.</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="Example tracing, metrics, logging and alert rule"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 pick a line</div><p id="exP">Each highlighted line maps to a tool in the lab.</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>recap · keep this</span><span class="hot">♥</span></div>
+  <h2>The whole page on one screen</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">Notice</div><div class="t">Metrics + alerts</div><p>Graph latency, errors and traffic for every endpoint. Alert on what users feel (P99, error rate), not on CPU.</p></div>
+    <div class="card"><div class="sub">Explain</div><div class="t">Logs</div><p>Structured, searchable, with a request or trace id on every line so you can jump from a log to its trace.</p></div>
+    <div class="card"><div class="sub">Pinpoint</div><div class="t">Traces</div><p>Propagate a trace id through every service call. The waterfall shows where time goes.</p></div>
+  </div>
+  <div class="takeaway"><div class="t">The tradeoff</div><p>Telemetry costs money and attention: storing every log and trace is expensive, and noisy alerts teach people to ignore them. Keep metrics for everything, sample traces, keep logs structured, and alert only on symptoms someone must act on.</p></div>
+  <h3 style="margin-top:26px">Check it <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="Pages"></nav>
+</main>
+
+<script src="../assets/explainer.js"></script>
+<script>
+(() => {
+const { $, el, esc } = X;
+const flags = { endpoint: false, logs: false, span: false, alert: false };
+
+/* ---------- data: 30 minutes of metrics (seeded), logs, one trace ---------- */
+const s = { r: 18 };
+const series = (base, jitter, from, to) => Array.from({ length: 31 }, (_, m) => (m >= from ? to : base) + (X.rnd(s) - 0.5) * jitter);
+const EPS = [
+  { name: '/concerts', data: series(140, 40, 99, 0) },
+  { name: '/seats', data: series(210, 60, 99, 0) },
+  { name: '/checkout', data: series(330, 120, 5, 1850) },
+];
+const LOGS = [
+  ['14:00:12', 'INFO', 'api', 'GET /concerts 200 132ms'],
+  ['14:01:40', 'INFO', 'api', 'POST /checkout 200 341ms order=8812'],
+  ['14:02:03', 'INFO', 'deploy', 'payments v2.31 rolled out to 6/6 instances (adds fraud-check before charging)'],
+  ['14:03:15', 'INFO', 'api', 'GET /seats 200 198ms'],
+  ['14:05:22', 'WARN', 'payments', 'fraud-check slow: 1702ms order=8840'],
+  ['14:05:23', 'INFO', 'api', 'POST /checkout 200 1893ms order=8840'],
+  ['14:06:01', 'INFO', 'api', 'GET /concerts 200 151ms'],
+  ['14:08:47', 'WARN', 'payments', 'fraud-check slow: 1766ms order=8861'],
+  ['14:08:48', 'INFO', 'api', 'POST /checkout 200 1920ms order=8861'],
+  ['14:11:30', 'INFO', 'api', 'GET /seats 200 224ms'],
+  ['14:14:05', 'WARN', 'payments', 'fraud-check slow: 1731ms order=8899'],
+  ['14:14:06', 'INFO', 'api', 'POST /checkout 200 1874ms order=8899'],
+  ['14:17:52', 'INFO', 'api', 'GET /concerts 200 128ms'],
+  ['14:21:09', 'WARN', 'payments', 'fraud-check slow: 1720ms order=8930 trace=7f3c9a'],
+  ['14:21:10', 'INFO', 'api', 'POST /checkout 200 1889ms order=8930 trace=7f3c9a'],
+  ['14:24:40', 'INFO', 'api', 'GET /seats 200 205ms'],
+  ['14:27:18', 'WARN', 'payments', 'fraud-check slow: 1748ms order=8961'],
+];
+const SPANS = [
+  ['POST /checkout', 'api', 0, 1889, 0],
+  ['auth.verify', 'auth', 8, 20, 1],
+  ['seats.reserve', 'inventory', 30, 45, 1],
+  ['payments.charge', 'payments', 80, 1795, 1],
+  ['fraud-check.score', 'fraud-check', 85, 1720, 2],
+  ['bank.authorize', 'bank-gateway', 1810, 62, 2],
+  ['email.enqueue', 'queue', 1876, 6, 1],
+];
+
+/* ---------- tools ---------- */
+const PANES = ['tMetrics', 'tLogs', 'tTraces', 'tAlerts'];
+X.seg($('#toolSeg'), ['📈 Metrics', '📜 Logs', '🧵 Traces', '🔔 Alerts'], i => {
+  PANES.forEach((p, j) => ($('#' + p).hidden = i !== j));
+  $('#tag').textContent = ['metrics', 'logs', 'traces', 'alerts'][i];
+  if (i === 0) drawCharts();
+}, 0);
+function drawCharts() {
+  const box = $('#charts'); box.innerHTML = '';
+  EPS.forEach(ep => {
+    const d = el('div', '', `<h3>${ep.name} · P99</h3><canvas class="chart" style="height:120px" aria-label="P99 latency of ${ep.name} from 14:00 to 14:30"></canvas><p class="muted" style="font-size:12px;margin:4px 0 0">14:00 → 14:30 · now ${X.fmt(ep.data[30])} ms</p>`);
+    box.append(d);
+  });
+  // draw after all cards exist, so each canvas has its final width
+  EPS.forEach((ep, i) => X.lineChart(box.children[i].querySelector('canvas'), [{ data: ep.data, token: ep.name === '/checkout' ? '--bad' : '--accent' }], { max: 2000, unit: 'ms' }));
+}
+const epSeg = X.seg($('#epSeg'), EPS.map(e => e.name), i => {
+  const ok = EPS[i].name === '/checkout';
+  if (ok) flags.endpoint = true;
+  $('#epSeg').title = ok ? 'Right' : 'No';
+  mis.update(flags);
+  showMetricHint(ok, EPS[i].name);
+}, -1);
+function showMetricHint(ok, name) {
+  let h = $('#mHint');
+  if (!h) { h = el('div', 'status'); h.id = 'mHint'; h.style.marginTop = '10px'; $('#tMetrics').append(h); }
+  h.className = 'status ' + (ok ? 'ok' : 'wait');
+  h.textContent = ok ? '✓ /checkout P99 jumped from about 330 ms to about 1,850 ms at 14:05, and stayed there. The other endpoints are flat. Metrics told you what and when. Not why.' : `⚠ ${name} looks flat. Look for the line that jumps.`;
+}
+function drawLogs() {
+  const q = $('#q').value.trim().toLowerCase();
+  const rows = LOGS.filter(l => !q || l.join(' ').toLowerCase().includes(q));
+  const ul = $('#logs'); ul.innerHTML = '';
+  rows.forEach(([t, lvl, svc, msg]) => ul.append(el('li', lvl === 'WARN' ? 'wait' : svc === 'deploy' ? 'ok' : '', esc(`${t}  ${lvl.padEnd(4)}  ${svc.padEnd(8)}  ${msg}`))));
+  $('#logCount').textContent = `${rows.length} of ${LOGS.length} lines (a real system would have millions)`;
+  if (q && rows.length && rows.every(l => /fraud|deploy|slow/.test(l[3])) && rows.length <= 7) { flags.logs = true; mis.update(flags); }
+}
+$('#q').addEventListener('input', drawLogs);
+function drawTrace() {
+  const box = $('#trace'); box.innerHTML = '';
+  const total = SPANS[0][3];
+  SPANS.forEach(([name, svc, start, dur, depth], i) => {
+    const b = el('button', 'opt');
+    b.type = 'button';
+    b.style.cssText = 'display:grid;grid-template-columns:minmax(120px,34%) 1fr;gap:8px;align-items:center;padding:4px 8px;font-family:var(--mono);font-size:12px;text-align:left';
+    b.innerHTML = `<span style="padding-left:${depth * 12}px">${esc(name)}</span><span style="position:relative;height:14px;background:var(--panel-2)"><i style="position:absolute;top:0;bottom:0;left:${(start / total) * 100}%;width:${Math.max(0.8, (dur / total) * 100)}%;background:var(${svc === 'fraud-check' ? '--bad' : '--accent'})"></i></span>`;
+    b.setAttribute('aria-label', `${name}, ${dur} ms`);
+    b.addEventListener('click', () => {
+      const info = $('#spanInfo');
+      if (svc === 'fraud-check') {
+        flags.span = true; mis.update(flags);
+        info.className = 'status ok';
+        info.textContent = `✓ fraud-check.score: ${dur} ms of the ${total} ms. It\'s called by payments, which was redeployed at 14:02 (v2.31). Found it: the new fraud check is slow. Next step: ask the fraud-check team, add a timeout, or call it in parallel.`;
+      } else {
+        info.className = 'status';
+        info.textContent = `${name} (${svc}): ${dur} ms.${name === 'payments.charge' ? ' Slow, but most of that time is spent inside its child span. Look one level deeper.' : ''}`;
+      }
+    });
+    box.append(b);
+  });
+}
+drawTrace();
+const normalPeak = 420, incident = 1850;
+function drawAlert() {
+  const thr = +$('#thr').value;
+  $('#thrV').textContent = X.fmt(thr) + ' ms';
+  const hit = incident > thr, noisy = thr < normalPeak;
+  $('#aHit').textContent = hit ? 'caught at 14:10' : 'missed';
+  $('#aHit').parentElement.className = 'meter' + (hit ? ' ok' : ' bad');
+  const noise = noisy ? Math.round((normalPeak - thr) / 6) + 4 : 0;
+  $('#aNoise').textContent = noise ? `~${noise} / day` : '0';
+  $('#aNoise').parentElement.className = 'meter' + (noise ? ' bad' : ' ok');
+  const t = $('#aTxt');
+  if (!hit) { t.className = 'status bad'; t.textContent = `✕ The slowdown peaked at about 1,850 ms, under your ${X.fmt(thr)} ms line, so nobody was paged. That's exactly what happened today.`; }
+  else if (noisy) { t.className = 'status bad'; t.textContent = `✕ It would catch the slowdown, but normal traffic crosses ${X.fmt(thr)} ms every day. Dee gets paged constantly and starts ignoring it.`; }
+  else { t.className = 'status ok'; t.textContent = '✓ Quiet on normal days, and it would have paged Dee at 14:10, 20 minutes before support noticed.'; flags.alert = true; mis.update(flags); }
+}
+$('#thr').addEventListener('input', drawAlert);
+
+const mis = X.missions($('#missions'), [
+  { text: '<b>Metrics</b>: which endpoint got slower?', hint: 'Compare the three P99 charts and pick the one that jumps.', check: f => f.endpoint },
+  { text: '<b>Logs</b>: search for a clue.', hint: 'Try “slow”, “fraud” or “deploy”. Notice what happened at 14:02.', check: f => f.logs },
+  { text: '<b>Traces</b>: click the span that takes the most time.', hint: 'The parent span is slow because of a child. Find the child.', check: f => f.span },
+  { text: '<b>Alerts</b>: set a threshold that would have caught this without paging on normal days.', hint: 'Above the normal 420 ms peaks, below today\'s 1,850 ms.', check: f => f.alert },
+]);
+drawLogs(); drawAlert(); requestAnimationFrame(drawCharts);
+addEventListener('resize', () => { if (!$('#tMetrics').hidden) drawCharts(); });
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="c">// trace: one span per unit of work, linked across services</span>', null],
+  ['<span class="key">const</span> span = tracer.startSpan(<span class="s">"fraud-check.score"</span>, { attributes: { <span class="s">"order.id"</span>: id } });', 'span'],
+  ['<span class="key">try</span> { score = <span class="key">await</span> fraud.score(order); } <span class="key">finally</span> { span.end(); }', 'span'],
+  ['', null],
+  ['<span class="c">// metric: a histogram of durations, labeled by route</span>', null],
+  ['duration.record(ms, { route: <span class="s">"/checkout"</span>, status: 200 });', 'metric'],
+  ['', null],
+  ['<span class="c">// log: structured, with the trace id</span>', null],
+  ['logger.warn({ msg: <span class="s">"fraud-check slow"</span>, ms, orderId: id, traceId });', 'log'],
+  ['', null],
+  ['<span class="c"># alert rule (Prometheus)</span>', null],
+  ['- alert: <span class="key">CheckoutSlow</span>', 'alert'],
+  ['  expr: histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{route="/checkout"}[5m]))) &gt; <span class="s">1</span>', 'expr'],
+  ['  for: <span class="s">5m</span>', 'for'],
+], {
+  span: ['Span', 'A timed piece of work. Spans share a trace id passed along in request headers (<code>traceparent</code>), so the backend can draw the waterfall from the Traces tab.'],
+  metric: ['Metric', 'One number per request, aggregated into a histogram per route. This is what the P99 charts in the Metrics tab are built from. Keep labels low-cardinality: route yes, user id no.'],
+  log: ['Structured log', 'Fields instead of a sentence. You can search <code>msg = "fraud-check slow"</code>, and the <code>traceId</code> takes you straight to the trace.'],
+  alert: ['Alert', 'Named, so the page says what\'s wrong: “CheckoutSlow”, not “metric 47 high”.'],
+  expr: ['Threshold', 'Checkout P99 over 1 second, the line you set in the Alerts tab. Alert on symptoms fans feel (latency, errors), not on causes like CPU.'],
+  for: ['For 5 minutes', 'A brief spike won\'t page anyone. It has to stay above the line.'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: 'Fans say one specific concert page is slow, but the overall P99 dashboard looks normal. What\'s the best next step?', opts: [
+    ['Wait until the dashboard shows it', false, 'An averaged dashboard can hide a problem that affects one page.'],
+    ['Find traces for that concert page and look at where the time goes', true, 'This is the “new question” case: filter traces (or structured logs) by the page or concert id to see what\'s different.'],
+    ['Add more CPU to every server', false, 'Nothing points to CPU yet. Find the slow part first.'],
+  ] },
+  { q: 'Dee\'s alert pages on “CPU &gt; 70%”. It fires most nights and nothing is ever wrong. What should change?', opts: [
+    ['Lower it to 60% to be safe', false, 'That makes it noisier, and noisy alerts get ignored.'],
+    ['Alert on user-facing symptoms like checkout P99 and error rate, and keep CPU on a dashboard', true, 'Page people for things users feel. High CPU with happy users isn\'t an emergency.'],
+    ['Delete all alerts', false, 'Then the next real problem waits for support tickets.'],
+  ] },
+  { q: 'Why put a trace id in every log line?', opts: [
+    ['It makes logs shorter', false, 'It makes them slightly longer.'],
+    ['So you can jump from a suspicious log line to the full trace of that request, and back', true, 'Linking the three kinds of telemetry by shared ids is what turns separate tools into observability.'],
+    ['Log storage requires it', false, 'Nothing requires it. It\'s a choice that pays off during incidents.'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'observability');
+})();
+</script>
+</body>
+</html>

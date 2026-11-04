@@ -1,0 +1,850 @@
+{
+ "page": "observability",
+ "segments": [
+  {
+   "kind": "attr",
+   "en": "width=device-width, initial-scale=1, viewport-fit=cover",
+   "zh": "="
+  },
+  {
+   "kind": "attr",
+   "en": "Use metrics, logs and traces to find a hidden slowdown in Encore's checkout, then write an alert that would have caught it.",
+   "zh": "用指標、日誌和追蹤找出 Encore 結帳中一個隱藏的變慢問題，再寫一條本來可以抓到它的告警。"
+  },
+  {
+   "kind": "attr",
+   "en": "Sections",
+   "zh": "章節"
+  },
+  {
+   "kind": "attr",
+   "en": "try: checkout, slow, deploy",
+   "zh": "試試：checkout、slow、deploy"
+  },
+  {
+   "kind": "attr",
+   "en": "Log lines",
+   "zh": "日誌行"
+  },
+  {
+   "kind": "attr",
+   "en": "Example tracing, metrics, logging and alert rule",
+   "zh": "追蹤、指標、日誌與告警規則範例"
+  },
+  {
+   "kind": "attr",
+   "en": "Pages",
+   "zh": "頁面"
+  },
+  {
+   "kind": "html",
+   "en": "Observability · System Design Lab",
+   "zh": "可觀測性 · System Design Lab"
+  },
+  {
+   "kind": "html",
+   "en": "system<b>.design.lab</b>",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "Investigate",
+   "zh": "開始調查"
+  },
+  {
+   "kind": "html",
+   "en": "The code",
+   "zh": "程式碼"
+  },
+  {
+   "kind": "html",
+   "en": "Recap",
+   "zh": "重點整理"
+  },
+  {
+   "kind": "html",
+   "en": "page 18 · stage 5 · ship and operate it",
+   "zh": "第 18 頁 · 階段 5 · 上線與維運"
+  },
+  {
+   "kind": "html",
+   "en": "Monitoring, logging, distributed tracing, metrics, alerts, observability",
+   "zh": "監控、日誌、分散式追蹤、指標、告警、可觀測性"
+  },
+  {
+   "kind": "html",
+   "en": "“Checkout feels slow.” <em>Nothing is down. Nothing changed. Where do you look?</em>",
+   "zh": "「結帳好像變慢了。」<em>沒有東西掛掉，也沒有人改過東西。你要從哪裡查起？</em>"
+  },
+  {
+   "kind": "html",
+   "en": "<b>Encore</b>It's 14:30. Support says checkout has been slow since lunch. No errors, no alerts, every server is up. Dee opens the three tools every production system needs: metrics, logs and traces.",
+   "zh": "<b>Encore</b>現在是 14:30。客服說從午餐時間開始結帳就很慢。沒有錯誤、沒有告警，每台伺服器都正常。Dee 打開每個正式系統都需要的三種工具：指標、日誌和追蹤。"
+  },
+  {
+   "kind": "html",
+   "en": "Start investigating ↓",
+   "zh": "開始調查 ↓"
+  },
+  {
+   "kind": "html",
+   "en": "lab · find it, then catch it next time",
+   "zh": "實驗室 · 找出原因，下次及早抓到"
+  },
+  {
+   "kind": "html",
+   "en": "metrics",
+   "zh": "指標"
+  },
+  {
+   "kind": "html",
+   "en": "Encore, 14:00 to 14:30",
+   "zh": "Encore，14:00 到 14:30"
+  },
+  {
+   "kind": "html",
+   "en": "<b>Metrics</b> are numbers over time: cheap to keep, great for spotting <i>what</i> changed and <i>when</i>. P99 latency per endpoint:",
+   "zh": "<b>指標（metrics）</b>是隨時間變化的數字：保存成本低，最適合看出<i>什麼</i>改變了、<i>何時</i>改變。各端點的 P99 延遲："
+  },
+  {
+   "kind": "html",
+   "en": "Which endpoint got slower?",
+   "zh": "哪個端點變慢了？"
+  },
+  {
+   "kind": "html",
+   "en": "<b>Logs</b> are individual events with details. Too many to read; you search them.",
+   "zh": "<b>日誌（logs）</b>是一筆筆帶有細節的事件。多到讀不完，所以要用搜尋的。"
+  },
+  {
+   "kind": "html",
+   "en": "Search logs",
+   "zh": "搜尋日誌"
+  },
+  {
+   "kind": "html",
+   "en": "<b>A trace</b> follows one request through every service it touched. This is one slow checkout from 14:21. Click a span.",
+   "zh": "<b>追蹤（trace）</b>會記錄一個請求經過的每一個服務。這是 14:21 一次很慢的結帳。點一個 span 看看。"
+  },
+  {
+   "kind": "html",
+   "en": "Click the bar that takes the most time.",
+   "zh": "點擊花最多時間的那條長條。"
+  },
+  {
+   "kind": "html",
+   "en": "<b>An alert</b> watches a metric and pages a human when it crosses a line. Set the line for checkout P99. Normal checkout P99 swings between 250 and 420 ms.",
+   "zh": "<b>告警（alert）</b>會盯著一個指標，越過門檻時就呼叫值班的人。替結帳的 P99 設定門檻。正常情況下結帳 P99 在 250 到 420 毫秒之間擺盪。"
+  },
+  {
+   "kind": "html",
+   "en": "Page Dee when checkout P99 &gt; <b id=\"thrV\">2500 ms</b> for 5 minutes",
+   "zh": "結帳 P99 &gt; <b id=\"thrV\">2500 ms</b> 持續 5 分鐘時呼叫 Dee"
+  },
+  {
+   "kind": "html",
+   "en": "Today's slowdown",
+   "zh": "今天的變慢"
+  },
+  {
+   "kind": "html",
+   "en": "False alarms",
+   "zh": "誤報"
+  },
+  {
+   "kind": "html",
+   "en": "on a normal day",
+   "zh": "在平常的一天"
+  },
+  {
+   "kind": "html",
+   "en": "Try this",
+   "zh": "試試看"
+  },
+  {
+   "kind": "html",
+   "en": "What &amp; when",
+   "zh": "什麼與何時"
+  },
+  {
+   "kind": "html",
+   "en": "Metrics",
+   "zh": "指標"
+  },
+  {
+   "kind": "html",
+   "en": "Aggregated numbers: request rate, error rate, latency percentiles, CPU. Cheap, fast to query, perfect for dashboards and alerts.",
+   "zh": "彙總後的數字：請求率、錯誤率、延遲百分位數、CPU。便宜、查詢快，最適合做儀表板和告警。"
+  },
+  {
+   "kind": "html",
+   "en": "Why",
+   "zh": "為什麼"
+  },
+  {
+   "kind": "html",
+   "en": "Logs",
+   "zh": "日誌"
+  },
+  {
+   "kind": "html",
+   "en": "One line per event, with details. Structured logs (JSON with fields) can be searched and filtered.",
+   "zh": "每個事件一行，附帶細節。結構化日誌（有欄位的 JSON）可以被搜尋和篩選。"
+  },
+  {
+   "kind": "html",
+   "en": "Where",
+   "zh": "在哪裡"
+  },
+  {
+   "kind": "html",
+   "en": "Traces",
+   "zh": "追蹤"
+  },
+  {
+   "kind": "html",
+   "en": "The path of one request across services, with the time spent in each. Shows exactly which hop is slow.",
+   "zh": "一個請求跨越各服務的路徑，以及在每個服務花的時間。能準確指出哪一段很慢。"
+  },
+  {
+   "kind": "html",
+   "en": "The one difference",
+   "zh": "關鍵差別"
+  },
+  {
+   "kind": "html",
+   "en": "<b>Monitoring</b> checks for problems you predicted: dashboards and alerts on known metrics. <b>Observability</b> is being able to answer questions you didn't predict, like “why is checkout slow for some fans since 14:05?”, by combining metrics, logs and traces that share the same ids and labels.",
+   "zh": "<b>監控（monitoring）</b>檢查的是你預料得到的問題：針對已知指標的儀表板與告警。<b>可觀測性（observability）</b>則是能回答你沒預料到的問題，例如「為什麼從 14:05 開始，有些歌迷結帳變慢？」，方法是把共用相同 id 和標籤的指標、日誌與追蹤結合起來。"
+  },
+  {
+   "kind": "html",
+   "en": "act 2 · the real thing",
+   "zh": "第 2 幕 · 真實世界"
+  },
+  {
+   "kind": "html",
+   "en": "opentelemetry",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "One request, three kinds of telemetry",
+   "zh": "一個請求，三種遙測資料"
+  },
+  {
+   "kind": "html",
+   "en": "OpenTelemetry is the open standard for producing all three. The alert rule is Prometheus. <b>Hover or tap a line.</b>",
+   "zh": "OpenTelemetry 是產生這三種資料的開放標準。告警規則用的是 Prometheus。<b>把滑鼠移到某一行上，或點一下。</b>"
+  },
+  {
+   "kind": "html",
+   "en": "👆 pick a line",
+   "zh": "👆 選一行"
+  },
+  {
+   "kind": "html",
+   "en": "Each highlighted line maps to a tool in the lab.",
+   "zh": "每一行反白後，都會對應到實驗室裡的一種工具。"
+  },
+  {
+   "kind": "html",
+   "en": "recap · keep this",
+   "zh": "重點整理 · 帶走這些"
+  },
+  {
+   "kind": "html",
+   "en": "The whole page on one screen",
+   "zh": "整頁濃縮在一個畫面"
+  },
+  {
+   "kind": "html",
+   "en": "Notice",
+   "zh": "察覺"
+  },
+  {
+   "kind": "html",
+   "en": "Metrics + alerts",
+   "zh": "指標＋告警"
+  },
+  {
+   "kind": "html",
+   "en": "Graph latency, errors and traffic for every endpoint. Alert on what users feel (P99, error rate), not on CPU.",
+   "zh": "替每個端點畫出延遲、錯誤和流量。針對使用者感受到的東西（P99、錯誤率）設告警，而不是 CPU。"
+  },
+  {
+   "kind": "html",
+   "en": "Explain",
+   "zh": "解釋"
+  },
+  {
+   "kind": "html",
+   "en": "Structured, searchable, with a request or trace id on every line so you can jump from a log to its trace.",
+   "zh": "結構化、可搜尋，每一行都帶著請求或追蹤 id，讓你能從日誌直接跳到它的追蹤。"
+  },
+  {
+   "kind": "html",
+   "en": "Pinpoint",
+   "zh": "精準定位"
+  },
+  {
+   "kind": "html",
+   "en": "Propagate a trace id through every service call. The waterfall shows where time goes.",
+   "zh": "在每次服務呼叫中傳遞追蹤 id。瀑布圖會顯示時間花在哪裡。"
+  },
+  {
+   "kind": "html",
+   "en": "The tradeoff",
+   "zh": "取捨"
+  },
+  {
+   "kind": "html",
+   "en": "Telemetry costs money and attention: storing every log and trace is expensive, and noisy alerts teach people to ignore them. Keep metrics for everything, sample traces, keep logs structured, and alert only on symptoms someone must act on.",
+   "zh": "遙測要花錢，也要花注意力：保存每一筆日誌和追蹤很昂貴，吵雜的告警則會讓人學會忽略它們。所有東西都要有指標、追蹤做抽樣、日誌保持結構化，而且只對必須有人處理的症狀發出告警。"
+  },
+  {
+   "kind": "html",
+   "en": "Check it",
+   "zh": "考考自己"
+  },
+  {
+   "kind": "js",
+   "en": "'/concerts'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'/seats'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'/checkout'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'INFO'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'GET /concerts 200 132ms'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'POST /checkout 200 341ms order=8812'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'payments v2.31 rolled out to 6/6 instances (adds fraud-check before charging)'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'GET /seats 200 198ms'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'WARN'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'fraud-check slow: 1702ms order=8840'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'POST /checkout 200 1893ms order=8840'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'GET /concerts 200 151ms'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'fraud-check slow: 1766ms order=8861'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'POST /checkout 200 1920ms order=8861'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'GET /seats 200 224ms'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'fraud-check slow: 1731ms order=8899'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'POST /checkout 200 1874ms order=8899'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'GET /concerts 200 128ms'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'fraud-check slow: 1720ms order=8930 trace=7f3c9a'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'POST /checkout 200 1889ms order=8930 trace=7f3c9a'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'GET /seats 200 205ms'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'fraud-check slow: 1748ms order=8961'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'POST /checkout'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'auth.verify'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'seats.reserve'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'payments.charge'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'fraud-check.score'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'bank.authorize'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'email.enqueue'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'tMetrics'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'tLogs'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'tTraces'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'tAlerts'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'📈 Metrics'",
+   "zh": "'📈 指標'"
+  },
+  {
+   "kind": "js",
+   "en": "'📜 Logs'",
+   "zh": "'📜 日誌'"
+  },
+  {
+   "kind": "js",
+   "en": "'🧵 Traces'",
+   "zh": "'🧵 追蹤'"
+  },
+  {
+   "kind": "js",
+   "en": "'🔔 Alerts'",
+   "zh": "'🔔 告警'"
+  },
+  {
+   "kind": "js",
+   "en": "`<h3>${ep.name} · P99</h3><canvas class=\"chart\" style=\"height:120px\" aria-label=\"P99 latency of ${ep.name} from 14:00 to 14:30\"></canvas><p class=\"muted\" style=\"font-size:12px;margin:4px 0 0\">14:00 → 14:30 · now ${X.fmt(ep.data[30])} ms</p>`",
+   "zh": "`<h3>${ep.name} · P99</h3><canvas class=\"chart\" style=\"height:120px\" aria-label=\"${ep.name} 在 14:00 到 14:30 的 P99 延遲\"></canvas><p class=\"muted\" style=\"font-size:12px;margin:4px 0 0\">14:00 → 14:30 · 目前 ${X.fmt(ep.data[30])} 毫秒</p>`"
+  },
+  {
+   "kind": "js",
+   "en": "'Right'",
+   "zh": "'答對'"
+  },
+  {
+   "kind": "js",
+   "en": "'No'",
+   "zh": "'不對'"
+  },
+  {
+   "kind": "js",
+   "en": "'mHint'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'✓ /checkout P99 jumped from about 330 ms to about 1,850 ms at 14:05, and stayed there. The other endpoints are flat. Metrics told you what and when. Not why.'",
+   "zh": "'✓ /checkout 的 P99 在 14:05 從大約 330 毫秒跳到大約 1,850 毫秒，而且一直維持在那裡。其他端點都很平穩。指標告訴你什麼、什麼時候，但沒告訴你為什麼。'"
+  },
+  {
+   "kind": "js",
+   "en": "`⚠ ${name} looks flat. Look for the line that jumps.`",
+   "zh": "`⚠ ${name} 看起來很平穩。找那條突然跳上去的線。`"
+  },
+  {
+   "kind": "js",
+   "en": "`${t}  ${lvl.padEnd(4)}  ${svc.padEnd(8)}  ${msg}`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "`${rows.length} of ${LOGS.length} lines (a real system would have millions)`",
+   "zh": "`${LOGS.length} 行中的 ${rows.length} 行（真實系統會有好幾百萬行）`"
+  },
+  {
+   "kind": "js",
+   "en": "'display:grid;grid-template-columns:minmax(120px,34%) 1fr;gap:8px;align-items:center;padding:4px 8px;font-family:var(--mono);font-size:12px;text-align:left'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "`<span style=\"padding-left:${depth * 12}px\">${esc(name)}</span><span style=\"position:relative;height:14px;background:var(--panel-2)\"><i style=\"position:absolute;top:0;bottom:0;left:${(start / total) * 100}%;width:${Math.max(0.8, (dur / total) * 100)}%;background:var(${svc === 'fraud-check' ? '--bad' : '--accent'})\"></i></span>`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "`${name}, ${dur} ms`",
+   "zh": "`${name}，${dur} 毫秒`"
+  },
+  {
+   "kind": "js",
+   "en": "`✓ fraud-check.score: ${dur} ms of the ${total} ms. It\\'s called by payments, which was redeployed at 14:02 (v2.31). Found it: the new fraud check is slow. Next step: ask the fraud-check team, add a timeout, or call it in parallel.`",
+   "zh": "`✓ fraud-check.score：${total} 毫秒中占了 ${dur} 毫秒。呼叫它的是 payments，而 payments 在 14:02 重新部署過（v2.31）。找到了：新加的詐騙檢查很慢。下一步：詢問 fraud-check 團隊、加上逾時，或改成平行呼叫。`"
+  },
+  {
+   "kind": "js",
+   "en": "`${name} (${svc}): ${dur} ms.${name === 'payments.charge' ? ' Slow, but most of that time is spent inside its child span. Look one level deeper.' : ''}`",
+   "zh": "`${name}（${svc}）：${dur} 毫秒。${name === 'payments.charge' ? '很慢，但大部分時間都花在它的子 span 裡。再往下看一層。' : ''}`"
+  },
+  {
+   "kind": "js",
+   "en": "' ms'",
+   "zh": "' 毫秒'"
+  },
+  {
+   "kind": "js",
+   "en": "'caught at 14:10'",
+   "zh": "'14:10 抓到'"
+  },
+  {
+   "kind": "js",
+   "en": "`~${noise} / day`",
+   "zh": "`每天約 ${noise} 次`"
+  },
+  {
+   "kind": "js",
+   "en": "`✕ The slowdown peaked at about 1,850 ms, under your ${X.fmt(thr)} ms line, so nobody was paged. That's exactly what happened today.`",
+   "zh": "`✕ 這次變慢的峰值大約是 1,850 毫秒，低於你設定的 ${X.fmt(thr)} 毫秒，所以沒有人被呼叫。今天發生的就是這樣。`"
+  },
+  {
+   "kind": "js",
+   "en": "`✕ It would catch the slowdown, but normal traffic crosses ${X.fmt(thr)} ms every day. Dee gets paged constantly and starts ignoring it.`",
+   "zh": "`✕ 它會抓到這次變慢，但正常流量每天都會超過 ${X.fmt(thr)} 毫秒。Dee 會一直被呼叫，最後開始忽略它。`"
+  },
+  {
+   "kind": "js",
+   "en": "'✓ Quiet on normal days, and it would have paged Dee at 14:10, 20 minutes before support noticed.'",
+   "zh": "'✓ 平常的日子很安靜，而且它會在 14:10 呼叫 Dee，比客服發現早了 20 分鐘。'"
+  },
+  {
+   "kind": "js",
+   "en": "'<b>Metrics</b>: which endpoint got slower?'",
+   "zh": "'<b>指標</b>：哪個端點變慢了？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Compare the three P99 charts and pick the one that jumps.'",
+   "zh": "'比較三張 P99 圖，選出那張突然跳上去的。'"
+  },
+  {
+   "kind": "js",
+   "en": "'<b>Logs</b>: search for a clue.'",
+   "zh": "'<b>日誌</b>：搜尋線索。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Try “slow”, “fraud” or “deploy”. Notice what happened at 14:02.'",
+   "zh": "'試試「slow」、「fraud」或「deploy」。注意 14:02 發生了什麼事。'"
+  },
+  {
+   "kind": "js",
+   "en": "'<b>Traces</b>: click the span that takes the most time.'",
+   "zh": "'<b>追蹤</b>：點擊花最多時間的 span。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The parent span is slow because of a child. Find the child.'",
+   "zh": "'父 span 很慢是因為某個子 span。找出那個子 span。'"
+  },
+  {
+   "kind": "js",
+   "en": "'<b>Alerts</b>: set a threshold that would have caught this without paging on normal days.'",
+   "zh": "'<b>告警</b>：設定一個門檻，既能抓到這次問題，平常又不會亂叫。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Above the normal 420 ms peaks, below today\\'s 1,850 ms.'",
+   "zh": "'高於平常 420 毫秒的峰值，低於今天的 1,850 毫秒。'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\">// trace: one span per unit of work, linked across services</span>'",
+   "zh": "'<span class=\"c\">// 追蹤：每個工作單位一個 span，跨服務串在一起</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">const</span> span = tracer.startSpan(<span class=\"s\">\"fraud-check.score\"</span>, { attributes: { <span class=\"s\">\"order.id\"</span>: id } });'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">try</span> { score = <span class=\"key\">await</span> fraud.score(order); } <span class=\"key\">finally</span> { span.end(); }'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\">// metric: a histogram of durations, labeled by route</span>'",
+   "zh": "'<span class=\"c\">// 指標：依路由標記的耗時直方圖</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'duration.record(ms, { route: <span class=\"s\">\"/checkout\"</span>, status: 200 });'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\">// log: structured, with the trace id</span>'",
+   "zh": "'<span class=\"c\">// 日誌：結構化，並帶上追蹤 id</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'logger.warn({ msg: <span class=\"s\">\"fraud-check slow\"</span>, ms, orderId: id, traceId });'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\"># alert rule (Prometheus)</span>'",
+   "zh": "'<span class=\"c\"># 告警規則（Prometheus）</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'- alert: <span class=\"key\">CheckoutSlow</span>'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  expr: histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{route=\"/checkout\"}[5m]))) &gt; <span class=\"s\">1</span>'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  for: <span class=\"s\">5m</span>'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Span'",
+   "zh": "'Span'"
+  },
+  {
+   "kind": "js",
+   "en": "'A timed piece of work. Spans share a trace id passed along in request headers (<code>traceparent</code>), so the backend can draw the waterfall from the Traces tab.'",
+   "zh": "'一段計時的工作。span 共用一個透過請求標頭（<code>traceparent</code>）傳遞的追蹤 id，所以後端能畫出「追蹤」分頁裡的瀑布圖。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Metric'",
+   "zh": "'指標'"
+  },
+  {
+   "kind": "js",
+   "en": "'One number per request, aggregated into a histogram per route. This is what the P99 charts in the Metrics tab are built from. Keep labels low-cardinality: route yes, user id no.'",
+   "zh": "'每個請求一個數字，依路由彙總成直方圖。「指標」分頁裡的 P99 圖就是這樣來的。標籤要保持低基數：路由可以，使用者 id 不行。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Structured log'",
+   "zh": "'結構化日誌'"
+  },
+  {
+   "kind": "js",
+   "en": "'Fields instead of a sentence. You can search <code>msg = \"fraud-check slow\"</code>, and the <code>traceId</code> takes you straight to the trace.'",
+   "zh": "'用欄位而不是一句話。你可以搜尋 <code>msg = \"fraud-check slow\"</code>，而 <code>traceId</code> 能帶你直接跳到追蹤。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Alert'",
+   "zh": "'告警'"
+  },
+  {
+   "kind": "js",
+   "en": "'Named, so the page says what\\'s wrong: “CheckoutSlow”, not “metric 47 high”.'",
+   "zh": "'要有名字，讓呼叫訊息說出問題是什麼：「CheckoutSlow」，而不是「指標 47 過高」。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Threshold'",
+   "zh": "'門檻'"
+  },
+  {
+   "kind": "js",
+   "en": "'Checkout P99 over 1 second, the line you set in the Alerts tab. Alert on symptoms fans feel (latency, errors), not on causes like CPU.'",
+   "zh": "'結帳 P99 超過 1 秒，也就是你在「告警」分頁設定的那條線。針對歌迷感受得到的症狀（延遲、錯誤）設告警，而不是 CPU 這類原因。'"
+  },
+  {
+   "kind": "js",
+   "en": "'For 5 minutes'",
+   "zh": "'持續 5 分鐘'"
+  },
+  {
+   "kind": "js",
+   "en": "'A brief spike won\\'t page anyone. It has to stay above the line.'",
+   "zh": "'短暫的尖峰不會呼叫任何人。必須一直維持在門檻之上。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Fans say one specific concert page is slow, but the overall P99 dashboard looks normal. What\\'s the best next step?'",
+   "zh": "'歌迷說某一個特定的演唱會頁面很慢，但整體的 P99 儀表板看起來很正常。最好的下一步是什麼？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Wait until the dashboard shows it'",
+   "zh": "'等儀表板顯示出來再說'"
+  },
+  {
+   "kind": "js",
+   "en": "'An averaged dashboard can hide a problem that affects one page.'",
+   "zh": "'平均過的儀表板可能會把只影響一個頁面的問題藏起來。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Find traces for that concert page and look at where the time goes'",
+   "zh": "'找出那個演唱會頁面的追蹤，看看時間花在哪裡'"
+  },
+  {
+   "kind": "js",
+   "en": "'This is the “new question” case: filter traces (or structured logs) by the page or concert id to see what\\'s different.'",
+   "zh": "'這就是「新問題」的情況：依頁面或演唱會 id 篩選追蹤（或結構化日誌），看看有什麼不一樣。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Add more CPU to every server'",
+   "zh": "'替每台伺服器加 CPU'"
+  },
+  {
+   "kind": "js",
+   "en": "'Nothing points to CPU yet. Find the slow part first.'",
+   "zh": "'目前沒有任何跡象指向 CPU。先找出慢的部分。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Dee\\'s alert pages on “CPU &gt; 70%”. It fires most nights and nothing is ever wrong. What should change?'",
+   "zh": "'Dee 的告警設在「CPU &gt; 70%」。它幾乎每晚都響，但從來沒出過問題。該怎麼改？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Lower it to 60% to be safe'",
+   "zh": "'保險起見，降到 60%'"
+  },
+  {
+   "kind": "js",
+   "en": "'That makes it noisier, and noisy alerts get ignored.'",
+   "zh": "'這只會讓它更吵，而吵雜的告警會被忽略。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Alert on user-facing symptoms like checkout P99 and error rate, and keep CPU on a dashboard'",
+   "zh": "'針對使用者感受得到的症狀設告警，例如結帳 P99 和錯誤率，CPU 則留在儀表板上'"
+  },
+  {
+   "kind": "js",
+   "en": "'Page people for things users feel. High CPU with happy users isn\\'t an emergency.'",
+   "zh": "'為使用者感受得到的事情呼叫人。CPU 高但使用者很開心，不是緊急狀況。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Delete all alerts'",
+   "zh": "'刪掉所有告警'"
+  },
+  {
+   "kind": "js",
+   "en": "'Then the next real problem waits for support tickets.'",
+   "zh": "'那下一個真正的問題就只能等客服工單了。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Why put a trace id in every log line?'",
+   "zh": "'為什麼要在每一行日誌裡放追蹤 id？'"
+  },
+  {
+   "kind": "js",
+   "en": "'It makes logs shorter'",
+   "zh": "'讓日誌變短'"
+  },
+  {
+   "kind": "js",
+   "en": "'It makes them slightly longer.'",
+   "zh": "'它會讓日誌稍微變長。'"
+  },
+  {
+   "kind": "js",
+   "en": "'So you can jump from a suspicious log line to the full trace of that request, and back'",
+   "zh": "'讓你能從一行可疑的日誌跳到那個請求的完整追蹤，再跳回來'"
+  },
+  {
+   "kind": "js",
+   "en": "'Linking the three kinds of telemetry by shared ids is what turns separate tools into observability.'",
+   "zh": "'用共用的 id 把三種遙測資料連起來，正是把各自獨立的工具變成可觀測性的關鍵。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Log storage requires it'",
+   "zh": "'日誌儲存系統要求這樣做'"
+  },
+  {
+   "kind": "js",
+   "en": "'Nothing requires it. It\\'s a choice that pays off during incidents.'",
+   "zh": "'沒有東西要求它。這是一個在事故時會得到回報的選擇。'"
+  }
+ ]
+}

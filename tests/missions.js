@@ -121,6 +121,12 @@ const FLOWS = {
     ['click', '#heal', 500],
     ['click', '#player button:nth-child(3)', 100], ['click', seg('modeSeg', 1), 100], ['click', '#cut', 4500],
   ],
+  observability: [
+    ['click', seg('epSeg', 1), 100], ['click', seg('epSeg', 3), 200],
+    ['click', seg('toolSeg', 2), 100], ['fill', ['#q', 'slow'], 200],
+    ['click', seg('toolSeg', 3), 100], ['click', '#trace button:nth-child(4)', 100], ['click', '#trace button:nth-child(5)', 200],
+    ['click', seg('toolSeg', 4), 100], ['fill', ['#thr', '300'], 100], ['fill', ['#thr', '1000'], 200],
+  ],
 };
 
 (async () => {
