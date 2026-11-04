@@ -1,0 +1,645 @@
+{
+ "page": "sharding",
+ "segments": [
+  {
+   "kind": "attr",
+   "en": "width=device-width, initial-scale=1, viewport-fit=cover",
+   "zh": "="
+  },
+  {
+   "kind": "attr",
+   "en": "Split Encore's orders across shards, add a shard and see how much data has to move, and find the hot shard.",
+   "zh": "把 Encore 的訂單分散到各個分片，加一個分片看看要搬多少資料，並找出熱點分片。"
+  },
+  {
+   "kind": "attr",
+   "en": "Sections",
+   "zh": "章節"
+  },
+  {
+   "kind": "attr",
+   "en": "Example partitioned table and shard routing code",
+   "zh": "分割資料表與分片路由程式碼範例"
+  },
+  {
+   "kind": "attr",
+   "en": "Pages",
+   "zh": "頁面"
+  },
+  {
+   "kind": "html",
+   "en": "Sharding and Partitioning · System Design Lab",
+   "zh": "分片與分割 · System Design Lab"
+  },
+  {
+   "kind": "html",
+   "en": "system<b>.design.lab</b>",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "Lab",
+   "zh": "實驗室"
+  },
+  {
+   "kind": "html",
+   "en": "The code",
+   "zh": "程式碼"
+  },
+  {
+   "kind": "html",
+   "en": "Recap",
+   "zh": "重點整理"
+  },
+  {
+   "kind": "html",
+   "en": "page 15 · stage 4 · keep data correct",
+   "zh": "第 15 頁 · 階段 4 · 保持資料正確"
+  },
+  {
+   "kind": "html",
+   "en": "Sharding, partitioning",
+   "zh": "分片、分割"
+  },
+  {
+   "kind": "html",
+   "en": "One database can't hold every order. <em>So which order goes where?</em>",
+   "zh": "一個資料庫裝不下所有訂單。<em>那每筆訂單要放哪裡？</em>"
+  },
+  {
+   "kind": "html",
+   "en": "<b>Encore</b>The orders table no longer fits on one machine, so Ana splits it across 4 database servers called <b>shards</b>. A rule decides which shard each order lives on. Pick the rule badly, and adding a 5th shard means moving almost everything, or one shard melts while the others sit idle.",
+   "zh": "<b>Encore</b>訂單資料表已經塞不進一台機器，所以 Ana 把它拆到 4 台資料庫伺服器上，這些伺服器叫做<b>分片（shard）</b>。由一條規則決定每筆訂單放在哪個分片。規則選得不好，加第 5 個分片就得把幾乎所有資料搬家，或是某個分片快燒掉、其他分片卻閒著。"
+  },
+  {
+   "kind": "html",
+   "en": "Open the lab ↓",
+   "zh": "打開實驗室 ↓"
+  },
+  {
+   "kind": "html",
+   "en": "lab · break it, then fix it",
+   "zh": "實驗室 · 先弄壞，再修好"
+  },
+  {
+   "kind": "html",
+   "en": "4 shards",
+   "zh": "4 個分片"
+  },
+  {
+   "kind": "html",
+   "en": "240 orders, 4 shards",
+   "zh": "240 筆訂單，4 個分片"
+  },
+  {
+   "kind": "html",
+   "en": "Each square is an order, colored by the shard it lives on. About 30% of orders are for the December reunion tour. Sizes are tiny on purpose; real tables have billions of rows.",
+   "zh": "每個方塊是一筆訂單，顏色代表它所在的分片。大約 30% 的訂單是 12 月重聚巡演的。規模刻意做得很小；真實的資料表有數十億列。"
+  },
+  {
+   "kind": "html",
+   "en": "Shard by",
+   "zh": "分片依據"
+  },
+  {
+   "kind": "html",
+   "en": "Shards",
+   "zh": "分片"
+  },
+  {
+   "kind": "html",
+   "en": "＋ Add a shard",
+   "zh": "＋ 加一個分片"
+  },
+  {
+   "kind": "html",
+   "en": "− Remove a shard",
+   "zh": "− 移除一個分片"
+  },
+  {
+   "kind": "html",
+   "en": "↺ Back to 4",
+   "zh": "↺ 回到 4 個"
+  },
+  {
+   "kind": "html",
+   "en": "Moved by the last change",
+   "zh": "上一次變更搬動的比例"
+  },
+  {
+   "kind": "html",
+   "en": "add or remove a shard",
+   "zh": "加入或移除一個分片"
+  },
+  {
+   "kind": "html",
+   "en": "Busiest shard",
+   "zh": "最忙的分片"
+  },
+  {
+   "kind": "html",
+   "en": "share of all orders",
+   "zh": "占所有訂單的比例"
+  },
+  {
+   "kind": "html",
+   "en": "Fair share",
+   "zh": "公平份額"
+  },
+  {
+   "kind": "html",
+   "en": "if perfectly balanced",
+   "zh": "完全平衡時"
+  },
+  {
+   "kind": "html",
+   "en": "Which shards does a query have to ask?",
+   "zh": "一條查詢需要問哪些分片？"
+  },
+  {
+   "kind": "html",
+   "en": "Try this",
+   "zh": "試試看"
+  },
+  {
+   "kind": "html",
+   "en": "Partitioning",
+   "zh": "分割（Partitioning）"
+  },
+  {
+   "kind": "html",
+   "en": "Splitting one big table into pieces by a rule, for example one piece per month. The pieces can all live in the same database; queries for one month only scan that piece.",
+   "zh": "依某條規則把一張大資料表拆成好幾塊，例如每個月一塊。這些分塊可以都放在同一個資料庫裡；查某個月的資料時只需要掃描那一塊。"
+  },
+  {
+   "kind": "html",
+   "en": "Sharding",
+   "zh": "分片（Sharding）"
+  },
+  {
+   "kind": "html",
+   "en": "Partitioning where the pieces live on <b>different machines</b>. Now you can grow past one server, but the app (or a proxy) must know which shard to ask, and queries across shards get expensive.",
+   "zh": "把分割出來的分塊放到<b>不同的機器</b>上。這樣就能突破單一伺服器的上限，但 App（或代理）必須知道要問哪個分片，跨分片的查詢也會變得很昂貴。"
+  },
+  {
+   "kind": "html",
+   "en": "The one difference",
+   "zh": "關鍵差別"
+  },
+  {
+   "kind": "html",
+   "en": "With <b>hash mod N</b>, changing N changes almost every answer, so adding one shard moves most of the data. <b>Consistent hashing</b> puts shards on a ring; a new shard only takes over the keys next to it, so only about 1 in N keys move.",
+   "zh": "用 <b>hash mod N</b> 時，N 一變，幾乎每個答案都跟著變，所以加一個分片就會搬動大部分資料。<b>一致性雜湊（consistent hashing）</b>把分片放在一個環上；新分片只會接手它旁邊的鍵，所以大約只有 N 分之一的鍵會搬動。"
+  },
+  {
+   "kind": "html",
+   "en": "act 2 · the real thing",
+   "zh": "第 2 幕 · 真實世界"
+  },
+  {
+   "kind": "html",
+   "en": "sql + code",
+   "zh": "SQL＋程式碼"
+  },
+  {
+   "kind": "html",
+   "en": "Partitioning inside one database, sharding across many",
+   "zh": "在一個資料庫內分割，跨多個資料庫分片"
+  },
+  {
+   "kind": "html",
+   "en": "<b>Hover or tap a line.</b>",
+   "zh": "<b>把滑鼠移到某一行上，或點一下。</b>"
+  },
+  {
+   "kind": "html",
+   "en": "👆 pick a line",
+   "zh": "👆 選一行"
+  },
+  {
+   "kind": "html",
+   "en": "Each highlighted line maps to the lab.",
+   "zh": "每一行反白後，都會對應到實驗室。"
+  },
+  {
+   "kind": "html",
+   "en": "recap · keep this",
+   "zh": "重點整理 · 帶走這些"
+  },
+  {
+   "kind": "html",
+   "en": "The whole page on one screen",
+   "zh": "整頁濃縮在一個畫面"
+  },
+  {
+   "kind": "html",
+   "en": "Split",
+   "zh": "拆分"
+  },
+  {
+   "kind": "html",
+   "en": "Break a big table into pieces by a key. Faster queries and easy cleanup (drop an old month), still one database.",
+   "zh": "依某個鍵把大資料表拆成好幾塊。查詢更快、清理更容易（直接丟掉舊的月份），而且仍然是一個資料庫。"
+  },
+  {
+   "kind": "html",
+   "en": "Spread",
+   "zh": "分散"
+  },
+  {
+   "kind": "html",
+   "en": "Put the pieces on different servers to grow past one machine. The <b>shard key</b> is the most important decision.",
+   "zh": "把分塊放到不同的伺服器上，突破單一機器的上限。<b>分片鍵（shard key）</b>是最重要的決定。"
+  },
+  {
+   "kind": "html",
+   "en": "Grow",
+   "zh": "成長"
+  },
+  {
+   "kind": "html",
+   "en": "Consistent hashing",
+   "zh": "一致性雜湊"
+  },
+  {
+   "kind": "html",
+   "en": "Adding or removing a shard moves only about 1/N of the data, instead of nearly all of it.",
+   "zh": "加入或移除一個分片時，只會搬動大約 N 分之一的資料，而不是幾乎全部。"
+  },
+  {
+   "kind": "html",
+   "en": "The tradeoff",
+   "zh": "取捨"
+  },
+  {
+   "kind": "html",
+   "en": "A good shard key spreads load evenly <i>and</i> matches your most common queries. Hashing spreads load but makes range queries ask every shard; ranges keep related data together but create hot spots. Sharding is hard to undo, so try indexes, caching and replicas (pages 2, 5, 14) first.",
+   "zh": "好的分片鍵要能平均分散負載，<i>並且</i>符合你最常用的查詢。雜湊能分散負載，但範圍查詢就得問每個分片；範圍能讓相關資料放在一起，卻會造成熱點。分片很難回頭，所以先試試索引、快取和副本（第 2、5、14 頁）。"
+  },
+  {
+   "kind": "html",
+   "en": "Check it",
+   "zh": "考考自己"
+  },
+  {
+   "kind": "js",
+   "en": "`shard-${s}-${v}`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "`<span><i style=\"background:var(${COLORS[s]});height:10px\"></i>shard ${s + 1}</span>`",
+   "zh": "`<span><i style=\"background:var(${COLORS[s]});height:10px\"></i>分片 ${s + 1}</span>`"
+  },
+  {
+   "kind": "js",
+   "en": "'<span>bright squares = moved by the last change</span>'",
+   "zh": "'<span>亮色方塊 = 上一次變更中被搬動的訂單</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "`<span>shard ${s + 1}</span><div class=\"bar\"><i style=\"width:${(k / N_KEYS) * 100}%;background:var(${COLORS[s]})\"></i></div><span class=\"num\">${Math.round((k / N_KEYS) * 100)}%</span>`",
+   "zh": "`<span>分片 ${s + 1}</span><div class=\"bar\"><i style=\"width:${(k / N_KEYS) * 100}%;background:var(${COLORS[s]})\"></i></div><span class=\"num\">${Math.round((k / N_KEYS) * 100)}%</span>`"
+  },
+  {
+   "kind": "js",
+   "en": "`${n} shards`",
+   "zh": "`${n} 個分片`"
+  },
+  {
+   "kind": "js",
+   "en": "`of orders changed shard (${lastChange.from} → ${lastChange.to})`",
+   "zh": "`的訂單換了分片（${lastChange.from} → ${lastChange.to}）`"
+  },
+  {
+   "kind": "js",
+   "en": "'add or remove a shard'",
+   "zh": "'加入或移除一個分片'"
+  },
+  {
+   "kind": "js",
+   "en": "`✕ Hot shard: one shard holds ${Math.round(hot * 100)}% of the orders and takes that share of the traffic, because December is the busiest month. Adding shards barely helps.`",
+   "zh": "`✕ 熱點分片：一個分片持有 ${Math.round(hot * 100)}% 的訂單，也承受同樣比例的流量，因為 12 月是最忙的月份。再加分片也幾乎沒幫助。`"
+  },
+  {
+   "kind": "js",
+   "en": "`✕ Changing from ${lastChange.from} to ${lastChange.to} shards moved ${Math.round(lastChange.pct * 100)}% of all orders. On a real system that means copying most of the database while it's serving traffic.`",
+   "zh": "`✕ 從 ${lastChange.from} 個分片變成 ${lastChange.to} 個，搬動了 ${Math.round(lastChange.pct * 100)}% 的訂單。在真實系統上，這代表要在服務流量的同時複製大部分的資料庫。`"
+  },
+  {
+   "kind": "js",
+   "en": "`✓ Only ${Math.round(lastChange.pct * 100)}% of orders moved: just the ones whose spot on the ring changed owner.`",
+   "zh": "`✓ 只有 ${Math.round(lastChange.pct * 100)}% 的訂單搬動了：就是環上那些換了主人的位置。`"
+  },
+  {
+   "kind": "js",
+   "en": "'✓ Orders are spread evenly across the shards.'",
+   "zh": "'✓ 訂單平均分散在各個分片上。'"
+  },
+  {
+   "kind": "js",
+   "en": "'✓ “My orders” for one fan: 1 shard, because orders are placed by fan id.'",
+   "zh": "'✓ 一位歌迷的「我的訂單」：1 個分片，因為訂單是依歌迷 id 放置的。'"
+  },
+  {
+   "kind": "js",
+   "en": "`⚠ “My orders” for one fan: all ${n} shards, because orders are placed by month and one fan buys in many months.`",
+   "zh": "`⚠ 一位歌迷的「我的訂單」：全部 ${n} 個分片，因為訂單是依月份放置的，而一位歌迷會在很多個月份買票。`"
+  },
+  {
+   "kind": "js",
+   "en": "'✓ “All December orders”: 1 shard, because the months are kept together.'",
+   "zh": "'✓「所有 12 月的訂單」：1 個分片，因為同一個月份的資料放在一起。'"
+  },
+  {
+   "kind": "js",
+   "en": "`⚠ “All December orders”: all ${n} shards (scatter-gather), because fan-id hashing scatters December everywhere.`",
+   "zh": "`⚠「所有 12 月的訂單」：全部 ${n} 個分片（scatter-gather），因為依歌迷 id 雜湊會把 12 月的訂單散布到各處。`"
+  },
+  {
+   "kind": "js",
+   "en": "'With <b>Hash mod N</b>, press <b>Add a shard</b>.'",
+   "zh": "'在<b>雜湊取餘數（mod N）</b>的設定下，按<b>加一個分片</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Going from 4 to 5 changes the answer of hash % N for most orders. About 80% of the data moves.'",
+   "zh": "'從 4 變成 5，大部分訂單的 hash % N 結果都會改變。大約 80% 的資料要搬家。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Go <b>Back to 4</b>, switch to <b>Consistent hashing</b>, and add a shard.'",
+   "zh": "'按<b>回到 4 個</b>，切換成<b>一致性雜湊</b>，再加一個分片。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The new shard takes a slice of the ring from its neighbors. Only about 1/5 of the orders move.'",
+   "zh": "'新分片從鄰居那裡分走環上的一段。只有大約 1/5 的訂單搬動。'"
+  },
+  {
+   "kind": "js",
+   "en": "'With consistent hashing, <b>remove a shard</b>.'",
+   "zh": "'在一致性雜湊的設定下，<b>移除一個分片</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Only the removed shard\\'s orders move, to their neighbors on the ring. Everything else stays put.'",
+   "zh": "'只有被移除分片上的訂單會搬到它在環上的鄰居，其他全部不動。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Switch to <b>Concert month</b>.'",
+   "zh": "'切換成<b>演唱會月份</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Ranges keep each month together, which is great for month queries. But December lands on one shard, which gets 30%+ of all the traffic.'",
+   "zh": "'範圍分片讓每個月份的資料放在一起，對月份查詢很好。但 12 月全部落在同一個分片上，它承受了 30% 以上的流量。'"
+  },
+  {
+   "kind": "js",
+   "en": "'“My orders” for one fan'",
+   "zh": "'一位歌迷的「我的訂單」'"
+  },
+  {
+   "kind": "js",
+   "en": "'“All December orders”'",
+   "zh": "'「所有 12 月的訂單」'"
+  },
+  {
+   "kind": "js",
+   "en": "'Hash of fan id (mod N)'",
+   "zh": "'歌迷 id 雜湊（mod N）'"
+  },
+  {
+   "kind": "js",
+   "en": "'Consistent hashing (fan id)'",
+   "zh": "'一致性雜湊（歌迷 id）'"
+  },
+  {
+   "kind": "js",
+   "en": "'Concert month (ranges)'",
+   "zh": "'演唱會月份（範圍）'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\">-- partitioning: one table, split by month, one database</span>'",
+   "zh": "'<span class=\"c\">-- 分割：一張資料表依月份拆分，仍在同一個資料庫</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">CREATE TABLE</span> orders (id bigint, fan_id bigint, concert_month date, …)'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  <span class=\"key\">PARTITION BY RANGE</span> (concert_month);'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">CREATE TABLE</span> orders_2026_12 <span class=\"key\">PARTITION OF</span> orders'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  <span class=\"key\">FOR VALUES FROM</span> (<span class=\"s\">\\'2026-12-01\\'</span>) <span class=\"key\">TO</span> (<span class=\"s\">\\'2027-01-01\\'</span>);'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\">// sharding: the app picks the database server</span>'",
+   "zh": "'<span class=\"c\">// 分片：由 App 選擇要連哪一台資料庫伺服器</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">const</span> ring = <span class=\"key\">new</span> HashRing([<span class=\"s\">\"db-a\"</span>, <span class=\"s\">\"db-b\"</span>, <span class=\"s\">\"db-c\"</span>, <span class=\"s\">\"db-d\"</span>]);'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">const</span> shard = ring.get(String(fanId));'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">await</span> pools[shard].query(<span class=\"s\">\"SELECT * FROM orders WHERE fan_id = $1\"</span>, [fanId]);'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\">// a query without the shard key has to ask everyone</span>'",
+   "zh": "'<span class=\"c\">// 沒有分片鍵的查詢，只能問每一個分片</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">const</span> all = <span class=\"key\">await</span> Promise.all(shards.map(s =&gt; s.query(<span class=\"s\">\"… WHERE month = 12\"</span>)));'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Partitioned table'",
+   "zh": "'分割資料表'"
+  },
+  {
+   "kind": "js",
+   "en": "'Postgres splits the table into pieces by month but still treats it as one table. Queries with a month filter only read the matching piece.'",
+   "zh": "'Postgres 依月份把資料表拆成好幾塊，但仍把它當成一張表。有月份條件的查詢只會讀取符合的那一塊。'"
+  },
+  {
+   "kind": "js",
+   "en": "'One piece'",
+   "zh": "'一個分塊'"
+  },
+  {
+   "kind": "js",
+   "en": "'Each partition is a real table. Dropping an old month is instant, which is much cheaper than <code>DELETE</code>-ing millions of rows.'",
+   "zh": "'每個分割區都是一張真的資料表。丟掉一個舊月份是瞬間完成的，比 <code>DELETE</code> 數百萬列便宜得多。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Consistent hashing ring'",
+   "zh": "'一致性雜湊環'"
+  },
+  {
+   "kind": "js",
+   "en": "'Each server owns many points on a ring (virtual nodes). Adding “db-e” only takes keys from its neighbors. That\\'s the lab\\'s 20% instead of 80%.'",
+   "zh": "'每台伺服器在環上擁有許多個點（虛擬節點）。加入「db-e」只會從它的鄰居那裡拿走鍵。這就是實驗室裡的 20% 而不是 80%。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Shard key'",
+   "zh": "'分片鍵'"
+  },
+  {
+   "kind": "js",
+   "en": "'Here, fan id: all of one fan\\'s orders live together, so “My orders” hits one server.'",
+   "zh": "'這裡是歌迷 id：同一位歌迷的所有訂單放在一起，所以「我的訂單」只會打到一台伺服器。'"
+  },
+  {
+   "kind": "js",
+   "en": "'One shard, one query'",
+   "zh": "'一個分片，一次查詢'"
+  },
+  {
+   "kind": "js",
+   "en": "'A query that includes the shard key goes to exactly one server. Make your most common queries look like this.'",
+   "zh": "'包含分片鍵的查詢只會送到剛好一台伺服器。讓你最常用的查詢都長這樣。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Scatter-gather'",
+   "zh": "'Scatter-gather'"
+  },
+  {
+   "kind": "js",
+   "en": "'Without the shard key, ask every shard and merge the results. Slow, and it gets slower as you add shards. That\\'s the “all shards” case in the lab.'",
+   "zh": "'沒有分片鍵時，就要問每個分片再合併結果。很慢，而且分片越多越慢。這就是實驗室裡「全部分片」的情況。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Encore shards orders with <code>hash(fan_id) % 4</code>. Ben wants to add a 5th shard during the busy season. What should worry him?'",
+   "zh": "'Encore 用 <code>hash(fan_id) % 4</code> 替訂單分片。Ben 想在旺季加第 5 個分片。他該擔心什麼？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Nothing: only the new shard\\'s data moves'",
+   "zh": "'沒什麼：只有新分片的資料會搬動'"
+  },
+  {
+   "kind": "js",
+   "en": "'With mod N, the result changes for most keys when N changes.'",
+   "zh": "'用 mod N 時，N 一改變，大部分鍵的結果都會跟著改變。'"
+  },
+  {
+   "kind": "js",
+   "en": "'About 80% of all orders will need to move between servers'",
+   "zh": "'大約 80% 的訂單需要在伺服器之間搬家'"
+  },
+  {
+   "kind": "js",
+   "en": "'That\\'s a huge migration under load. Consistent hashing (or pre-splitting into many small shards) avoids it.'",
+   "zh": "'這是在負載下進行的大型遷移。一致性雜湊（或預先切成很多小分片）可以避免它。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The new shard will be empty forever'",
+   "zh": "'新分片會永遠是空的'"
+  },
+  {
+   "kind": "js",
+   "en": "'It gets its share, but by reshuffling almost everyone else\\'s data too.'",
+   "zh": "'它會分到自己的份，只是代價是把幾乎所有人的資料也重新洗牌一遍。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Orders are sharded by concert date. During the reunion tour on-sale, one database is at 100% CPU and the rest are idle. Why?'",
+   "zh": "'訂單依演唱會日期分片。重聚巡演開賣時，一台資料庫 CPU 到 100%，其他都閒著。為什麼？'"
+  },
+  {
+   "kind": "js",
+   "en": "'The busy server is broken'",
+   "zh": "'那台忙碌的伺服器壞了'"
+  },
+  {
+   "kind": "js",
+   "en": "'It\\'s working fine. It just owns all the hot data.'",
+   "zh": "'它運作得很好，只是擁有了所有熱門資料。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Range sharding put every reunion-tour order on the same shard: a hot shard'",
+   "zh": "'範圍分片把所有重聚巡演的訂單都放在同一個分片：熱點分片'"
+  },
+  {
+   "kind": "js",
+   "en": "'Pick a key that spreads the busiest traffic, like fan id or order id hashed, and keep date ranges for partitioning within a shard.'",
+   "zh": "'選一個能分散最忙流量的鍵，例如雜湊後的歌迷 id 或訂單 id，日期範圍則留給分片內部的分割使用。'"
+  },
+  {
+   "kind": "js",
+   "en": "'There are too few shards'",
+   "zh": "'分片太少了'"
+  },
+  {
+   "kind": "js",
+   "en": "'More shards wouldn\\'t split December, which still lands in one range.'",
+   "zh": "'再多分片也拆不開 12 月，它仍然落在同一個範圍裡。'"
+  },
+  {
+   "kind": "js",
+   "en": "'What\\'s the difference between partitioning and sharding?'",
+   "zh": "'分割和分片有什麼不同？'"
+  },
+  {
+   "kind": "js",
+   "en": "'They\\'re different words for the same thing'",
+   "zh": "'它們是同一件事的不同說法'"
+  },
+  {
+   "kind": "js",
+   "en": "'They\\'re related, but there\\'s a key difference.'",
+   "zh": "'它們有關係，但有一個關鍵差別。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Partitioning splits a table into pieces; sharding puts those pieces on different machines'",
+   "zh": "'分割是把資料表拆成好幾塊；分片是把這些分塊放到不同的機器上'"
+  },
+  {
+   "kind": "js",
+   "en": "'You can partition inside one database. Sharding adds the distributed part: routing, cross-shard queries, rebalancing.'",
+   "zh": "'你可以在一個資料庫內分割。分片多了分散式的部分：路由、跨分片查詢、重新平衡。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Sharding is for reads and partitioning is for writes'",
+   "zh": "'分片是給讀取用的，分割是給寫入用的'"
+  },
+  {
+   "kind": "js",
+   "en": "'Both affect reads and writes. The difference is one machine vs many.'",
+   "zh": "'兩者都會影響讀取和寫入。差別在於一台機器還是多台。'"
+  }
+ ]
+}

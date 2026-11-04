@@ -108,6 +108,13 @@ const FLOWS = {
     ['click', seg('foSeg', 2), 100], ['click', '#kill', 4500],
     ['click', seg('syncSeg', 2), 100], ['click', '#kill', 4500],
   ],
+  sharding: [
+    ['click', '#add', 300],
+    ['click', '#reset', 100], ['click', seg('keySeg', 2), 100], ['click', '#add', 300],
+    ['click', '#rem', 300],
+    ['click', seg('keySeg', 3), 300],
+    ['click', seg('qSeg', 2), 200],
+  ],
 };
 
 (async () => {

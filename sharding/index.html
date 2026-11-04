@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Split Encore's orders across shards, add a shard and see how much data has to move, and find the hot shard.">
+<title>Sharding and Partitioning · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/explainer.css">
+</head>
+<body>
+<!-- Plan. Stuck point: "just split the data" — people miss that the shard key decides balance, which queries are cheap, and how much moves when you grow.
+     Lab: 240 orders, 4 shards. Shard by hash mod N / consistent hashing / concert month. Add/remove shards; moved %, per-shard load, query fan-out.
+     One difference: mod N moves almost everything, consistent hashing moves ~1/N. -->
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="Sections"><a href="#lab">Lab</a><a href="#real">The code</a><a href="#recap">Recap</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>page 15 · stage 4 · keep data correct</span><span class="hot">30 · 31</span></div>
+  <div class="eyebrow">Sharding, partitioning</div>
+  <h1>One database can't hold every order. <em>So which order goes where?</em></h1>
+  <div class="scenario"><b>Encore</b>The orders table no longer fits on one machine, so Ana splits it across 4 database servers called <b>shards</b>. A rule decides which shard each order lives on. Pick the rule badly, and adding a 5th shard means moving almost everything, or one shard melts while the others sit idle.</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">Open the lab ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>lab · break it, then fix it</span><span class="hot" id="tag">4 shards</span></div>
+  <h2>240 orders, 4 shards</h2>
+  <p>Each square is an order, colored by the shard it lives on. About 30% of orders are for the December reunion tour. Sizes are tiny on purpose; real tables have billions of rows.</p>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">Shard by</span><div id="keySeg"></div></div>
+      <div class="ctl"><span class="lab-k">Shards</span>
+        <div class="presets"><button class="btn sm" id="add" type="button">＋ Add a shard</button><button class="btn sm" id="rem" type="button">− Remove a shard</button><button class="btn sm" id="reset" type="button">↺ Back to 4</button></div></div>
+    </div>
+    <div class="cells" id="grid" style="--cols:24" aria-hidden="true"></div>
+    <div class="legend" id="legend"></div>
+    <div class="meters" style="margin:0">
+      <div class="meter"><div class="k">Moved by the last change</div><div class="v" id="mMoved">–</div><div class="d" id="mMovedD">add or remove a shard</div></div>
+      <div class="meter"><div class="k">Busiest shard</div><div class="v" id="mHot">–</div><div class="d">share of all orders</div></div>
+      <div class="meter"><div class="k">Fair share</div><div class="v" id="mFair">25%</div><div class="d">if perfectly balanced</div></div>
+    </div>
+    <div class="bars" id="bars" style="max-width:640px"></div>
+    <div class="ctl"><span class="lab-k">Which shards does a query have to ask?</span><div id="qSeg"></div></div>
+    <div class="status" id="qTxt" role="status"></div>
+    <div class="status" id="status" role="status"></div>
+  </div>
+  <h3>Try this</h3>
+  <ol class="missions" id="missions"></ol>
+  <div class="compare">
+    <div><h3>Partitioning</h3><p style="margin:0">Splitting one big table into pieces by a rule, for example one piece per month. The pieces can all live in the same database; queries for one month only scan that piece.</p></div>
+    <div><h3>Sharding</h3><p style="margin:0">Partitioning where the pieces live on <b>different machines</b>. Now you can grow past one server, but the app (or a proxy) must know which shard to ask, and queries across shards get expensive.</p></div>
+  </div>
+  <div class="takeaway"><div class="t">The one difference</div><p>With <b>hash mod N</b>, changing N changes almost every answer, so adding one shard moves most of the data. <b>Consistent hashing</b> puts shards on a ring; a new shard only takes over the keys next to it, so only about 1 in N keys move.</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>act 2 · the real thing</span><span class="hot">sql + code</span></div>
+  <h2>Partitioning inside one database, sharding across many</h2>
+  <p><b>Hover or tap a line.</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="Example partitioned table and shard routing code"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 pick a line</div><p id="exP">Each highlighted line maps to the lab.</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>recap · keep this</span><span class="hot">♥</span></div>
+  <h2>The whole page on one screen</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">Split</div><div class="t">Partitioning</div><p>Break a big table into pieces by a key. Faster queries and easy cleanup (drop an old month), still one database.</p></div>
+    <div class="card"><div class="sub">Spread</div><div class="t">Sharding</div><p>Put the pieces on different servers to grow past one machine. The <b>shard key</b> is the most important decision.</p></div>
+    <div class="card"><div class="sub">Grow</div><div class="t">Consistent hashing</div><p>Adding or removing a shard moves only about 1/N of the data, instead of nearly all of it.</p></div>
+  </div>
+  <div class="takeaway"><div class="t">The tradeoff</div><p>A good shard key spreads load evenly <i>and</i> matches your most common queries. Hashing spreads load but makes range queries ask every shard; ranges keep related data together but create hot spots. Sharding is hard to undo, so try indexes, caching and replicas (pages 2, 5, 14) first.</p></div>
+  <h3 style="margin-top:26px">Check it <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="Pages"></nav>
+</main>
+
+<script src="../assets/explainer.js"></script>
+<script>
+(() => {
+const { $, el } = X;
+const COLORS = ['--accent', '--ok', '--wait', '--bad', '--accent-2', '--muted'];
+const N_KEYS = 240, VNODES = 40, MAX = 6, MIN = 2;
+
+/* ---------- data + placement rules (pure) ---------- */
+const hash = x => { let h = Math.imul(x ^ 0x9e3779b9, 0x85ebca6b); h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 16; return h >>> 0; };
+const strHash = s => { let h = 2166136261; for (const c of s) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return hash(h); };
+const ORDERS = Array.from({ length: N_KEYS }, (_, i) => {
+  const r = hash(i + 7) % 100;
+  return { fan: 1000 + i, month: r < 30 ? 11 : r % 11 }; // ~30% December (11), the rest spread over Jan–Nov
+});
+function ring(n) {
+  const pts = [];
+  for (let s = 0; s < n; s++) for (let v = 0; v < VNODES; v++) pts.push([strHash(`shard-${s}-${v}`), s]);
+  return pts.sort((a, b) => a[0] - b[0]);
+}
+function place(rule, n) {
+  if (rule === 0) return ORDERS.map(o => hash(o.fan) % n);
+  if (rule === 1) { const r = ring(n); return ORDERS.map(o => { const h = hash(o.fan); const p = r.find(x => x[0] >= h) || r[0]; return p[1]; }); }
+  return ORDERS.map(o => Math.min(n - 1, Math.floor((o.month * n) / 12))); // months split into N contiguous ranges
+}
+
+/* ---------- UI ---------- */
+let rule = 0, n = 4, cur = place(rule, n), moved = null, lastChange = null;
+const runs = [];
+const grid = $('#grid');
+ORDERS.forEach(() => grid.append(el('div', 'cell')));
+const cells = [...grid.children];
+function change(newN) {
+  if (newN < MIN || newN > MAX) return;
+  const next = place(rule, newN);
+  moved = next.map((s, i) => s !== cur[i]);
+  lastChange = { rule, from: n, to: newN, pct: moved.filter(Boolean).length / N_KEYS };
+  runs.push(lastChange);
+  n = newN; cur = next; render();
+}
+function render() {
+  const counts = Array(n).fill(0); cur.forEach(s => counts[s]++);
+  cells.forEach((c, i) => {
+    c.style.background = `var(${COLORS[cur[i]]})`; c.style.borderColor = `var(${COLORS[cur[i]]})`;
+    c.classList.toggle('dim', !!moved && !moved[i]);
+  });
+  $('#legend').innerHTML = counts.map((k, s) => `<span><i style="background:var(${COLORS[s]});height:10px"></i>shard ${s + 1}</span>`).join('') + (moved ? '<span>bright squares = moved by the last change</span>' : '');
+  $('#bars').innerHTML = counts.map((k, s) => `<span>shard ${s + 1}</span><div class="bar"><i style="width:${(k / N_KEYS) * 100}%;background:var(${COLORS[s]})"></i></div><span class="num">${Math.round((k / N_KEYS) * 100)}%</span>`).join('');
+  const hot = Math.max(...counts) / N_KEYS;
+  $('#tag').textContent = `${n} shards`;
+  $('#mMoved').textContent = lastChange ? Math.round(lastChange.pct * 100) + '%' : '–';
+  $('#mMovedD').textContent = lastChange ? `of orders changed shard (${lastChange.from} → ${lastChange.to})` : 'add or remove a shard';
+  $('#mMoved').parentElement.className = 'meter' + (!lastChange ? '' : lastChange.pct > 0.5 ? ' bad' : ' ok');
+  $('#mHot').textContent = Math.round(hot * 100) + '%';
+  $('#mHot').parentElement.className = 'meter' + (hot > 1.6 / n ? ' bad' : hot > 1.25 / n ? ' wait' : ' ok');
+  $('#mFair').textContent = Math.round(100 / n) + '%';
+  $('#add').disabled = n >= MAX; $('#rem').disabled = n <= MIN;
+  const st = $('#status');
+  if (hot > 1.6 / n) { st.className = 'status bad'; st.textContent = `✕ Hot shard: one shard holds ${Math.round(hot * 100)}% of the orders and takes that share of the traffic, because December is the busiest month. Adding shards barely helps.`; }
+  else if (lastChange && lastChange.pct > 0.5) { st.className = 'status bad'; st.textContent = `✕ Changing from ${lastChange.from} to ${lastChange.to} shards moved ${Math.round(lastChange.pct * 100)}% of all orders. On a real system that means copying most of the database while it's serving traffic.`; }
+  else if (lastChange) { st.className = 'status ok'; st.textContent = `✓ Only ${Math.round(lastChange.pct * 100)}% of orders moved: just the ones whose spot on the ring changed owner.`; }
+  else { st.className = 'status ok'; st.textContent = '✓ Orders are spread evenly across the shards.'; }
+  drawQuery(); mis.update({ runs, rule, hot, n });
+}
+function drawQuery() {
+  const q = qSeg ? qSeg.value : 0;
+  const touched = q === 0 ? (rule === 2 ? n : 1) : (rule === 2 ? 1 : n);
+  const t = $('#qTxt');
+  t.className = 'status ' + (touched > 1 ? 'wait' : 'ok');
+  t.textContent = q === 0
+    ? (touched === 1 ? '✓ “My orders” for one fan: 1 shard, because orders are placed by fan id.' : `⚠ “My orders” for one fan: all ${n} shards, because orders are placed by month and one fan buys in many months.`)
+    : (touched === 1 ? '✓ “All December orders”: 1 shard, because the months are kept together.' : `⚠ “All December orders”: all ${n} shards (scatter-gather), because fan-id hashing scatters December everywhere.`);
+}
+const mis = X.missions($('#missions'), [
+  { text: 'With <b>Hash mod N</b>, press <b>Add a shard</b>.', hint: 'Going from 4 to 5 changes the answer of hash % N for most orders. About 80% of the data moves.', check: s => s.runs.some(r => r.rule === 0 && r.to > r.from && r.pct > 0.6) },
+  { text: 'Go <b>Back to 4</b>, switch to <b>Consistent hashing</b>, and add a shard.', hint: 'The new shard takes a slice of the ring from its neighbors. Only about 1/5 of the orders move.', check: s => s.runs.some(r => r.rule === 1 && r.to > r.from && r.pct < 0.35) },
+  { text: 'With consistent hashing, <b>remove a shard</b>.', hint: 'Only the removed shard\'s orders move, to their neighbors on the ring. Everything else stays put.', check: s => s.runs.some(r => r.rule === 1 && r.to < r.from && r.pct < 0.4) },
+  { text: 'Switch to <b>Concert month</b>.', hint: 'Ranges keep each month together, which is great for month queries. But December lands on one shard, which gets 30%+ of all the traffic.', check: s => s.rule === 2 && s.hot > 1.6 / s.n },
+]);
+const qSeg = X.seg($('#qSeg'), ['“My orders” for one fan', '“All December orders”'], () => drawQuery(), 0);
+X.seg($('#keySeg'), ['Hash of fan id (mod N)', 'Consistent hashing (fan id)', 'Concert month (ranges)'], i => { rule = i; cur = place(rule, n); moved = null; lastChange = null; render(); }, 0);
+$('#add').addEventListener('click', () => change(n + 1));
+$('#rem').addEventListener('click', () => change(n - 1));
+$('#reset').addEventListener('click', () => { n = 4; cur = place(rule, n); moved = null; lastChange = null; render(); });
+render();
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="c">-- partitioning: one table, split by month, one database</span>', null],
+  ['<span class="key">CREATE TABLE</span> orders (id bigint, fan_id bigint, concert_month date, …)', 'part'],
+  ['  <span class="key">PARTITION BY RANGE</span> (concert_month);', 'part'],
+  ['<span class="key">CREATE TABLE</span> orders_2026_12 <span class="key">PARTITION OF</span> orders', 'piece'],
+  ['  <span class="key">FOR VALUES FROM</span> (<span class="s">\'2026-12-01\'</span>) <span class="key">TO</span> (<span class="s">\'2027-01-01\'</span>);', 'piece'],
+  ['', null],
+  ['<span class="c">// sharding: the app picks the database server</span>', null],
+  ['<span class="key">const</span> ring = <span class="key">new</span> HashRing([<span class="s">"db-a"</span>, <span class="s">"db-b"</span>, <span class="s">"db-c"</span>, <span class="s">"db-d"</span>]);', 'ring'],
+  ['<span class="key">const</span> shard = ring.get(String(fanId));', 'key'],
+  ['<span class="key">await</span> pools[shard].query(<span class="s">"SELECT * FROM orders WHERE fan_id = $1"</span>, [fanId]);', 'one'],
+  ['', null],
+  ['<span class="c">// a query without the shard key has to ask everyone</span>', null],
+  ['<span class="key">const</span> all = <span class="key">await</span> Promise.all(shards.map(s =&gt; s.query(<span class="s">"… WHERE month = 12"</span>)));', 'scatter'],
+], {
+  part: ['Partitioned table', 'Postgres splits the table into pieces by month but still treats it as one table. Queries with a month filter only read the matching piece.'],
+  piece: ['One piece', 'Each partition is a real table. Dropping an old month is instant, which is much cheaper than <code>DELETE</code>-ing millions of rows.'],
+  ring: ['Consistent hashing ring', 'Each server owns many points on a ring (virtual nodes). Adding “db-e” only takes keys from its neighbors. That\'s the lab\'s 20% instead of 80%.'],
+  key: ['Shard key', 'Here, fan id: all of one fan\'s orders live together, so “My orders” hits one server.'],
+  one: ['One shard, one query', 'A query that includes the shard key goes to exactly one server. Make your most common queries look like this.'],
+  scatter: ['Scatter-gather', 'Without the shard key, ask every shard and merge the results. Slow, and it gets slower as you add shards. That\'s the “all shards” case in the lab.'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: 'Encore shards orders with <code>hash(fan_id) % 4</code>. Ben wants to add a 5th shard during the busy season. What should worry him?', opts: [
+    ['Nothing: only the new shard\'s data moves', false, 'With mod N, the result changes for most keys when N changes.'],
+    ['About 80% of all orders will need to move between servers', true, 'That\'s a huge migration under load. Consistent hashing (or pre-splitting into many small shards) avoids it.'],
+    ['The new shard will be empty forever', false, 'It gets its share, but by reshuffling almost everyone else\'s data too.'],
+  ] },
+  { q: 'Orders are sharded by concert date. During the reunion tour on-sale, one database is at 100% CPU and the rest are idle. Why?', opts: [
+    ['The busy server is broken', false, 'It\'s working fine. It just owns all the hot data.'],
+    ['Range sharding put every reunion-tour order on the same shard: a hot shard', true, 'Pick a key that spreads the busiest traffic, like fan id or order id hashed, and keep date ranges for partitioning within a shard.'],
+    ['There are too few shards', false, 'More shards wouldn\'t split December, which still lands in one range.'],
+  ] },
+  { q: 'What\'s the difference between partitioning and sharding?', opts: [
+    ['They\'re different words for the same thing', false, 'They\'re related, but there\'s a key difference.'],
+    ['Partitioning splits a table into pieces; sharding puts those pieces on different machines', true, 'You can partition inside one database. Sharding adds the distributed part: routing, cross-shard queries, rebalancing.'],
+    ['Sharding is for reads and partitioning is for writes', false, 'Both affect reads and writes. The difference is one machine vs many.'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'sharding');
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-Hans-CN" data-lang="zh-cn" data-slug="sharding">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="把 Encore 的订单分散到各个分片，加一个分片看看要搬多少数据，并找出热点分片。">
+<title>分片与分割 · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/explainer.css">
+</head>
+<body>
+<!-- Plan. Stuck point: "just split the data" — people miss that the shard key decides balance, which queries are cheap, and how much moves when you grow.
+     Lab: 240 orders, 4 shards. Shard by hash mod N / consistent hashing / concert month. Add/remove shards; moved %, per-shard load, query fan-out.
+     One difference: mod N moves almost everything, consistent hashing moves ~1/N. -->
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="章节"><a href="#lab">实验室</a><a href="#real">代码</a><a href="#recap">重点整理</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>第 15 页 · 阶段 4 · 保持数据正确</span><span class="hot">30 · 31</span></div>
+  <div class="eyebrow">分片、分割</div>
+  <h1>一个数据库装不下所有订单。<em>那每笔订单要放哪里？</em></h1>
+  <div class="scenario"><b>Encore</b>订单数据表已经塞不进一台机器，所以 Ana 把它拆到 4 台数据库服务器上，这些服务器叫做<b>分片（shard）</b>。由一条规则决定每笔订单放在哪个分片。规则选得不好，加第 5 个分片就得把几乎所有数据搬家，或是某个分片快烧掉、其他分片却闲着。</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">打开实验室 ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>实验室 · 先弄坏，再修好</span><span class="hot" id="tag">4 个分片</span></div>
+  <h2>240 笔订单，4 个分片</h2>
+  <p>每个方块是一笔订单，颜色代表它所在的分片。大约 30% 的订单是 12 月重聚巡演的。规模刻意做得很小；真实的数据表有数十亿列。</p>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">分片依据</span><div id="keySeg"></div></div>
+      <div class="ctl"><span class="lab-k">分片</span>
+        <div class="presets"><button class="btn sm" id="add" type="button">＋ 加一个分片</button><button class="btn sm" id="rem" type="button">− 移除一个分片</button><button class="btn sm" id="reset" type="button">↺ 回到 4 个</button></div></div>
+    </div>
+    <div class="cells" id="grid" style="--cols:24" aria-hidden="true"></div>
+    <div class="legend" id="legend"></div>
+    <div class="meters" style="margin:0">
+      <div class="meter"><div class="k">上一次变更搬动的比例</div><div class="v" id="mMoved">–</div><div class="d" id="mMovedD">加入或移除一个分片</div></div>
+      <div class="meter"><div class="k">最忙的分片</div><div class="v" id="mHot">–</div><div class="d">占所有订单的比例</div></div>
+      <div class="meter"><div class="k">公平份额</div><div class="v" id="mFair">25%</div><div class="d">完全平衡时</div></div>
+    </div>
+    <div class="bars" id="bars" style="max-width:640px"></div>
+    <div class="ctl"><span class="lab-k">一条查找需要问哪些分片？</span><div id="qSeg"></div></div>
+    <div class="status" id="qTxt" role="status"></div>
+    <div class="status" id="status" role="status"></div>
+  </div>
+  <h3>试试看</h3>
+  <ol class="missions" id="missions"></ol>
+  <div class="compare">
+    <div><h3>分割（Partitioning）</h3><p style="margin:0">依某条规则把一张大数据表拆成好几块，例如每个月一块。这些分块可以都放在同一个数据库里；查某个月的数据时只需要扫描那一块。</p></div>
+    <div><h3>分片（Sharding）</h3><p style="margin:0">把分割出来的分块放到<b>不同的机器</b>上。这样就能突破单一服务器的上限，但 App（或代理）必须知道要问哪个分片，跨分片的查找也会变得很昂贵。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">关键差别</div><p>用 <b>hash mod N</b> 时，N 一变，几乎每个答案都跟着变，所以加一个分片就会搬动大部分数据。<b>一致性哈希（consistent hashing）</b>把分片放在一个环上；新分片只会接手它旁边的键，所以大约只有 N 分之一的键会搬动。</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>第 2 幕 · 真实世界</span><span class="hot">SQL＋代码</span></div>
+  <h2>在一个数据库内分割，跨多个数据库分片</h2>
+  <p><b>把鼠标移到某一行上，或点一下。</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="分割数据表与分片路由代码范例"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 选一行</div><p id="exP">每一行反白后，都会对应到实验室。</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>重点整理 · 带走这些</span><span class="hot">♥</span></div>
+  <h2>整页浓缩在一个画面</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">拆分</div><div class="t">分割（Partitioning）</div><p>依某个键把大数据表拆成好几块。查找更快、清理更容易（直接丢掉旧的月份），而且仍然是一个数据库。</p></div>
+    <div class="card"><div class="sub">分散</div><div class="t">分片（Sharding）</div><p>把分块放到不同的服务器上，突破单一机器的上限。<b>分片键（shard key）</b>是最重要的决定。</p></div>
+    <div class="card"><div class="sub">成长</div><div class="t">一致性哈希</div><p>加入或移除一个分片时，只会搬动大约 N 分之一的数据，而不是几乎全部。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">取舍</div><p>好的分片键要能平均分散负载，<i>并且</i>符合你最常用的查找。哈希能分散负载，但范围查找就得问每个分片；范围能让相关数据放在一起，却会造成热点。分片很难回头，所以先试试索引、缓存和副本（第 2、5、14 页）。</p></div>
+  <h3 style="margin-top:26px">考考自己 <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="页面"></nav>
+</main>
+
+<script src="../../assets/explainer.js"></script>
+<script src="../../assets/i18n.zh-cn.js"></script>
+<script>
+(() => {
+const { $, el } = X;
+const COLORS = ['--accent', '--ok', '--wait', '--bad', '--accent-2', '--muted'];
+const N_KEYS = 240, VNODES = 40, MAX = 6, MIN = 2;
+
+/* ---------- data + placement rules (pure) ---------- */
+const hash = x => { let h = Math.imul(x ^ 0x9e3779b9, 0x85ebca6b); h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 16; return h >>> 0; };
+const strHash = s => { let h = 2166136261; for (const c of s) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return hash(h); };
+const ORDERS = Array.from({ length: N_KEYS }, (_, i) => {
+  const r = hash(i + 7) % 100;
+  return { fan: 1000 + i, month: r < 30 ? 11 : r % 11 }; // ~30% December (11), the rest spread over Jan–Nov
+});
+function ring(n) {
+  const pts = [];
+  for (let s = 0; s < n; s++) for (let v = 0; v < VNODES; v++) pts.push([strHash(`shard-${s}-${v}`), s]);
+  return pts.sort((a, b) => a[0] - b[0]);
+}
+function place(rule, n) {
+  if (rule === 0) return ORDERS.map(o => hash(o.fan) % n);
+  if (rule === 1) { const r = ring(n); return ORDERS.map(o => { const h = hash(o.fan); const p = r.find(x => x[0] >= h) || r[0]; return p[1]; }); }
+  return ORDERS.map(o => Math.min(n - 1, Math.floor((o.month * n) / 12))); // months split into N contiguous ranges
+}
+
+/* ---------- UI ---------- */
+let rule = 0, n = 4, cur = place(rule, n), moved = null, lastChange = null;
+const runs = [];
+const grid = $('#grid');
+ORDERS.forEach(() => grid.append(el('div', 'cell')));
+const cells = [...grid.children];
+function change(newN) {
+  if (newN < MIN || newN > MAX) return;
+  const next = place(rule, newN);
+  moved = next.map((s, i) => s !== cur[i]);
+  lastChange = { rule, from: n, to: newN, pct: moved.filter(Boolean).length / N_KEYS };
+  runs.push(lastChange);
+  n = newN; cur = next; render();
+}
+function render() {
+  const counts = Array(n).fill(0); cur.forEach(s => counts[s]++);
+  cells.forEach((c, i) => {
+    c.style.background = `var(${COLORS[cur[i]]})`; c.style.borderColor = `var(${COLORS[cur[i]]})`;
+    c.classList.toggle('dim', !!moved && !moved[i]);
+  });
+  $('#legend').innerHTML = counts.map((k, s) => `<span><i style="background:var(${COLORS[s]});height:10px"></i>分片 ${s + 1}</span>`).join('') + (moved ? '<span>亮色方块 = 上一次变更中被搬动的订单</span>' : '');
+  $('#bars').innerHTML = counts.map((k, s) => `<span>分片 ${s + 1}</span><div class="bar"><i style="width:${(k / N_KEYS) * 100}%;background:var(${COLORS[s]})"></i></div><span class="num">${Math.round((k / N_KEYS) * 100)}%</span>`).join('');
+  const hot = Math.max(...counts) / N_KEYS;
+  $('#tag').textContent = `${n} 个分片`;
+  $('#mMoved').textContent = lastChange ? Math.round(lastChange.pct * 100) + '%' : '–';
+  $('#mMovedD').textContent = lastChange ? `的订单换了分片（${lastChange.from} → ${lastChange.to}）` : '加入或移除一个分片';
+  $('#mMoved').parentElement.className = 'meter' + (!lastChange ? '' : lastChange.pct > 0.5 ? ' bad' : ' ok');
+  $('#mHot').textContent = Math.round(hot * 100) + '%';
+  $('#mHot').parentElement.className = 'meter' + (hot > 1.6 / n ? ' bad' : hot > 1.25 / n ? ' wait' : ' ok');
+  $('#mFair').textContent = Math.round(100 / n) + '%';
+  $('#add').disabled = n >= MAX; $('#rem').disabled = n <= MIN;
+  const st = $('#status');
+  if (hot > 1.6 / n) { st.className = 'status bad'; st.textContent = `✕ 热点分片：一个分片持有 ${Math.round(hot * 100)}% 的订单，也承受同样比例的流量，因为 12 月是最忙的月份。再加分片也几乎没帮助。`; }
+  else if (lastChange && lastChange.pct > 0.5) { st.className = 'status bad'; st.textContent = `✕ 从 ${lastChange.from} 个分片变成 ${lastChange.to} 个，搬动了 ${Math.round(lastChange.pct * 100)}% 的订单。在真实系统上，这代表要在服务流量的同时拷贝大部分的数据库。`; }
+  else if (lastChange) { st.className = 'status ok'; st.textContent = `✓ 只有 ${Math.round(lastChange.pct * 100)}% 的订单搬动了：就是环上那些换了主人的位置。`; }
+  else { st.className = 'status ok'; st.textContent = '✓ 订单平均分散在各个分片上。'; }
+  drawQuery(); mis.update({ runs, rule, hot, n });
+}
+function drawQuery() {
+  const q = qSeg ? qSeg.value : 0;
+  const touched = q === 0 ? (rule === 2 ? n : 1) : (rule === 2 ? 1 : n);
+  const t = $('#qTxt');
+  t.className = 'status ' + (touched > 1 ? 'wait' : 'ok');
+  t.textContent = q === 0
+    ? (touched === 1 ? '✓ 一位歌迷的「我的订单」：1 个分片，因为订单是依歌迷 id 放置的。' : `⚠ 一位歌迷的「我的订单」：全部 ${n} 个分片，因为订单是依月份放置的，而一位歌迷会在很多个月份买票。`)
+    : (touched === 1 ? '✓「所有 12 月的订单」：1 个分片，因为同一个月份的数据放在一起。' : `⚠「所有 12 月的订单」：全部 ${n} 个分片（scatter-gather），因为依歌迷 id 哈希会把 12 月的订单散布到各处。`);
+}
+const mis = X.missions($('#missions'), [
+  { text: '在<b>哈希取余数（mod N）</b>的设置下，按<b>加一个分片</b>。', hint: '从 4 变成 5，大部分订单的 hash % N 结果都会改变。大约 80% 的数据要搬家。', check: s => s.runs.some(r => r.rule === 0 && r.to > r.from && r.pct > 0.6) },
+  { text: '按<b>回到 4 个</b>，切换成<b>一致性哈希</b>，再加一个分片。', hint: '新分片从邻居那里分走环上的一段。只有大约 1/5 的订单搬动。', check: s => s.runs.some(r => r.rule === 1 && r.to > r.from && r.pct < 0.35) },
+  { text: '在一致性哈希的设置下，<b>移除一个分片</b>。', hint: '只有被移除分片上的订单会搬到它在环上的邻居，其他全部不动。', check: s => s.runs.some(r => r.rule === 1 && r.to < r.from && r.pct < 0.4) },
+  { text: '切换成<b>演唱会月份</b>。', hint: '范围分片让每个月份的数据放在一起，对月份查找很好。但 12 月全部落在同一个分片上，它承受了 30% 以上的流量。', check: s => s.rule === 2 && s.hot > 1.6 / s.n },
+]);
+const qSeg = X.seg($('#qSeg'), ['一位歌迷的「我的订单」', '「所有 12 月的订单」'], () => drawQuery(), 0);
+X.seg($('#keySeg'), ['歌迷 id 哈希（mod N）', '一致性哈希（歌迷 id）', '演唱会月份（范围）'], i => { rule = i; cur = place(rule, n); moved = null; lastChange = null; render(); }, 0);
+$('#add').addEventListener('click', () => change(n + 1));
+$('#rem').addEventListener('click', () => change(n - 1));
+$('#reset').addEventListener('click', () => { n = 4; cur = place(rule, n); moved = null; lastChange = null; render(); });
+render();
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="c">-- 分割：一张数据表依月份拆分，仍在同一个数据库</span>', null],
+  ['<span class="key">CREATE TABLE</span> orders (id bigint, fan_id bigint, concert_month date, …)', 'part'],
+  ['  <span class="key">PARTITION BY RANGE</span> (concert_month);', 'part'],
+  ['<span class="key">CREATE TABLE</span> orders_2026_12 <span class="key">PARTITION OF</span> orders', 'piece'],
+  ['  <span class="key">FOR VALUES FROM</span> (<span class="s">\'2026-12-01\'</span>) <span class="key">TO</span> (<span class="s">\'2027-01-01\'</span>);', 'piece'],
+  ['', null],
+  ['<span class="c">// 分片：由 App 选择要连哪一台数据库服务器</span>', null],
+  ['<span class="key">const</span> ring = <span class="key">new</span> HashRing([<span class="s">"db-a"</span>, <span class="s">"db-b"</span>, <span class="s">"db-c"</span>, <span class="s">"db-d"</span>]);', 'ring'],
+  ['<span class="key">const</span> shard = ring.get(String(fanId));', 'key'],
+  ['<span class="key">await</span> pools[shard].query(<span class="s">"SELECT * FROM orders WHERE fan_id = $1"</span>, [fanId]);', 'one'],
+  ['', null],
+  ['<span class="c">// 没有分片键的查找，只能问每一个分片</span>', null],
+  ['<span class="key">const</span> all = <span class="key">await</span> Promise.all(shards.map(s =&gt; s.query(<span class="s">"… WHERE month = 12"</span>)));', 'scatter'],
+], {
+  part: ['分割数据表', 'Postgres 依月份把数据表拆成好几块，但仍把它当成一张表。有月份条件的查找只会读取符合的那一块。'],
+  piece: ['一个分块', '每个分割区都是一张真的数据表。丢掉一个旧月份是瞬间完成的，比 <code>DELETE</code> 数百万列便宜得多。'],
+  ring: ['一致性哈希环', '每台服务器在环上拥有许多个点（虚拟节点）。加入「db-e」只会从它的邻居那里拿走键。这就是实验室里的 20% 而不是 80%。'],
+  key: ['分片键', '这里是歌迷 id：同一位歌迷的所有订单放在一起，所以「我的订单」只会打到一台服务器。'],
+  one: ['一个分片，一次查找', '包含分片键的查找只会送到刚好一台服务器。让你最常用的查找都长这样。'],
+  scatter: ['Scatter-gather', '没有分片键时，就要问每个分片再合并结果。很慢，而且分片越多越慢。这就是实验室里「全部分片」的情况。'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: 'Encore 用 <code>hash(fan_id) % 4</code> 替订单分片。Ben 想在旺季加第 5 个分片。他该担心什么？', opts: [
+    ['没什么：只有新分片的数据会搬动', false, '用 mod N 时，N 一改变，大部分键的结果都会跟着改变。'],
+    ['大约 80% 的订单需要在服务器之间搬家', true, '这是在负载下进行的大型迁移。一致性哈希（或预先切成很多小分片）可以避免它。'],
+    ['新分片会永远是空的', false, '它会分到自己的份，只是代价是把几乎所有人的数据也重新洗牌一遍。'],
+  ] },
+  { q: '订单依演唱会日期分片。重聚巡演开卖时，一台数据库 CPU 到 100%，其他都闲着。为什么？', opts: [
+    ['那台忙碌的服务器坏了', false, '它运作得很好，只是拥有了所有热门数据。'],
+    ['范围分片把所有重聚巡演的订单都放在同一个分片：热点分片', true, '选一个能分散最忙流量的键，例如哈希后的歌迷 id 或订单 id，日期范围则留给分片内部的分割使用。'],
+    ['分片太少了', false, '再多分片也拆不开 12 月，它仍然落在同一个范围里。'],
+  ] },
+  { q: '分割和分片有什么不同？', opts: [
+    ['它们是同一件事的不同说法', false, '它们有关系，但有一个关键差别。'],
+    ['分割是把数据表拆成好几块；分片是把这些分块放到不同的机器上', true, '你可以在一个数据库内分割。分片多了分布式的部分：路由、跨分片查找、重新平衡。'],
+    ['分片是给读取用的，分割是给写入用的', false, '两者都会影响读取和写入。差别在于一台机器还是多台。'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'sharding');
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW" data-lang="zh-tw" data-slug="sharding">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="把 Encore 的訂單分散到各個分片，加一個分片看看要搬多少資料，並找出熱點分片。">
+<title>分片與分割 · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/explainer.css">
+</head>
+<body>
+<!-- Plan. Stuck point: "just split the data" — people miss that the shard key decides balance, which queries are cheap, and how much moves when you grow.
+     Lab: 240 orders, 4 shards. Shard by hash mod N / consistent hashing / concert month. Add/remove shards; moved %, per-shard load, query fan-out.
+     One difference: mod N moves almost everything, consistent hashing moves ~1/N. -->
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="章節"><a href="#lab">實驗室</a><a href="#real">程式碼</a><a href="#recap">重點整理</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>第 15 頁 · 階段 4 · 保持資料正確</span><span class="hot">30 · 31</span></div>
+  <div class="eyebrow">分片、分割</div>
+  <h1>一個資料庫裝不下所有訂單。<em>那每筆訂單要放哪裡？</em></h1>
+  <div class="scenario"><b>Encore</b>訂單資料表已經塞不進一台機器，所以 Ana 把它拆到 4 台資料庫伺服器上，這些伺服器叫做<b>分片（shard）</b>。由一條規則決定每筆訂單放在哪個分片。規則選得不好，加第 5 個分片就得把幾乎所有資料搬家，或是某個分片快燒掉、其他分片卻閒著。</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">打開實驗室 ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>實驗室 · 先弄壞，再修好</span><span class="hot" id="tag">4 個分片</span></div>
+  <h2>240 筆訂單，4 個分片</h2>
+  <p>每個方塊是一筆訂單，顏色代表它所在的分片。大約 30% 的訂單是 12 月重聚巡演的。規模刻意做得很小；真實的資料表有數十億列。</p>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">分片依據</span><div id="keySeg"></div></div>
+      <div class="ctl"><span class="lab-k">分片</span>
+        <div class="presets"><button class="btn sm" id="add" type="button">＋ 加一個分片</button><button class="btn sm" id="rem" type="button">− 移除一個分片</button><button class="btn sm" id="reset" type="button">↺ 回到 4 個</button></div></div>
+    </div>
+    <div class="cells" id="grid" style="--cols:24" aria-hidden="true"></div>
+    <div class="legend" id="legend"></div>
+    <div class="meters" style="margin:0">
+      <div class="meter"><div class="k">上一次變更搬動的比例</div><div class="v" id="mMoved">–</div><div class="d" id="mMovedD">加入或移除一個分片</div></div>
+      <div class="meter"><div class="k">最忙的分片</div><div class="v" id="mHot">–</div><div class="d">占所有訂單的比例</div></div>
+      <div class="meter"><div class="k">公平份額</div><div class="v" id="mFair">25%</div><div class="d">完全平衡時</div></div>
+    </div>
+    <div class="bars" id="bars" style="max-width:640px"></div>
+    <div class="ctl"><span class="lab-k">一條查詢需要問哪些分片？</span><div id="qSeg"></div></div>
+    <div class="status" id="qTxt" role="status"></div>
+    <div class="status" id="status" role="status"></div>
+  </div>
+  <h3>試試看</h3>
+  <ol class="missions" id="missions"></ol>
+  <div class="compare">
+    <div><h3>分割（Partitioning）</h3><p style="margin:0">依某條規則把一張大資料表拆成好幾塊，例如每個月一塊。這些分塊可以都放在同一個資料庫裡；查某個月的資料時只需要掃描那一塊。</p></div>
+    <div><h3>分片（Sharding）</h3><p style="margin:0">把分割出來的分塊放到<b>不同的機器</b>上。這樣就能突破單一伺服器的上限，但 App（或代理）必須知道要問哪個分片，跨分片的查詢也會變得很昂貴。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">關鍵差別</div><p>用 <b>hash mod N</b> 時，N 一變，幾乎每個答案都跟著變，所以加一個分片就會搬動大部分資料。<b>一致性雜湊（consistent hashing）</b>把分片放在一個環上；新分片只會接手它旁邊的鍵，所以大約只有 N 分之一的鍵會搬動。</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>第 2 幕 · 真實世界</span><span class="hot">SQL＋程式碼</span></div>
+  <h2>在一個資料庫內分割，跨多個資料庫分片</h2>
+  <p><b>把滑鼠移到某一行上，或點一下。</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="分割資料表與分片路由程式碼範例"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 選一行</div><p id="exP">每一行反白後，都會對應到實驗室。</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>重點整理 · 帶走這些</span><span class="hot">♥</span></div>
+  <h2>整頁濃縮在一個畫面</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">拆分</div><div class="t">分割（Partitioning）</div><p>依某個鍵把大資料表拆成好幾塊。查詢更快、清理更容易（直接丟掉舊的月份），而且仍然是一個資料庫。</p></div>
+    <div class="card"><div class="sub">分散</div><div class="t">分片（Sharding）</div><p>把分塊放到不同的伺服器上，突破單一機器的上限。<b>分片鍵（shard key）</b>是最重要的決定。</p></div>
+    <div class="card"><div class="sub">成長</div><div class="t">一致性雜湊</div><p>加入或移除一個分片時，只會搬動大約 N 分之一的資料，而不是幾乎全部。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">取捨</div><p>好的分片鍵要能平均分散負載，<i>並且</i>符合你最常用的查詢。雜湊能分散負載，但範圍查詢就得問每個分片；範圍能讓相關資料放在一起，卻會造成熱點。分片很難回頭，所以先試試索引、快取和副本（第 2、5、14 頁）。</p></div>
+  <h3 style="margin-top:26px">考考自己 <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="頁面"></nav>
+</main>
+
+<script src="../../assets/explainer.js"></script>
+<script src="../../assets/i18n.zh-tw.js"></script>
+<script>
+(() => {
+const { $, el } = X;
+const COLORS = ['--accent', '--ok', '--wait', '--bad', '--accent-2', '--muted'];
+const N_KEYS = 240, VNODES = 40, MAX = 6, MIN = 2;
+
+/* ---------- data + placement rules (pure) ---------- */
+const hash = x => { let h = Math.imul(x ^ 0x9e3779b9, 0x85ebca6b); h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 16; return h >>> 0; };
+const strHash = s => { let h = 2166136261; for (const c of s) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return hash(h); };
+const ORDERS = Array.from({ length: N_KEYS }, (_, i) => {
+  const r = hash(i + 7) % 100;
+  return { fan: 1000 + i, month: r < 30 ? 11 : r % 11 }; // ~30% December (11), the rest spread over Jan–Nov
+});
+function ring(n) {
+  const pts = [];
+  for (let s = 0; s < n; s++) for (let v = 0; v < VNODES; v++) pts.push([strHash(`shard-${s}-${v}`), s]);
+  return pts.sort((a, b) => a[0] - b[0]);
+}
+function place(rule, n) {
+  if (rule === 0) return ORDERS.map(o => hash(o.fan) % n);
+  if (rule === 1) { const r = ring(n); return ORDERS.map(o => { const h = hash(o.fan); const p = r.find(x => x[0] >= h) || r[0]; return p[1]; }); }
+  return ORDERS.map(o => Math.min(n - 1, Math.floor((o.month * n) / 12))); // months split into N contiguous ranges
+}
+
+/* ---------- UI ---------- */
+let rule = 0, n = 4, cur = place(rule, n), moved = null, lastChange = null;
+const runs = [];
+const grid = $('#grid');
+ORDERS.forEach(() => grid.append(el('div', 'cell')));
+const cells = [...grid.children];
+function change(newN) {
+  if (newN < MIN || newN > MAX) return;
+  const next = place(rule, newN);
+  moved = next.map((s, i) => s !== cur[i]);
+  lastChange = { rule, from: n, to: newN, pct: moved.filter(Boolean).length / N_KEYS };
+  runs.push(lastChange);
+  n = newN; cur = next; render();
+}
+function render() {
+  const counts = Array(n).fill(0); cur.forEach(s => counts[s]++);
+  cells.forEach((c, i) => {
+    c.style.background = `var(${COLORS[cur[i]]})`; c.style.borderColor = `var(${COLORS[cur[i]]})`;
+    c.classList.toggle('dim', !!moved && !moved[i]);
+  });
+  $('#legend').innerHTML = counts.map((k, s) => `<span><i style="background:var(${COLORS[s]});height:10px"></i>分片 ${s + 1}</span>`).join('') + (moved ? '<span>亮色方塊 = 上一次變更中被搬動的訂單</span>' : '');
+  $('#bars').innerHTML = counts.map((k, s) => `<span>分片 ${s + 1}</span><div class="bar"><i style="width:${(k / N_KEYS) * 100}%;background:var(${COLORS[s]})"></i></div><span class="num">${Math.round((k / N_KEYS) * 100)}%</span>`).join('');
+  const hot = Math.max(...counts) / N_KEYS;
+  $('#tag').textContent = `${n} 個分片`;
+  $('#mMoved').textContent = lastChange ? Math.round(lastChange.pct * 100) + '%' : '–';
+  $('#mMovedD').textContent = lastChange ? `的訂單換了分片（${lastChange.from} → ${lastChange.to}）` : '加入或移除一個分片';
+  $('#mMoved').parentElement.className = 'meter' + (!lastChange ? '' : lastChange.pct > 0.5 ? ' bad' : ' ok');
+  $('#mHot').textContent = Math.round(hot * 100) + '%';
+  $('#mHot').parentElement.className = 'meter' + (hot > 1.6 / n ? ' bad' : hot > 1.25 / n ? ' wait' : ' ok');
+  $('#mFair').textContent = Math.round(100 / n) + '%';
+  $('#add').disabled = n >= MAX; $('#rem').disabled = n <= MIN;
+  const st = $('#status');
+  if (hot > 1.6 / n) { st.className = 'status bad'; st.textContent = `✕ 熱點分片：一個分片持有 ${Math.round(hot * 100)}% 的訂單，也承受同樣比例的流量，因為 12 月是最忙的月份。再加分片也幾乎沒幫助。`; }
+  else if (lastChange && lastChange.pct > 0.5) { st.className = 'status bad'; st.textContent = `✕ 從 ${lastChange.from} 個分片變成 ${lastChange.to} 個，搬動了 ${Math.round(lastChange.pct * 100)}% 的訂單。在真實系統上，這代表要在服務流量的同時複製大部分的資料庫。`; }
+  else if (lastChange) { st.className = 'status ok'; st.textContent = `✓ 只有 ${Math.round(lastChange.pct * 100)}% 的訂單搬動了：就是環上那些換了主人的位置。`; }
+  else { st.className = 'status ok'; st.textContent = '✓ 訂單平均分散在各個分片上。'; }
+  drawQuery(); mis.update({ runs, rule, hot, n });
+}
+function drawQuery() {
+  const q = qSeg ? qSeg.value : 0;
+  const touched = q === 0 ? (rule === 2 ? n : 1) : (rule === 2 ? 1 : n);
+  const t = $('#qTxt');
+  t.className = 'status ' + (touched > 1 ? 'wait' : 'ok');
+  t.textContent = q === 0
+    ? (touched === 1 ? '✓ 一位歌迷的「我的訂單」：1 個分片，因為訂單是依歌迷 id 放置的。' : `⚠ 一位歌迷的「我的訂單」：全部 ${n} 個分片，因為訂單是依月份放置的，而一位歌迷會在很多個月份買票。`)
+    : (touched === 1 ? '✓「所有 12 月的訂單」：1 個分片，因為同一個月份的資料放在一起。' : `⚠「所有 12 月的訂單」：全部 ${n} 個分片（scatter-gather），因為依歌迷 id 雜湊會把 12 月的訂單散布到各處。`);
+}
+const mis = X.missions($('#missions'), [
+  { text: '在<b>雜湊取餘數（mod N）</b>的設定下，按<b>加一個分片</b>。', hint: '從 4 變成 5，大部分訂單的 hash % N 結果都會改變。大約 80% 的資料要搬家。', check: s => s.runs.some(r => r.rule === 0 && r.to > r.from && r.pct > 0.6) },
+  { text: '按<b>回到 4 個</b>，切換成<b>一致性雜湊</b>，再加一個分片。', hint: '新分片從鄰居那裡分走環上的一段。只有大約 1/5 的訂單搬動。', check: s => s.runs.some(r => r.rule === 1 && r.to > r.from && r.pct < 0.35) },
+  { text: '在一致性雜湊的設定下，<b>移除一個分片</b>。', hint: '只有被移除分片上的訂單會搬到它在環上的鄰居，其他全部不動。', check: s => s.runs.some(r => r.rule === 1 && r.to < r.from && r.pct < 0.4) },
+  { text: '切換成<b>演唱會月份</b>。', hint: '範圍分片讓每個月份的資料放在一起，對月份查詢很好。但 12 月全部落在同一個分片上，它承受了 30% 以上的流量。', check: s => s.rule === 2 && s.hot > 1.6 / s.n },
+]);
+const qSeg = X.seg($('#qSeg'), ['一位歌迷的「我的訂單」', '「所有 12 月的訂單」'], () => drawQuery(), 0);
+X.seg($('#keySeg'), ['歌迷 id 雜湊（mod N）', '一致性雜湊（歌迷 id）', '演唱會月份（範圍）'], i => { rule = i; cur = place(rule, n); moved = null; lastChange = null; render(); }, 0);
+$('#add').addEventListener('click', () => change(n + 1));
+$('#rem').addEventListener('click', () => change(n - 1));
+$('#reset').addEventListener('click', () => { n = 4; cur = place(rule, n); moved = null; lastChange = null; render(); });
+render();
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="c">-- 分割：一張資料表依月份拆分，仍在同一個資料庫</span>', null],
+  ['<span class="key">CREATE TABLE</span> orders (id bigint, fan_id bigint, concert_month date, …)', 'part'],
+  ['  <span class="key">PARTITION BY RANGE</span> (concert_month);', 'part'],
+  ['<span class="key">CREATE TABLE</span> orders_2026_12 <span class="key">PARTITION OF</span> orders', 'piece'],
+  ['  <span class="key">FOR VALUES FROM</span> (<span class="s">\'2026-12-01\'</span>) <span class="key">TO</span> (<span class="s">\'2027-01-01\'</span>);', 'piece'],
+  ['', null],
+  ['<span class="c">// 分片：由 App 選擇要連哪一台資料庫伺服器</span>', null],
+  ['<span class="key">const</span> ring = <span class="key">new</span> HashRing([<span class="s">"db-a"</span>, <span class="s">"db-b"</span>, <span class="s">"db-c"</span>, <span class="s">"db-d"</span>]);', 'ring'],
+  ['<span class="key">const</span> shard = ring.get(String(fanId));', 'key'],
+  ['<span class="key">await</span> pools[shard].query(<span class="s">"SELECT * FROM orders WHERE fan_id = $1"</span>, [fanId]);', 'one'],
+  ['', null],
+  ['<span class="c">// 沒有分片鍵的查詢，只能問每一個分片</span>', null],
+  ['<span class="key">const</span> all = <span class="key">await</span> Promise.all(shards.map(s =&gt; s.query(<span class="s">"… WHERE month = 12"</span>)));', 'scatter'],
+], {
+  part: ['分割資料表', 'Postgres 依月份把資料表拆成好幾塊，但仍把它當成一張表。有月份條件的查詢只會讀取符合的那一塊。'],
+  piece: ['一個分塊', '每個分割區都是一張真的資料表。丟掉一個舊月份是瞬間完成的，比 <code>DELETE</code> 數百萬列便宜得多。'],
+  ring: ['一致性雜湊環', '每台伺服器在環上擁有許多個點（虛擬節點）。加入「db-e」只會從它的鄰居那裡拿走鍵。這就是實驗室裡的 20% 而不是 80%。'],
+  key: ['分片鍵', '這裡是歌迷 id：同一位歌迷的所有訂單放在一起，所以「我的訂單」只會打到一台伺服器。'],
+  one: ['一個分片，一次查詢', '包含分片鍵的查詢只會送到剛好一台伺服器。讓你最常用的查詢都長這樣。'],
+  scatter: ['Scatter-gather', '沒有分片鍵時，就要問每個分片再合併結果。很慢，而且分片越多越慢。這就是實驗室裡「全部分片」的情況。'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: 'Encore 用 <code>hash(fan_id) % 4</code> 替訂單分片。Ben 想在旺季加第 5 個分片。他該擔心什麼？', opts: [
+    ['沒什麼：只有新分片的資料會搬動', false, '用 mod N 時，N 一改變，大部分鍵的結果都會跟著改變。'],
+    ['大約 80% 的訂單需要在伺服器之間搬家', true, '這是在負載下進行的大型遷移。一致性雜湊（或預先切成很多小分片）可以避免它。'],
+    ['新分片會永遠是空的', false, '它會分到自己的份，只是代價是把幾乎所有人的資料也重新洗牌一遍。'],
+  ] },
+  { q: '訂單依演唱會日期分片。重聚巡演開賣時，一台資料庫 CPU 到 100%，其他都閒著。為什麼？', opts: [
+    ['那台忙碌的伺服器壞了', false, '它運作得很好，只是擁有了所有熱門資料。'],
+    ['範圍分片把所有重聚巡演的訂單都放在同一個分片：熱點分片', true, '選一個能分散最忙流量的鍵，例如雜湊後的歌迷 id 或訂單 id，日期範圍則留給分片內部的分割使用。'],
+    ['分片太少了', false, '再多分片也拆不開 12 月，它仍然落在同一個範圍裡。'],
+  ] },
+  { q: '分割和分片有什麼不同？', opts: [
+    ['它們是同一件事的不同說法', false, '它們有關係，但有一個關鍵差別。'],
+    ['分割是把資料表拆成好幾塊；分片是把這些分塊放到不同的機器上', true, '你可以在一個資料庫內分割。分片多了分散式的部分：路由、跨分片查詢、重新平衡。'],
+    ['分片是給讀取用的，分割是給寫入用的', false, '兩者都會影響讀取和寫入。差別在於一台機器還是多台。'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'sharding');
+})();
+</script>
+</body>
+</html>
