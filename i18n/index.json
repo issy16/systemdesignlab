@@ -1,0 +1,195 @@
+{
+ "page": "index",
+ "segments": [
+  {
+   "kind": "attr",
+   "en": "width=device-width, initial-scale=1, viewport-fit=cover",
+   "zh": "="
+  },
+  {
+   "kind": "attr",
+   "en": "Learn system design by breaking a simulated concert ticket app and fixing it. Interactive pages covering 111 production engineering concepts.",
+   "zh": "弄壞一個模擬的演唱會售票 App，再親手修好它，藉此學會系統設計。互動頁面涵蓋 111 個正式環境工程概念。"
+  },
+  {
+   "kind": "attr",
+   "en": "Sections",
+   "zh": "章節"
+  },
+  {
+   "kind": "attr",
+   "en": "e.g. idempotency, P99, CORS",
+   "zh": "例如：冪等性、P99、CORS"
+  },
+  {
+   "kind": "html",
+   "en": "System Design Lab",
+   "zh": "System Design Lab 系統設計實驗室"
+  },
+  {
+   "kind": "html",
+   "en": "system<b>.design.lab</b>",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "Roadmap",
+   "zh": "學習地圖"
+  },
+  {
+   "kind": "html",
+   "en": "How it works",
+   "zh": "運作方式"
+  },
+  {
+   "kind": "html",
+   "en": "system design lab",
+   "zh": "系統設計實驗室"
+  },
+  {
+   "kind": "html",
+   "en": "Learn system design by <em>breaking things on purpose.</em>",
+   "zh": "學系統設計，就從<em>故意把東西弄壞</em>開始。"
+  },
+  {
+   "kind": "html",
+   "en": "Every page is a small simulation of <b>Encore</b>, a fictional concert ticket app, as it grows from one server into a production system. You push traffic, cause the failure, apply the fix, and see why it works.",
+   "zh": "每一頁都是 <b>Encore</b> 的小型模擬。Encore 是一個虛構的演唱會售票 App，會從一台伺服器一路成長為正式上線的系統。你負責灌流量、引發故障、套用解法，親眼看到它為什麼有效。"
+  },
+  {
+   "kind": "html",
+   "en": "<b>Meet the team</b>Ana builds the backend, Ben handles payments, Cai builds the frontend, and Dee keeps it all running. Each page drops them into a new problem.",
+   "zh": "<b>認識團隊</b>Ana 負責後端，Ben 負責金流，Cai 負責前端，Dee 負責讓一切持續運作。每一頁都會把他們丟進一個新問題。"
+  },
+  {
+   "kind": "html",
+   "en": "Start with page 1 →",
+   "zh": "從第 1 頁開始 →"
+  },
+  {
+   "kind": "html",
+   "en": "See all topics ↓",
+   "zh": "看所有主題 ↓"
+  },
+  {
+   "kind": "html",
+   "en": "how every page works",
+   "zh": "每一頁怎麼進行"
+  },
+  {
+   "kind": "html",
+   "en": "5 steps",
+   "zh": "5 個步驟"
+  },
+  {
+   "kind": "html",
+   "en": "1 · Scenario",
+   "zh": "1 · 情境"
+  },
+  {
+   "kind": "html",
+   "en": "The problem",
+   "zh": "問題"
+  },
+  {
+   "kind": "html",
+   "en": "A short situation from Encore's growth, in a sentence or two.",
+   "zh": "一兩句話描述 Encore 成長途中遇到的狀況。"
+  },
+  {
+   "kind": "html",
+   "en": "2–3 · Lab",
+   "zh": "2–3 · 實驗室"
+  },
+  {
+   "kind": "html",
+   "en": "Break it, fix it",
+   "zh": "弄壞它，再修好它"
+  },
+  {
+   "kind": "html",
+   "en": "A simulation with guided missions. Cause the failure, then apply the concept and compare.",
+   "zh": "附帶引導任務的模擬。先引發故障，再套用概念並比較差異。"
+  },
+  {
+   "kind": "html",
+   "en": "4–5 · Explain, check",
+   "zh": "4–5 · 解說、檢驗"
+  },
+  {
+   "kind": "html",
+   "en": "Name it, test it",
+   "zh": "說出名字，考考自己"
+  },
+  {
+   "kind": "html",
+   "en": "The real config or code, mapped line by line. Then three scenario questions.",
+   "zh": "真實的設定檔或程式碼，逐行對照。最後是三題情境題。"
+  },
+  {
+   "kind": "html",
+   "en": "All demos run in your browser. Numbers are simulated to show the shape of each problem, not to benchmark real systems.",
+   "zh": "所有示範都在你的瀏覽器裡執行。數字是模擬的，用來呈現問題的樣貌，不是真實系統的效能基準。"
+  },
+  {
+   "kind": "html",
+   "en": "roadmap",
+   "zh": "學習地圖"
+  },
+  {
+   "kind": "html",
+   "en": "Every topic",
+   "zh": "所有主題"
+  },
+  {
+   "kind": "html",
+   "en": "Find a concept",
+   "zh": "搜尋概念"
+  },
+  {
+   "kind": "js",
+   "en": "`${built} of ${X.CATALOG.length} pages live`",
+   "zh": "`已上線 ${built} / ${X.CATALOG.length} 頁`"
+  },
+  {
+   "kind": "js",
+   "en": "`${X.CATALOG.length} pages · ${X.CONCEPTS.length - 1} concepts`",
+   "zh": "`${X.CATALOG.length} 頁 · ${X.CONCEPTS.length - 1} 個概念`"
+  },
+  {
+   "kind": "js",
+   "en": "`<h3 style=\"margin:0\">Stage ${st.n} · ${esc(st.name)}</h3><span class=\"muted\" style=\"font-size:13px\">${pages.length} page${pages.length > 1 ? 's' : ''}</span>`",
+   "zh": "`<h3 style=\"margin:0\">階段 ${st.n} · ${esc(st.name)}</h3><span class=\"muted\" style=\"font-size:13px\">${pages.length} 頁</span>`"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"pill ok\">live</span>'",
+   "zh": "'<span class=\"pill ok\">已上線</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"pill wait\">partial</span>'",
+   "zh": "'<span class=\"pill wait\">部分完成</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"pill\">coming soon</span>'",
+   "zh": "'<span class=\"pill\">即將推出</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "`<div class=\"n\"><span>page ${p.n}</span>${badge}</div><div class=\"t\">${esc(p.title)}</div><div class=\"c\">${p.ids.map(id => esc(X.CONCEPTS[id])).join(' · ')}</div>`",
+   "zh": "`<div class=\"n\"><span>第 ${p.n} 頁</span>${badge}</div><div class=\"t\">${esc(p.title)}</div><div class=\"c\">${p.ids.map(id => esc(X.CONCEPTS[id])).join(' · ')}</div>`"
+  },
+  {
+   "kind": "js",
+   "en": "`${shown} page${shown > 1 ? 's' : ''} match “${q.trim()}”.`",
+   "zh": "`有 ${shown} 頁符合「${q.trim()}」。`"
+  },
+  {
+   "kind": "js",
+   "en": "`Nothing matches “${q.trim()}”.`",
+   "zh": "`沒有符合「${q.trim()}」的結果。`"
+  }
+ ]
+}

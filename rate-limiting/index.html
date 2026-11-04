@@ -206,8 +206,8 @@ function render() {
   const st = $('#status');
   if (!S.t) { st.className = 'status'; st.textContent = 'Press Play to start.'; }
   else if (m.ana.r503) { st.className = 'status bad'; st.textContent = '✕ The server is overloaded. The bot\'s requests fill the line, so Ana\'s requests fail with 503 too.'; }
-  else if (m.ana.r429 && S.mode === 1) { st.className = 'status bad'; st.textContent = '✕ The server is safe, but Ana is blocked. She\'s sharing one bucket with the bot, which spends almost every token.'; }
-  else if (m.ana.r429) { st.className = 'status wait'; st.textContent = '⚠ Ana went past her own limit with that burst. She just waits for the refill, and the bot can\'t affect her.'; }
+  else if (m.ana.r429 && S.mode === 1) { st.className = 'status bad'; st.textContent = '✕ The server is safe, but Ana is blocked. Ana shares one bucket with the bot, which spends almost every token.'; }
+  else if (m.ana.r429) { st.className = 'status wait'; st.textContent = '⚠ That burst went past Ana\'s own limit. The extra clicks just wait for the refill, and the bot can\'t affect Ana.'; }
   else if (S.bot && S.mode === 2) { st.className = 'status ok'; st.textContent = `✓ The bot gets 429s from its own bucket (about ${S.refill} requests/s get through). Ana is unaffected, and the server load stays low.`; }
   else { st.className = 'status ok'; st.textContent = '✓ Everything is getting through.'; }
   player.clock(`t = ${(S.t / 1000).toFixed(1)} s`);

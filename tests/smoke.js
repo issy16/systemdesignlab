@@ -8,7 +8,8 @@ const { chromium } = require('playwright');
   const fs = require('fs');
   const root = path.resolve(__dirname, '..');
   const files = process.argv.slice(2).length ? process.argv.slice(2).map(f => path.resolve(f))
-    : [path.join(root, 'index.html'), ...fs.readdirSync(root).filter(d => fs.existsSync(path.join(root, d, 'index.html'))).map(d => path.join(root, d, 'index.html'))];
+    : [root, path.join(root, 'zh-tw'), path.join(root, 'zh-cn')].filter(fs.existsSync).flatMap(base =>
+        [path.join(base, 'index.html'), ...fs.readdirSync(base).filter(d => !/^zh-/.test(d) && fs.existsSync(path.join(base, d, 'index.html'))).map(d => path.join(base, d, 'index.html'))]);
   const shots = path.join(root, 'tests', 'screenshots');
   fs.mkdirSync(shots, { recursive: true });
   const browser = await chromium.launch();
@@ -32,7 +33,7 @@ const { chromium } = require('playwright');
 
     // Click through: repeat passes so buttons revealed by earlier clicks get exercised too.
     let clicks = 0;
-    for (let pass = 0; pass < 2; pass++) {
+    for (let pass = 0; pass < (+process.env.PASSES || (/zh-(tw|cn)/.test(rel) ? 1 : 2)); pass++) {
       const buttons = await page.$$('button:not([disabled]), input[type=checkbox]');
       for (const b of buttons) {
         if (!(await b.isVisible().catch(() => false))) continue;

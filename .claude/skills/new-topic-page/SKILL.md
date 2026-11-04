@@ -38,6 +38,7 @@ Copy the structure of the reference page: hero → lab → (optional extra act) 
 
 1. Set the page's `status` to `'built'` in `X.CATALOG`, then run `node tests/gen-docs.js`.
 2. Add a flow for the page to `FLOWS` in `tests/missions.js`.
-3. Run `node tests/smoke.js <slug>/index.html` and `node tests/missions.js <slug>`. If a mission doesn't complete, tune the simulation, not the test. A mission the test can't finish is one a learner can't finish either.
-4. Look at the light, dark and mobile screenshots in `tests/screenshots/` once, and fix what's broken.
-5. Click through the page yourself, in order, once.
+3. Translate: `python3 tools/i18n.py extract <slug>`, fill every `"zh"` in `i18n/<slug>.json` with Traditional Chinese (Taiwan usage, English term in parentheses on first use), then `python3 tools/i18n.py build`. See CLAUDE.md → Translations.
+4. Run `node tests/smoke.js <slug>/index.html` and `node tests/missions.js <slug>` (and `--lang zh-tw <slug>`). If a mission doesn't complete, tune the simulation, not the test. A mission the test can't finish is one a learner can't finish either.
+5. Look at the light, dark and mobile screenshots in `tests/screenshots/` once, and fix what's broken.
+6. Click through the page yourself, in order, once.

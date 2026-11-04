@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW" data-lang="zh-tw" data-slug="load-balancing-scaling">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="垂直擴展、水平擴展、關掉一台伺服器，並在流量尖峰下比較不同的負載平衡演算法。">
+<title>負載平衡與擴展 · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/explainer.css">
+</head>
+<body>
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="章節"><a href="#lab">實驗室</a><a href="#real">設定檔</a><a href="#recap">重點整理</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>第 6 頁 · 階段 2 · 更多流量</span><span class="hot">3 · 46 · 47</span></div>
+  <div class="eyebrow">負載平衡、水平擴展、垂直擴展</div>
+  <h1>買一台更大的伺服器，還是買更多台？<em>然後決定每個請求交給誰。</em></h1>
+  <div class="scenario"><b>Encore</b>一台伺服器撐 Encore 撐得好好的，直到重聚巡演開賣。Dee 有兩個選擇：<b>向上</b>擴展（換一台更大的機器），或<b>向外</b>擴展（在負載平衡器後面放更多台）。兩種都試試，然後拔掉其中一台的插頭。</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">打開實驗室 ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>實驗室 · 先弄壞，再修好</span><span class="hot" id="tag">1 台伺服器</span></div>
+  <h2>開賣尖峰</h2>
+  <p>10 個請求中有 9 個是快速的頁面瀏覽，1 個是需要大約 8 倍工作量的結帳。每台伺服器依序處理自己的隊伍，一次一個請求。容量是模擬值，不是效能基準。</p>
+
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl">
+        <label for="rate">流量：每秒 <b id="rateV">30</b> 個請求</label>
+        <input type="range" id="rate" min="10" max="300" step="10" value="30">
+        <div class="presets"><button class="btn sm" type="button" data-rate="30">平常日</button><button class="btn sm" type="button" data-rate="150">開賣尖峰</button></div>
+      </div>
+      <div class="ctl"><span class="lab-k">調整伺服器</span>
+        <div class="presets">
+          <button class="btn sm" id="up" type="button">⬆ 換更大的機器（向上擴展）</button>
+          <button class="btn sm" id="out" type="button">＋ 加一台伺服器（向外擴展）</button>
+          <button class="btn sm bad" id="kill" type="button">✕ 關掉一台伺服器</button>
+        </div>
+      </div>
+      <div class="ctl"><span class="lab-k">負載平衡器把每個請求送到</span><div id="algoSeg"></div></div>
+      <div class="ctl"><span class="lab-k">模擬</span><div id="player"></div></div>
+    </div>
+    <div class="servers" id="servers" aria-label="伺服器"></div>
+    <div class="meters" style="margin:0">
+      <div class="meter"><div class="k">已服務</div><div class="v" id="mTp">0/s</div><div class="d">完成的請求</div></div>
+      <div class="meter"><div class="k">P95 延遲</div><div class="v" id="mP95">0 ms</div><div class="d">最慢的 1/20</div></div>
+      <div class="meter"><div class="k">錯誤</div><div class="v" id="mErr">0</div><div class="d">最近 3 秒的 503</div></div>
+      <div class="meter"><div class="k">容量</div><div class="v" id="mCap">0/s</div><div class="d">所有伺服器合計，概略值</div></div>
+    </div>
+    <div class="status" id="status" role="status">按「播放」開始送出流量。</div>
+  </div>
+
+  <h3>試試看</h3>
+  <ol class="missions" id="missions"></ol>
+
+  <div class="compare">
+    <div><h3>向上擴展（垂直）</h3><p style="margin:0">一台更大的機器。不用改程式，也不用協調。但能買到的機器有上限，升級通常意味著停機，而且它一掛，所有東西跟著掛。</p></div>
+    <div><h3>向外擴展（水平）</h3><p style="margin:0">在<b>負載平衡器（load balancer）</b>後面放更多台機器。幾乎可以無限成長，也撐得過壞掉一台。但 App 不能把重要狀態存在某一台伺服器的記憶體裡，因為下一個請求可能會落到別台。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">關鍵差別</div><p><b>向上</b>擴展讓一台伺服器變強。<b>向外</b>擴展增加伺服器數量，需要負載平衡器來分配流量。怎麼分配很重要：<b>最少連線</b>會注意到卡在慢請求上的伺服器，<b>輪詢</b>則會繼續塞更多給它。</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>第 2 幕 · 真實世界</span><span class="hot">nginx</span></div>
+  <h2>負載平衡器只是幾行設定</h2>
+  <p>這是 nginx，最常見的負載平衡器之一。雲端負載平衡器（AWS ALB、Cloudflare、GCP）在網頁主控台上也有同樣的設定。<b>把滑鼠移到某一行上，或點一下。</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="nginx 負載平衡器設定範例"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 選一行</div><p id="exP">每一行反白後，都會對應到實驗室裡的一個控制項。</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>重點整理 · 帶走這些</span><span class="hot">♥</span></div>
+  <h2>整頁濃縮在一個畫面</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">更強</div><div class="t">垂直擴展</div><p>一台更大的機器。最簡單的第一步，但有硬性上限，也是單點故障。</p></div>
+    <div class="card"><div class="sub">更多</div><div class="t">水平擴展</div><p>更多台機器。撐得過故障，也能持續成長，前提是伺服器彼此可以互換（無狀態）。</p></div>
+    <div class="card"><div class="sub">交通指揮</div><div class="t">負載平衡器</div><p>把請求分配到各台伺服器、跳過掛掉的伺服器，並選擇一種策略：輪詢、最少連線等等。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">取捨</div><p>向上擴展很簡單，直到它不再簡單。向外擴展需要一些設計工作（共用工作階段、共用資料庫），但能去掉天花板和單點故障。大多數團隊會先向上，再向外。</p></div>
+
+  <h3 style="margin-top:26px">考考自己 <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="頁面"></nav>
+</main>
+
+<script src="../../assets/explainer.js"></script>
+<script src="../../assets/i18n.zh-tw.js"></script>
+<script>
+(() => {
+const { $, $$, el } = X;
+const SIZES = [{ name: 'medium', cap: 120 }, { name: 'large', cap: 240 }, { name: 'x-large', cap: 480 }];
+const DT = 100, MEAN_WORK = 0.9 * 1 + 0.1 * 8, QMAX = 120, WIN = 3000;
+const reqCap = units => Math.round(units / MEAN_WORK);
+
+/* ---------- simulation: pure state + tick ---------- */
+function init(seed, o = {}) {
+  return Object.assign({ r: seed, t: 0, rate: 30, algo: 0, rr: 0, servers: [mk(1, 0)], next: 2, kills: 0, done: [], errs: [], ticks: 0, log: {} }, o);
+}
+function mk(id, size) { return { id, size, alive: true, q: [], busy: 0 }; }
+function outstanding(sv, at) { return sv.q.length + (sv.busy > at ? 1 : 0); }
+function tick(s) {
+  const t0 = s.t, t1 = t0 + DT;
+  const n = X.poisson(s, s.rate * DT / 1000);
+  for (let i = 0; i < n; i++) {
+    const at = t0 + X.rnd(s) * DT, work = X.rnd(s) < 0.1 ? 8 : 1;
+    const alive = s.servers.filter(x => x.alive);
+    if (!alive.length) { s.errs.push(at); continue; }
+    let sv;
+    if (s.algo === 0) { sv = alive[s.rr % alive.length]; s.rr++; }
+    else if (s.algo === 1) sv = alive.reduce((a, b) => (outstanding(b, at) < outstanding(a, at) ? b : a));
+    else sv = alive[Math.floor(X.rnd(s) * alive.length)];
+    if (sv.q.length >= QMAX) { s.errs.push(at); continue; }
+    sv.q.push({ at, work });
+  }
+  for (const sv of s.servers) {
+    if (!sv.alive) continue;
+    sv.q.sort((a, b) => a.at - b.at);
+    const cap = SIZES[sv.size].cap;
+    while (sv.q.length) {
+      const start = Math.max(sv.busy, sv.q[0].at);
+      if (start >= t1) break;
+      const r = sv.q.shift();
+      sv.busy = start + (r.work / cap) * 1000;
+      s.done.push([sv.busy, sv.busy - r.at]);
+    }
+  }
+  s.t = t1; s.ticks++;
+  s.done = s.done.filter(d => d[0] > t1 - WIN - 1000);
+  s.errs = s.errs.filter(t => t > t1 - WIN);
+  return s;
+}
+function metrics(s) {
+  const win = s.done.filter(d => d[0] <= s.t && d[0] > s.t - WIN).map(d => d[1]);
+  const alive = s.servers.filter(x => x.alive);
+  return { tp: win.length / (WIN / 1000), p95: X.pct(win, 0.95), err: s.errs.length, cap: alive.reduce((a, x) => a + reqCap(SIZES[x.size].cap), 0), alive: alive.length };
+}
+
+/* ---------- UI ---------- */
+let S = init(31);
+const flags = { scaledUpAlone: false, killedAlone: false, killedOut: false, k5: 0 };
+const healthy = m => m.p95 < 500 && m.err === 0;
+const mis = X.missions($('#missions'), [
+  { text: '在平常日（每秒 30 個請求、1 台 medium 伺服器）按<b>播放</b>。', hint: '餘裕很多，每個請求都很快就被處理。', check: s => s.ticks >= 20 && s.rate <= 40 },
+  { text: '按下<b>開賣尖峰</b>（每秒 150 個）。', hint: '伺服器的隊伍滿了。請求先是等待，接著收到 503 錯誤。', check: s => s.rate >= 150 && (metrics(s).err > 0 || metrics(s).p95 > 1000) },
+  { text: '<b>向上</b>擴展：一直按「換更大的機器」，直到一台伺服器撐得住。', hint: '有效，但 x-large 之後就沒有更大的機器了。', check: s => { const m = metrics(s); const ok = s.servers.length === 1 && s.rate >= 150 && s.ticks > 25 && healthy(m); if (ok) flags.scaledUpAlone = true; return ok; } },
+  { text: '現在把那台伺服器<b>關掉</b>。', hint: '只有一台機器，就是單點故障。整個服務都掛了。', check: s => { if (metrics(s).alive === 0 && s.servers.length === 1) flags.killedAlone = true; return flags.killedAlone; } },
+  { text: '改成<b>向外</b>擴展：一直加 medium 伺服器，直到撐住尖峰。', hint: '負載平衡器把工作分散開來。每台 medium 伺服器大約能處理每秒 70 個請求。', check: s => metrics(s).alive >= 3 && s.rate >= 150 && s.ticks > 25 && healthy(metrics(s)), then: () => (flags.k5 = S.kills) },
+  { text: '再加一台，然後<b>關掉其中一台</b>。', hint: '負載平衡器不再把請求送給它。只有已經在它隊伍裡的請求會失敗，網站依然正常。', check: s => { const m = metrics(s); if (s.kills > flags.k5 && m.alive >= 3 && s.ticks > 25 && m.p95 < 800) flags.killedOut = true; return flags.killedOut; } },
+  { text: '尖峰持續時，比較<b>輪詢</b>和<b>最少連線</b>。', hint: '看 P95 和每台伺服器的隊伍。輪詢會持續餵給一台卡在結帳請求上的伺服器。', check: s => s.algo === 1 && s.ticks > 30 && s.rate >= 150 },
+]);
+function render() {
+  const m = metrics(S);
+  $('#rateV').textContent = S.rate;
+  const box = $('#servers'); box.innerHTML = '';
+  S.servers.forEach(sv => {
+    const lineLen = sv.q.length, cap = SIZES[sv.size].cap;
+    const util = sv.alive ? Math.min(1, (sv.q.reduce((a, r) => a + r.work, 0) + (sv.busy > S.t ? 1 : 0)) / (cap * 0.5)) : 0;
+    const state = !sv.alive ? ['已停機', 'bad'] : lineLen >= QMAX * 0.8 ? ['超載', 'bad'] : lineLen > 15 ? ['忙碌', 'wait'] : ['正常', 'ok'];
+    const d = el('div', 'server' + (sv.alive ? '' : ' down'));
+    d.innerHTML = `<div class="nm"><span>app-${sv.id}</span><span class="pill ${state[1]}">${state[0]}</span></div>
+      <div class="mono">${SIZES[sv.size].name} · 約 ${reqCap(cap)} 請求/秒</div>
+      <div class="bar ${state[1] === 'bad' ? 'risk' : ''}"><i style="width:${util * 100}%"></i></div>
+      <div class="mono">隊伍：${sv.alive ? lineLen : '–'}</div>`;
+    box.append(d);
+  });
+  $('#tag').textContent = `${S.servers.length} 台中有 ${m.alive} 台運作中`;
+  $('#mTp').textContent = X.fmt(m.tp) + '/s';
+  $('#mP95').textContent = X.fmt(m.p95) + ' 毫秒';
+  $('#mP95').parentElement.className = 'meter' + (m.p95 > 1000 ? ' bad' : m.p95 > 400 ? ' wait' : '');
+  $('#mErr').textContent = X.fmt(m.err);
+  $('#mErr').parentElement.className = 'meter' + (m.err ? ' bad' : '');
+  $('#mCap').textContent = m.cap + '/s';
+  const single = S.servers.filter(x => x.alive);
+  $('#up').disabled = !single.length || single.every(x => x.size === SIZES.length - 1);
+  $('#up').textContent = $('#up').disabled && single.length ? '⬆ 已經是最大的機器' : '⬆ 換更大的機器（向上擴展）';
+  $('#out').disabled = S.servers.filter(x => x.alive).length >= 8;
+  $('#kill').disabled = !m.alive;
+  const st = $('#status');
+  if (!S.t) { st.className = 'status'; st.textContent = '按「播放」開始送出流量。'; }
+  else if (!m.alive) { st.className = 'status bad'; st.textContent = '✕ 全面停擺：一台伺服器都不剩，每個請求都失敗。'; }
+  else if (m.err) { st.className = 'status bad'; st.textContent = `✕ 超載：每秒 ${S.rate} 個請求，容量卻只有約每秒 ${m.cap} 個。最近 3 秒有 ${m.err} 個請求收到 503。`; }
+  else if (m.p95 > 400) { st.className = 'status wait'; st.textContent = `⚠ 撐得住，但隊伍開始形成。P95 為 ${X.fmt(m.p95)} 毫秒。`; }
+  else { st.className = 'status ok'; st.textContent = `✓ 健康：${m.alive} 台伺服器，P95 ${X.fmt(m.p95)} 毫秒。`; }
+  player.clock(`t = ${(S.t / 1000).toFixed(1)} s`);
+  mis.update(S);
+}
+const player = X.player($('#player'), {
+  step: () => { tick(S); render(); }, stepTicks: 5,
+  reset: () => { S = init(31, { rate: S.rate, algo: S.algo }); Object.keys(flags).forEach(k => (flags[k] = k === 'k5' ? 0 : false)); mis.reset(); render(); },
+});
+const t0 = () => { S.ticks = 0; };
+$('#rate').addEventListener('input', e => { S.rate = +e.target.value; t0(); render(); });
+$$('[data-rate]').forEach(b => b.addEventListener('click', () => { $('#rate').value = b.dataset.rate; $('#rate').dispatchEvent(new Event('input')); if (!player.running) player.play(); }));
+$('#up').addEventListener('click', () => { S.servers.forEach(sv => { if (sv.alive && sv.size < SIZES.length - 1) sv.size++; }); t0(); render(); });
+$('#out').addEventListener('click', () => { S.servers.push(mk(S.next++, 0)); t0(); render(); });
+$('#kill').addEventListener('click', () => {
+  const sv = S.servers.find(x => x.alive); if (!sv) return;
+  sv.alive = false; S.kills++; sv.q.forEach(r => S.errs.push(S.t)); sv.q = []; t0(); render();
+});
+X.seg($('#algoSeg'), ['輪詢（Round robin）', '最少連線（Least connections）', '隨機'], i => { S.algo = i; t0(); render(); }, 0);
+render();
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="key">upstream</span> encore_app {', 'upstream'],
+  ['    <span class="key">least_conn</span>;', 'algo'],
+  ['    <span class="key">server</span> app1.internal:3000;', 'servers'],
+  ['    <span class="key">server</span> app2.internal:3000;', 'servers'],
+  ['    <span class="key">server</span> app3.internal:3000 max_fails=3 fail_timeout=10s;', 'fails'],
+  ['}', null],
+  ['', null],
+  ['<span class="key">server</span> {', null],
+  ['    <span class="key">listen</span> 443 ssl;', 'listen'],
+  ['    <span class="key">location</span> / {', null],
+  ['        <span class="key">proxy_pass</span> http://encore_app;', 'proxy'],
+  ['        <span class="key">proxy_next_upstream</span> error timeout;', 'retry'],
+  ['    }', null],
+  ['}', null],
+], {
+  upstream: ['伺服器群組', '一組具名、可互換的應用伺服器。向外擴展就是在這裡多加一行（或交給自動擴展幫你做）。'],
+  algo: ['平衡演算法', '拿掉這一行，nginx 就會使用<b>輪詢</b>。<code>least_conn</code> 會把每個請求送給目前進行中請求最少的伺服器，也就是實驗室裡的「最少連線」。'],
+  servers: ['伺服器', '每一行是一台應用伺服器，就像實驗室裡的方框。它們必須可以互換：同樣的程式碼，不在本機記憶體裡保存重要狀態。'],
+  fails: ['跳過掛掉的伺服器', '失敗 3 次後，nginx 會在 10 秒內停止把流量送給這台伺服器。這就是為什麼關掉一台伺服器時，只損失了已經在它隊伍裡等的請求。'],
+  listen: ['唯一的大門', '歌迷連線到負載平衡器，從來不會直接連到應用伺服器。這讓你可以增減伺服器而沒有人察覺。'],
+  proxy: ['轉送', '把每個請求轉給從 upstream 群組中挑出的一台伺服器。'],
+  retry: ['換一台試試', '如果選中的伺服器出錯或逾時，就把請求改送到另一台重試。只對可以重複執行的請求才安全（見第 10 頁〈冪等性〉）。'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: 'Encore 已經跑在雲端供應商賣的最大機器上，開賣時 CPU 還是到 95%。現在怎麼辦？', opts: [
+    ['升級成更大的機器', false, '沒有更大的了。這就是垂直擴展的天花板。'],
+    ['向外擴展：在負載平衡器後面跑好幾台伺服器', true, '水平擴展沒有單一機器的天花板，也去掉了單點故障。'],
+    ['更常重開伺服器', false, '重開不會增加容量，只會造成短暫停機。'],
+  ] },
+  { q: '向外擴展到 3 台伺服器之後，歌迷會隨機被登出。為什麼？', opts: [
+    ['負載平衡器壞了', false, '它正在做它該做的事：把請求分散到各台伺服器。'],
+    ['工作階段存在某一台伺服器的記憶體裡，所以下一個請求落到一台不認得這位歌迷的伺服器', true, '水平擴展需要無狀態的伺服器。把工作階段移到共用的儲存空間（Redis、資料庫或簽章過的 cookie）。'],
+    ['3 台伺服器是不吉利的數字', false, '只要狀態存在本機記憶體裡，任何超過一台的數量都有同樣的問題。'],
+  ] },
+  { q: '有一台伺服器一直卡在慢速的結帳請求上，其他台卻閒著。哪一種平衡設定最有幫助？', opts: [
+    ['輪詢（Round robin）', false, '輪詢會依序分配請求，不管每台伺服器有多忙。'],
+    ['最少連線（Least connections）', true, '它會把新請求送給進行中請求最少的伺服器，所以卡在慢工作上的伺服器會收到比較少的新請求。'],
+    ['把每個請求都送給第一台伺服器', false, '這等於把你的三台伺服器又變回一台。'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'load-balancing-scaling');
+})();
+</script>
+</body>
+</html>

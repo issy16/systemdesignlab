@@ -1,0 +1,745 @@
+{
+ "page": "caching",
+ "segments": [
+  {
+   "kind": "attr",
+   "en": "width=device-width, initial-scale=1, viewport-fit=cover",
+   "zh": "="
+  },
+  {
+   "kind": "attr",
+   "en": "Put a cache in front of a struggling database, then find the stale data it creates and fix it with invalidation.",
+   "zh": "在吃力的資料庫前面加一層快取，再找出它造成的過期資料，並用快取失效修好它。"
+  },
+  {
+   "kind": "attr",
+   "en": "Sections",
+   "zh": "章節"
+  },
+  {
+   "kind": "attr",
+   "en": "Example caching code",
+   "zh": "快取程式碼範例"
+  },
+  {
+   "kind": "attr",
+   "en": "Pages",
+   "zh": "頁面"
+  },
+  {
+   "kind": "html",
+   "en": "Caching · System Design Lab",
+   "zh": "快取 · System Design Lab"
+  },
+  {
+   "kind": "html",
+   "en": "system<b>.design.lab</b>",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "Lab",
+   "zh": "實驗室"
+  },
+  {
+   "kind": "html",
+   "en": "The code",
+   "zh": "程式碼"
+  },
+  {
+   "kind": "html",
+   "en": "Recap",
+   "zh": "重點整理"
+  },
+  {
+   "kind": "html",
+   "en": "page 5 · stage 2 · more traffic",
+   "zh": "第 5 頁 · 階段 2 · 更多流量"
+  },
+  {
+   "kind": "html",
+   "en": "Caching, edge caching, cache invalidation",
+   "zh": "快取、邊緣快取、快取失效"
+  },
+  {
+   "kind": "html",
+   "en": "Caching is easy. <em>Knowing when the copy is wrong is the hard part.</em>",
+   "zh": "快取很簡單。<em>難的是知道副本什麼時候錯了。</em>"
+  },
+  {
+   "kind": "html",
+   "en": "<b>Encore</b>Every fan on a concert page asks the database the same question: “how many seats are left?” At 200 page views a second, the database gives up. Ana adds a cache. The database recovers, and then fans start buying seats that were already gone.",
+   "zh": "<b>Encore</b>演唱會頁面上的每位歌迷，都在問資料庫同一個問題：「還剩幾個位子？」每秒 200 次頁面瀏覽時，資料庫撐不住了。Ana 加了一層快取，資料庫恢復了，接著歌迷開始買到早就賣掉的座位。"
+  },
+  {
+   "kind": "html",
+   "en": "Open the lab ↓",
+   "zh": "打開實驗室 ↓"
+  },
+  {
+   "kind": "html",
+   "en": "lab · break it, then fix it",
+   "zh": "實驗室 · 先弄壞，再修好"
+  },
+  {
+   "kind": "html",
+   "en": "no cache",
+   "zh": "沒有快取"
+  },
+  {
+   "kind": "html",
+   "en": "200 page views a second, one database",
+   "zh": "每秒 200 次頁面瀏覽，一個資料庫"
+  },
+  {
+   "kind": "html",
+   "en": "Encore has 20 concerts, and a few are far more popular than the rest. Fans buy about 2 tickets a second, and every purchase changes a seat count. The database handles about <b>100 queries a second</b> before it slows down. Fans are 150 ms away from Encore's servers. All numbers are simulated.",
+   "zh": "Encore 有 20 場演唱會，其中幾場比其他場熱門得多。歌迷每秒大約買 2 張票，每次購買都會改變座位數。資料庫大約能處理<b>每秒 100 次查詢</b>，超過就會變慢。歌迷距離 Encore 的伺服器 150 毫秒。所有數字都是模擬的。"
+  },
+  {
+   "kind": "html",
+   "en": "Cache",
+   "zh": "快取"
+  },
+  {
+   "kind": "html",
+   "en": "TTL (how long a copy is kept): <b id=\"ttlV\">10 s</b>",
+   "zh": "TTL（副本保留多久）：<b id=\"ttlV\">10 s</b>"
+  },
+  {
+   "kind": "html",
+   "en": "Cache size: <b id=\"sizeV\">20</b> concerts",
+   "zh": "快取大小：<b id=\"sizeV\">20</b> 場演唱會"
+  },
+  {
+   "kind": "html",
+   "en": "When a ticket is sold",
+   "zh": "賣出一張票時"
+  },
+  {
+   "kind": "html",
+   "en": "Simulation",
+   "zh": "模擬"
+  },
+  {
+   "kind": "html",
+   "en": "Reunion Tour · Night 1",
+   "zh": "重聚巡演 · 第 1 晚"
+  },
+  {
+   "kind": "html",
+   "en": "Fans see",
+   "zh": "歌迷看到"
+  },
+  {
+   "kind": "html",
+   "en": "<b id=\"seen\">500 seats left</b>",
+   "zh": "<b id=\"seen\">500 個空位</b>"
+  },
+  {
+   "kind": "html",
+   "en": "Database",
+   "zh": "資料庫"
+  },
+  {
+   "kind": "html",
+   "en": "<b id=\"truth\">500 seats left</b>",
+   "zh": "<b id=\"truth\">500 個空位</b>"
+  },
+  {
+   "kind": "html",
+   "en": "✓ in sync",
+   "zh": "✓ 一致"
+  },
+  {
+   "kind": "html",
+   "en": "Database load",
+   "zh": "資料庫負載"
+  },
+  {
+   "kind": "html",
+   "en": "0 queries/s of ~100",
+   "zh": "每秒 0 次查詢，上限約 100"
+  },
+  {
+   "kind": "html",
+   "en": "Hit rate",
+   "zh": "命中率"
+  },
+  {
+   "kind": "html",
+   "en": "answered by the cache",
+   "zh": "由快取回答"
+  },
+  {
+   "kind": "html",
+   "en": "Page latency",
+   "zh": "頁面延遲"
+  },
+  {
+   "kind": "html",
+   "en": "0 ms",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "average for a fan",
+   "zh": "歌迷的平均值"
+  },
+  {
+   "kind": "html",
+   "en": "Stale reads",
+   "zh": "過期讀取"
+  },
+  {
+   "kind": "html",
+   "en": "wrong seat count shown",
+   "zh": "顯示錯誤的座位數"
+  },
+  {
+   "kind": "html",
+   "en": "Database queries",
+   "zh": "資料庫查詢"
+  },
+  {
+   "kind": "html",
+   "en": "capacity ~100/s",
+   "zh": "上限約每秒 100 次"
+  },
+  {
+   "kind": "html",
+   "en": "Press Play to start the traffic.",
+   "zh": "按「播放」開始送出流量。"
+  },
+  {
+   "kind": "html",
+   "en": "Try this",
+   "zh": "試試看"
+  },
+  {
+   "kind": "html",
+   "en": "TTL only",
+   "zh": "只靠 TTL"
+  },
+  {
+   "kind": "html",
+   "en": "Every copy expires after a fixed time. Simple, and works with any cache, but fans can see an old answer for up to the full TTL. Long TTL means less load and more staleness, short TTL means the opposite.",
+   "zh": "每份副本在固定時間後過期。很簡單，任何快取都能用，但歌迷可能在整段 TTL 期間都看到舊答案。TTL 長，負載低但更容易過期；TTL 短則相反。"
+  },
+  {
+   "kind": "html",
+   "en": "Delete on write",
+   "zh": "寫入時刪除"
+  },
+  {
+   "kind": "html",
+   "en": "When the data changes, delete (or update) the cached copy. Reads stay fast and fresh. But <i>every</i> code path that changes the data has to remember to do it. This is cache <b>invalidation</b>.",
+   "zh": "資料變更時，刪除（或更新）快取副本。讀取依然又快又新。但<i>每一條</i>會改到資料的程式路徑都要記得這麼做。這就是快取<b>失效（invalidation）</b>。"
+  },
+  {
+   "kind": "html",
+   "en": "The one difference",
+   "zh": "關鍵差別"
+  },
+  {
+   "kind": "html",
+   "en": "A cache is a <b>copy</b>. The real question isn't “is it fast?” but “<b>how wrong can the copy be, and for how long?</b>” TTL limits how long. Invalidation removes the copy the moment it's wrong.",
+   "zh": "快取是一份<b>副本</b>。真正的問題不是「快不快？」而是「<b>副本可以錯得多離譜、錯多久？</b>」TTL 限制錯多久；失效則在副本一出錯就把它移除。"
+  },
+  {
+   "kind": "html",
+   "en": "act 2 · the real thing",
+   "zh": "第 2 幕 · 真實世界"
+  },
+  {
+   "kind": "html",
+   "en": "redis",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "The cache-aside pattern, plus an edge header",
+   "zh": "旁路快取（cache-aside）模式，加上一個邊緣標頭"
+  },
+  {
+   "kind": "html",
+   "en": "This is the most common way apps use a cache like Redis or Memcached. <b>Hover or tap a line.</b>",
+   "zh": "這是 App 使用 Redis 或 Memcached 這類快取最常見的方式。<b>把滑鼠移到某一行上，或點一下。</b>"
+  },
+  {
+   "kind": "html",
+   "en": "👆 pick a line",
+   "zh": "👆 選一行"
+  },
+  {
+   "kind": "html",
+   "en": "Each highlighted line maps to a control in the lab.",
+   "zh": "每一行反白後，都會對應到實驗室裡的一個控制項。"
+  },
+  {
+   "kind": "html",
+   "en": "recap · keep this",
+   "zh": "重點整理 · 帶走這些"
+  },
+  {
+   "kind": "html",
+   "en": "The whole page on one screen",
+   "zh": "整頁濃縮在一個畫面"
+  },
+  {
+   "kind": "html",
+   "en": "What",
+   "zh": "是什麼"
+  },
+  {
+   "kind": "html",
+   "en": "Caching",
+   "zh": "快取"
+  },
+  {
+   "kind": "html",
+   "en": "Keep a copy of an answer so you don't recompute or refetch it. Fewer database queries, faster pages.",
+   "zh": "把答案留一份副本，就不必重新計算或重新抓取。資料庫查詢更少，頁面更快。"
+  },
+  {
+   "kind": "html",
+   "en": "Where",
+   "zh": "放哪裡"
+  },
+  {
+   "kind": "html",
+   "en": "Edge caching",
+   "zh": "邊緣快取"
+  },
+  {
+   "kind": "html",
+   "en": "Keep the copy in a CDN close to the fan, so hits skip the trip to your servers entirely. Only for data that's the same for everyone.",
+   "zh": "把副本放在離歌迷很近的 CDN，命中時完全不用跑到你的伺服器。只適用於每個人看到都一樣的資料。"
+  },
+  {
+   "kind": "html",
+   "en": "When it's wrong",
+   "zh": "錯了怎麼辦"
+  },
+  {
+   "kind": "html",
+   "en": "Invalidation",
+   "zh": "快取失效"
+  },
+  {
+   "kind": "html",
+   "en": "Delete or update the copy when the data changes, and use TTLs as a backstop. Decide how stale each kind of data is allowed to be.",
+   "zh": "資料變更時刪除或更新副本，並用 TTL 當作最後防線。決定每一種資料可以容忍多舊。"
+  },
+  {
+   "kind": "html",
+   "en": "The tradeoff",
+   "zh": "取捨"
+  },
+  {
+   "kind": "html",
+   "en": "Every cache trades freshness for speed. A seat count can be a few seconds old on the concert page, but the checkout must always ask the database. Cache what can be slightly wrong, never what must be exactly right.",
+   "zh": "每一種快取都在用新鮮度換速度。演唱會頁面上的座位數可以晚幾秒，但結帳一定要問資料庫。快取可以稍微錯一點的東西，絕不快取必須完全正確的東西。"
+  },
+  {
+   "kind": "html",
+   "en": "Check it",
+   "zh": "考考自己"
+  },
+  {
+   "kind": "js",
+   "en": "'Press <b>Play</b> with <b>no cache</b>.'",
+   "zh": "'在<b>沒有快取</b>的情況下按<b>播放</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Every page view is a database query: 200 a second against a capacity of ~100. Watch the latency.'",
+   "zh": "'每次頁面瀏覽都是一次資料庫查詢：每秒 200 次，上限卻只有約 100 次。看看延遲。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Turn on the <b>App cache</b>.'",
+   "zh": "'開啟<b>應用程式快取</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Popular concerts get answered from memory. The database calms down within a second.'",
+   "zh": "'熱門演唱會直接從記憶體回答。資料庫在一秒內就冷靜下來。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Raise the <b>TTL to 60 s</b> and watch “Fans see” vs “Database”.'",
+   "zh": "'把 <b>TTL 調到 60 秒</b>，比較「歌迷看到」和「資料庫」。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Seats are selling, but the cached copy doesn\\'t know. Fans now see seats that don\\'t exist.'",
+   "zh": "'座位一直在賣，但快取副本不知道。歌迷現在看到的是根本不存在的座位。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Switch “When a ticket is sold” to <b>Delete the cached copy</b>.'",
+   "zh": "'把「賣出一張票時」切換成<b>刪除快取副本</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Stale reads drop to almost zero, and the hit rate stays high.'",
+   "zh": "'過期讀取幾乎降到零，命中率依然很高。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Switch to the <b>Edge cache</b>.'",
+   "zh": "'切換到<b>邊緣快取</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Hits are now answered by a CDN next to the fan, so they skip the 150 ms trip to Encore.'",
+   "zh": "'現在命中的請求由歌迷身邊的 CDN 回答，省下到 Encore 的 150 毫秒路程。'"
+  },
+  {
+   "kind": "js",
+   "en": "'no cache'",
+   "zh": "'沒有快取'"
+  },
+  {
+   "kind": "js",
+   "en": "'app cache'",
+   "zh": "'應用程式快取'"
+  },
+  {
+   "kind": "js",
+   "en": "'edge cache'",
+   "zh": "'邊緣快取'"
+  },
+  {
+   "kind": "js",
+   "en": "' ms'",
+   "zh": "' 毫秒'"
+  },
+  {
+   "kind": "js",
+   "en": "`off by ${m.off.toFixed(1)} seats on average`",
+   "zh": "`平均差了 ${m.off.toFixed(1)} 個座位`"
+  },
+  {
+   "kind": "js",
+   "en": "'wrong seat count shown'",
+   "zh": "'顯示錯誤的座位數'"
+  },
+  {
+   "kind": "js",
+   "en": "`${m.dbqps} queries/s of ~${DB_CAP}${load >= 1 ? ': overloaded' : ''}`",
+   "zh": "`每秒 ${m.dbqps} 次查詢，上限約 ${DB_CAP}${load >= 1 ? '：超載' : ''}`"
+  },
+  {
+   "kind": "js",
+   "en": "' seats left'",
+   "zh": "' 個空位'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"pill ok\">✓ in sync</span>'",
+   "zh": "'<span class=\"pill ok\">✓ 一致</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "`<span class=\"pill bad\">✕ stale by ${seen - S.seats[0]}</span> fans can try to buy seats that are gone`",
+   "zh": "`<span class=\"pill bad\">✕ 差了 ${seen - S.seats[0]} 個</span> 歌迷可能會去買已經賣掉的座位`"
+  },
+  {
+   "kind": "js",
+   "en": "'Press Play to start the traffic.'",
+   "zh": "'按「播放」開始送出流量。'"
+  },
+  {
+   "kind": "js",
+   "en": "`✕ The database is overloaded: ${m.dbqps} queries/s. Every page view waits behind the others.`",
+   "zh": "`✕ 資料庫超載：每秒 ${m.dbqps} 次查詢。每次頁面瀏覽都排在別人後面等。`"
+  },
+  {
+   "kind": "js",
+   "en": "`✕ Fast, but wrong: ${(m.stale * 100).toFixed(0)}% of page views show an old seat count. Copies live ${S.ttl} s, and seats sell every second.`",
+   "zh": "`✕ 很快，但是錯的：${(m.stale * 100).toFixed(0)}% 的頁面瀏覽顯示舊的座位數。副本存活 ${S.ttl} 秒，而座位每秒都在賣。`"
+  },
+  {
+   "kind": "js",
+   "en": "`⚠ Mostly fresh, but ${(m.stale * 100).toFixed(1)}% of page views show an outdated seat count.`",
+   "zh": "`⚠ 大致新鮮，但有 ${(m.stale * 100).toFixed(1)}% 的頁面瀏覽顯示過時的座位數。`"
+  },
+  {
+   "kind": "js",
+   "en": "`✓ Fast and fresh: ${(m.hit * 100).toFixed(0)}% hits, and the database only sees misses.`",
+   "zh": "`✓ 又快又新：命中率 ${(m.hit * 100).toFixed(0)}%，資料庫只會看到未命中的請求。`"
+  },
+  {
+   "kind": "js",
+   "en": "'✓ The database keeps up for now.'",
+   "zh": "'✓ 資料庫暫時撐得住。'"
+  },
+  {
+   "kind": "js",
+   "en": "`t = ${(S.t / 1000).toFixed(1)} s`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'No cache'",
+   "zh": "'沒有快取'"
+  },
+  {
+   "kind": "js",
+   "en": "'App cache'",
+   "zh": "'應用程式快取'"
+  },
+  {
+   "kind": "js",
+   "en": "'Edge cache (CDN)'",
+   "zh": "'邊緣快取（CDN）'"
+  },
+  {
+   "kind": "js",
+   "en": "'Do nothing (wait for TTL)'",
+   "zh": "'什麼都不做（等 TTL 過期）'"
+  },
+  {
+   "kind": "js",
+   "en": "'Delete the cached copy'",
+   "zh": "'刪除快取副本'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">async function</span> getConcert(id) {'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  <span class=\"key\">const</span> cached = <span class=\"key\">await</span> redis.get(<span class=\"s\">`concert:${id}`</span>);'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  <span class=\"key\">if</span> (cached) <span class=\"key\">return</span> JSON.parse(cached);'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  <span class=\"key\">const</span> concert = <span class=\"key\">await</span> db.concerts.find(id);'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  <span class=\"key\">await</span> redis.set(<span class=\"s\">`concert:${id}`</span>, JSON.stringify(concert),'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'                  { EX: <span class=\"s\">10</span> });'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  <span class=\"key\">return</span> concert;'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">async function</span> buyTicket(id, fan) {'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  <span class=\"key\">await</span> db.tickets.insert({ concertId: id, fan });'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  <span class=\"key\">await</span> redis.del(<span class=\"s\">`concert:${id}`</span>);'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\"># Response header: let CDNs keep a copy for 10 s</span>'",
+   "zh": "'<span class=\"c\"># 回應標頭：讓 CDN 保留副本 10 秒</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">Cache-Control</span>: public, max-age=<span class=\"s\">10</span>'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Look in the cache first'",
+   "zh": "'先查快取'"
+  },
+  {
+   "kind": "js",
+   "en": "'Each concert has its own key. That\\'s why cache size matters: if a key was evicted to make room, this lookup misses.'",
+   "zh": "'每場演唱會都有自己的鍵（key）。這就是快取大小重要的原因：如果某個鍵為了騰出空間被淘汰，這次查找就會未命中。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Hit'",
+   "zh": "'命中（Hit）'"
+  },
+  {
+   "kind": "js",
+   "en": "'Found it: no database query at all. The hit rate meter counts how often this line returns.'",
+   "zh": "'找到了：完全不需要查詢資料庫。命中率儀表計算的就是這一行回傳的頻率。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Miss'",
+   "zh": "'未命中（Miss）'"
+  },
+  {
+   "kind": "js",
+   "en": "'Not cached (or expired): ask the database. These are the queries on the database load bar.'",
+   "zh": "'沒有快取（或已過期）：去問資料庫。這些就是資料庫負載條上的查詢。'"
+  },
+  {
+   "kind": "js",
+   "en": "'TTL'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<code>EX: 10</code> means “forget this after 10 seconds”. It\\'s the TTL slider. It guarantees a copy is never more than 10 s old.'",
+   "zh": "'<code>EX: 10</code> 的意思是「10 秒後忘掉它」，也就是 TTL 滑桿。它保證副本永遠不會舊超過 10 秒。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The write'",
+   "zh": "'寫入'"
+  },
+  {
+   "kind": "js",
+   "en": "'A seat was sold. The database changes, and the cached copy is now wrong.'",
+   "zh": "'賣出一個座位。資料庫變了，快取副本現在是錯的。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Invalidate'",
+   "zh": "'失效'"
+  },
+  {
+   "kind": "js",
+   "en": "'Delete the copy so the next read fetches fresh data. This is the “Delete the cached copy” switch. Forget this line in one code path and you get stale data that\\'s very hard to track down.'",
+   "zh": "'刪除副本，讓下一次讀取抓到新資料。這就是「刪除快取副本」開關。只要有一條程式路徑忘了這一行，就會產生非常難追查的過期資料。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Edge caching'",
+   "zh": "'邊緣快取'"
+  },
+  {
+   "kind": "js",
+   "en": "'Tells CDNs (and browsers) they may keep and share this response for 10 s. <code>public</code> means it\\'s the same for everyone. Never use it on personal data like a fan\\'s orders.'",
+   "zh": "'告訴 CDN（和瀏覽器）可以保留並共用這個回應 10 秒。<code>public</code> 代表每個人看到的都一樣。絕對不要用在個人資料上，例如某位歌迷的訂單。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Fans see “12 seats left” on the concert page, but checkout says the show is sold out. What\\'s the likely cause?'",
+   "zh": "'演唱會頁面顯示「剩 12 個座位」，結帳卻說已經售完。最可能的原因是什麼？'"
+  },
+  {
+   "kind": "js",
+   "en": "'The checkout has a bug'",
+   "zh": "'結帳有 bug'"
+  },
+  {
+   "kind": "js",
+   "en": "'Checkout reads the database, which is right. The concert page is the one showing an old copy.'",
+   "zh": "'結帳讀的是資料庫，它是對的。顯示舊副本的是演唱會頁面。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The concert page shows a cached seat count that wasn\\'t invalidated when seats sold'",
+   "zh": "'演唱會頁面顯示的是快取的座位數，座位賣出時沒有讓它失效'"
+  },
+  {
+   "kind": "js",
+   "en": "'Delete or update the cached copy on every sale, or shorten the TTL, and always re-check the database at checkout.'",
+   "zh": "'每次售出時刪除或更新快取副本，或縮短 TTL，並且在結帳時一律重新查詢資料庫。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The cache is too small'",
+   "zh": "'快取太小'"
+  },
+  {
+   "kind": "js",
+   "en": "'A small cache causes misses (slow), not wrong answers.'",
+   "zh": "'快取太小會造成未命中（變慢），而不是錯誤的答案。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Afraid of stale data, Dee sets every TTL to half a second. What happens during an on-sale rush?'",
+   "zh": "'Dee 怕資料過期，把每個 TTL 都設成半秒。開賣湧入時會發生什麼事？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Fresh data and no downside'",
+   "zh": "'資料很新，而且沒有任何缺點'"
+  },
+  {
+   "kind": "js",
+   "en": "'Copies expire so fast that most reads miss.'",
+   "zh": "'副本過期得太快，大部分讀取都會未命中。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The hit rate collapses and the database load comes back'",
+   "zh": "'命中率崩跌，資料庫負載又回來了'"
+  },
+  {
+   "kind": "js",
+   "en": "'TTL trades staleness for load. Very short TTLs give up most of the benefit. Invalidation on write is usually the better tool for fresh data.'",
+   "zh": "'TTL 是在用過期程度換負載。非常短的 TTL 會放棄大部分好處。要新鮮的資料，寫入時讓快取失效通常是更好的工具。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The cache starts returning errors'",
+   "zh": "'快取開始回傳錯誤'"
+  },
+  {
+   "kind": "js",
+   "en": "'It keeps working, it just rarely has a copy when you ask.'",
+   "zh": "'它還是照常運作，只是你問的時候它很少有副本。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Which of these should not go in a shared edge cache (CDN)?'",
+   "zh": "'下列哪一項不應該放進共用的邊緣快取（CDN）？'"
+  },
+  {
+   "kind": "js",
+   "en": "'The concert poster image'",
+   "zh": "'演唱會海報圖片'"
+  },
+  {
+   "kind": "js",
+   "en": "'Same for everyone and rarely changes. A perfect fit.'",
+   "zh": "'每個人看到都一樣，而且很少變動。非常適合。'"
+  },
+  {
+   "kind": "js",
+   "en": "'A fan\\'s personal “My orders” page'",
+   "zh": "'某位歌迷個人的「我的訂單」頁面'"
+  },
+  {
+   "kind": "js",
+   "en": "'A shared cache could serve one fan\\'s orders to another. Personal responses need <code>Cache-Control: private</code> or no caching.'",
+   "zh": "'共用快取可能會把一位歌迷的訂單拿給另一位看。個人化的回應需要 <code>Cache-Control: private</code>，或乾脆不快取。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The venue\\'s address and seating map'",
+   "zh": "'場館地址與座位圖'"
+  },
+  {
+   "kind": "js",
+   "en": "'Same for everyone and slow to change. A great fit for the edge.'",
+   "zh": "'每個人看到都一樣，而且很少變動。非常適合放在邊緣。'"
+  }
+ ]
+}

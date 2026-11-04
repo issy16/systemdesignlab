@@ -165,7 +165,7 @@ function render() {
   S.servers.forEach(sv => {
     const lineLen = sv.q.length, cap = SIZES[sv.size].cap;
     const util = sv.alive ? Math.min(1, (sv.q.reduce((a, r) => a + r.work, 0) + (sv.busy > S.t ? 1 : 0)) / (cap * 0.5)) : 0;
-    const state = !sv.alive ? ['down', 'bad'] : lineLen >= QMAX * 0.8 ? ['overloaded', 'bad'] : lineLen > 15 ? ['busy', 'wait'] : ['ok', 'ok'];
+    const state = !sv.alive ? ['Down', 'bad'] : lineLen >= QMAX * 0.8 ? ['Overloaded', 'bad'] : lineLen > 15 ? ['Busy', 'wait'] : ['OK', 'ok'];
     const d = el('div', 'server' + (sv.alive ? '' : ' down'));
     d.innerHTML = `<div class="nm"><span>app-${sv.id}</span><span class="pill ${state[1]}">${state[0]}</span></div>
       <div class="mono">${SIZES[sv.size].name} · ~${reqCap(cap)} req/s</div>

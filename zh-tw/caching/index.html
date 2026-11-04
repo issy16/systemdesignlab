@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW" data-lang="zh-tw" data-slug="caching">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="在吃力的資料庫前面加一層快取，再找出它造成的過期資料，並用快取失效修好它。">
+<title>快取 · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/explainer.css">
+</head>
+<body>
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="章節"><a href="#lab">實驗室</a><a href="#real">程式碼</a><a href="#recap">重點整理</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>第 5 頁 · 階段 2 · 更多流量</span><span class="hot">2 · 49 · 50</span></div>
+  <div class="eyebrow">快取、邊緣快取、快取失效</div>
+  <h1>快取很簡單。<em>難的是知道副本什麼時候錯了。</em></h1>
+  <div class="scenario"><b>Encore</b>演唱會頁面上的每位歌迷，都在問資料庫同一個問題：「還剩幾個位子？」每秒 200 次頁面瀏覽時，資料庫撐不住了。Ana 加了一層快取，資料庫恢復了，接著歌迷開始買到早就賣掉的座位。</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">打開實驗室 ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>實驗室 · 先弄壞，再修好</span><span class="hot" id="modeTag">沒有快取</span></div>
+  <h2>每秒 200 次頁面瀏覽，一個資料庫</h2>
+  <p>Encore 有 20 場演唱會，其中幾場比其他場熱門得多。歌迷每秒大約買 2 張票，每次購買都會改變座位數。資料庫大約能處理<b>每秒 100 次查詢</b>，超過就會變慢。歌迷距離 Encore 的伺服器 150 毫秒。所有數字都是模擬的。</p>
+
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">快取</span><div id="modeSeg"></div></div>
+      <div class="ctl">
+        <label for="ttl">TTL（副本保留多久）：<b id="ttlV">10 s</b></label>
+        <input type="range" id="ttl" min="0" max="5" step="1" value="2">
+      </div>
+      <div class="ctl">
+        <label for="size">快取大小：<b id="sizeV">20</b> 場演唱會</label>
+        <input type="range" id="size" min="1" max="20" step="1" value="20">
+      </div>
+      <div class="ctl"><span class="lab-k">賣出一張票時</span><div id="invSeg"></div></div>
+      <div class="ctl"><span class="lab-k">模擬</span><div id="player"></div></div>
+    </div>
+
+    <div class="compare" style="margin:0">
+      <div>
+        <h3>重聚巡演 · 第 1 晚</h3>
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-family:var(--mono);font-size:14px">
+          <span class="muted">歌迷看到</span><b id="seen">500 個空位</b>
+          <span class="muted">資料庫</span><b id="truth">500 個空位</b>
+        </div>
+        <div style="margin-top:8px" id="stalePill"><span class="pill ok">✓ 一致</span></div>
+      </div>
+      <div>
+        <h3>資料庫負載</h3>
+        <div class="bar" style="height:18px"><i id="dbBar"></i></div>
+        <p class="muted" style="font-size:13px;margin:6px 0 0" id="dbTxt">每秒 0 次查詢，上限約 100</p>
+      </div>
+    </div>
+
+    <div class="meters" style="margin:0">
+      <div class="meter"><div class="k">命中率</div><div class="v" id="mHit">–</div><div class="d">由快取回答</div></div>
+      <div class="meter"><div class="k">頁面延遲</div><div class="v" id="mLat">0 ms</div><div class="d">歌迷的平均值</div></div>
+      <div class="meter"><div class="k">過期讀取</div><div class="v" id="mStale">0%</div><div class="d" id="mOff">顯示錯誤的座位數</div></div>
+      <div class="meter"><div class="k">資料庫查詢</div><div class="v" id="mDb">0/s</div><div class="d">上限約每秒 100 次</div></div>
+    </div>
+    <div class="status" id="status" role="status">按「播放」開始送出流量。</div>
+  </div>
+
+  <h3>試試看</h3>
+  <ol class="missions" id="missions"></ol>
+
+  <div class="compare">
+    <div><h3>只靠 TTL</h3><p style="margin:0">每份副本在固定時間後過期。很簡單，任何快取都能用，但歌迷可能在整段 TTL 期間都看到舊答案。TTL 長，負載低但更容易過期；TTL 短則相反。</p></div>
+    <div><h3>寫入時刪除</h3><p style="margin:0">資料變更時，刪除（或更新）快取副本。讀取依然又快又新。但<i>每一條</i>會改到資料的程式路徑都要記得這麼做。這就是快取<b>失效（invalidation）</b>。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">關鍵差別</div><p>快取是一份<b>副本</b>。真正的問題不是「快不快？」而是「<b>副本可以錯得多離譜、錯多久？</b>」TTL 限制錯多久；失效則在副本一出錯就把它移除。</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>第 2 幕 · 真實世界</span><span class="hot">redis</span></div>
+  <h2>旁路快取（cache-aside）模式，加上一個邊緣標頭</h2>
+  <p>這是 App 使用 Redis 或 Memcached 這類快取最常見的方式。<b>把滑鼠移到某一行上，或點一下。</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="快取程式碼範例"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 選一行</div><p id="exP">每一行反白後，都會對應到實驗室裡的一個控制項。</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>重點整理 · 帶走這些</span><span class="hot">♥</span></div>
+  <h2>整頁濃縮在一個畫面</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">是什麼</div><div class="t">快取</div><p>把答案留一份副本，就不必重新計算或重新抓取。資料庫查詢更少，頁面更快。</p></div>
+    <div class="card"><div class="sub">放哪裡</div><div class="t">邊緣快取</div><p>把副本放在離歌迷很近的 CDN，命中時完全不用跑到你的伺服器。只適用於每個人看到都一樣的資料。</p></div>
+    <div class="card"><div class="sub">錯了怎麼辦</div><div class="t">快取失效</div><p>資料變更時刪除或更新副本，並用 TTL 當作最後防線。決定每一種資料可以容忍多舊。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">取捨</div><p>每一種快取都在用新鮮度換速度。演唱會頁面上的座位數可以晚幾秒，但結帳一定要問資料庫。快取可以稍微錯一點的東西，絕不快取必須完全正確的東西。</p></div>
+
+  <h3 style="margin-top:26px">考考自己 <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="頁面"></nav>
+</main>
+
+<script src="../../assets/explainer.js"></script>
+<script src="../../assets/i18n.zh-tw.js"></script>
+<script>
+(() => {
+const { $ } = X;
+const TTLS = [1, 5, 10, 30, 60, 300], N = 20, DT = 100, DB_CAP = 100, FAR = 150, EDGE = 15, WIN = 3000;
+const W = Array.from({ length: N }, (_, i) => 1 / (i + 1)), WSUM = W.reduce((a, b) => a + b, 0);
+const pick = s => { let u = X.rnd(s) * WSUM; for (let i = 0; i < N; i++) { u -= W[i]; if (u <= 0) return i; } return N - 1; };
+
+/* ---------- simulation: pure state + tick ---------- */
+function init(seed, o = {}) {
+  return Object.assign({ r: seed, t: 0, rate: 200, mode: 0, ttl: 10, size: 20, inv: false, seats: Array(N).fill(500), ver: Array(N).fill(0), cache: new Map(), ev: [], dbq: [], ticks: 0 }, o);
+}
+function dbLatency(s) {
+  const load = s.dbq.filter(t => t > s.t - 1000).length / DB_CAP;
+  return load >= 1 ? 1500 : Math.min(1500, 20 / (1 - load));
+}
+function tick(s) {
+  const t0 = s.t, t1 = t0 + DT;
+  for (let i = 0, n = X.poisson(s, 2 * DT / 1000); i < n; i++) {
+    const k = pick(s);
+    if (s.seats[k] > 0) { s.seats[k]--; s.ver[k]++; }
+    if (s.inv) s.cache.delete(k);
+  }
+  const reads = X.poisson(s, s.rate * DT / 1000);
+  for (let i = 0; i < reads; i++) {
+    const at = t0 + (i / Math.max(1, reads)) * DT, k = pick(s);
+    const e = s.mode ? s.cache.get(k) : null;
+    if (e && e.exp > at) {
+      e.used = at;
+      s.ev.push({ t: at, hit: 1, stale: e.ver < s.ver[k] ? 1 : 0, off: s.ver[k] - e.ver, lat: s.mode === 2 ? EDGE : FAR + 2 });
+    } else {
+      const lat = FAR + dbLatency(s);
+      s.dbq.push(at);
+      s.ev.push({ t: at, hit: 0, stale: 0, off: 0, lat });
+      if (s.mode) {
+        if (!s.cache.has(k) && s.cache.size >= s.size) {
+          let lru = null; for (const [kk, v] of s.cache) if (!lru || v.used < lru[1].used) lru = [kk, v];
+          s.cache.delete(lru[0]);
+        }
+        s.cache.set(k, { seats: s.seats[k], ver: s.ver[k], exp: at + s.ttl * 1000, used: at });
+      }
+    }
+  }
+  s.t = t1; s.ticks++;
+  s.ev = s.ev.filter(e => e.t > t1 - WIN);
+  s.dbq = s.dbq.filter(t => t > t1 - 1000);
+  return s;
+}
+function metrics(s) {
+  const e = s.ev, n = e.length || 1, hits = e.filter(x => x.hit), stale = e.filter(x => x.stale);
+  return {
+    hit: s.mode ? hits.length / n : null, lat: X.avg(e.map(x => x.lat)), stale: stale.length / n,
+    off: stale.length ? X.avg(stale.map(x => x.off)) : 0, dbqps: s.dbq.length,
+  };
+}
+
+/* ---------- UI ---------- */
+let S = init(21);
+const ticks0 = () => { S.ticks = 0; };
+const mis = X.missions($('#missions'), [
+  { text: '在<b>沒有快取</b>的情況下按<b>播放</b>。', hint: '每次頁面瀏覽都是一次資料庫查詢：每秒 200 次，上限卻只有約 100 次。看看延遲。', check: s => s.mode === 0 && s.ticks >= 25 },
+  { text: '開啟<b>應用程式快取</b>。', hint: '熱門演唱會直接從記憶體回答。資料庫在一秒內就冷靜下來。', check: s => s.mode > 0 && s.ticks >= 25 && metrics(s).hit > 0.9 },
+  { text: '把 <b>TTL 調到 60 秒</b>，比較「歌迷看到」和「資料庫」。', hint: '座位一直在賣，但快取副本不知道。歌迷現在看到的是根本不存在的座位。', check: s => s.mode > 0 && s.ttl >= 60 && !s.inv && s.ticks >= 30 && metrics(s).stale > 0.2 },
+  { text: '把「賣出一張票時」切換成<b>刪除快取副本</b>。', hint: '過期讀取幾乎降到零，命中率依然很高。', check: s => s.mode > 0 && s.inv && s.ticks >= 30 && metrics(s).stale < 0.01 },
+  { text: '切換到<b>邊緣快取</b>。', hint: '現在命中的請求由歌迷身邊的 CDN 回答，省下到 Encore 的 150 毫秒路程。', check: s => s.mode === 2 && s.ticks >= 25 },
+]);
+function render() {
+  const m = metrics(S);
+  $('#ttlV').textContent = S.ttl + ' s'; $('#sizeV').textContent = S.size;
+  $('#modeTag').textContent = ['沒有快取', '應用程式快取', '邊緣快取'][S.mode];
+  ['ttl', 'size'].forEach(id => ($('#' + id).disabled = !S.mode));
+  $('#mHit').textContent = m.hit == null ? '–' : (m.hit * 100).toFixed(0) + '%';
+  $('#mLat').textContent = X.fmt(m.lat) + ' 毫秒';
+  $('#mLat').parentElement.className = 'meter' + (m.lat > 600 ? ' bad' : m.lat > 250 ? ' wait' : ' ok');
+  $('#mStale').textContent = (m.stale * 100).toFixed(1) + '%';
+  $('#mStale').parentElement.className = 'meter' + (m.stale > 0.2 ? ' bad' : m.stale > 0.01 ? ' wait' : '');
+  $('#mOff').textContent = m.stale ? `平均差了 ${m.off.toFixed(1)} 個座位` : '顯示錯誤的座位數';
+  $('#mDb').textContent = m.dbqps + '/s';
+  const load = Math.min(1, m.dbqps / DB_CAP);
+  $('#dbBar').style.width = load * 100 + '%';
+  $('#dbBar').style.background = load >= 1 ? 'var(--bad)' : load > 0.7 ? 'var(--wait)' : 'var(--ok)';
+  $('#dbTxt').textContent = `每秒 ${m.dbqps} 次查詢，上限約 ${DB_CAP}${load >= 1 ? '：超載' : ''}`;
+  const e = S.mode ? S.cache.get(0) : null;
+  const seen = e && e.exp > S.t ? e.seats : S.seats[0];
+  $('#seen').textContent = seen + ' 個空位';
+  $('#truth').textContent = S.seats[0] + ' 個空位';
+  $('#stalePill').innerHTML = seen === S.seats[0] ? '<span class="pill ok">✓ 一致</span>' : `<span class="pill bad">✕ 差了 ${seen - S.seats[0]} 個</span> 歌迷可能會去買已經賣掉的座位`;
+  const st = $('#status');
+  if (!S.t) { st.className = 'status'; st.textContent = '按「播放」開始送出流量。'; }
+  else if (load >= 1) { st.className = 'status bad'; st.textContent = `✕ 資料庫超載：每秒 ${m.dbqps} 次查詢。每次頁面瀏覽都排在別人後面等。`; }
+  else if (m.stale > 0.2) { st.className = 'status bad'; st.textContent = `✕ 很快，但是錯的：${(m.stale * 100).toFixed(0)}% 的頁面瀏覽顯示舊的座位數。副本存活 ${S.ttl} 秒，而座位每秒都在賣。`; }
+  else if (m.stale > 0.01) { st.className = 'status wait'; st.textContent = `⚠ 大致新鮮，但有 ${(m.stale * 100).toFixed(1)}% 的頁面瀏覽顯示過時的座位數。`; }
+  else { st.className = 'status ok'; st.textContent = S.mode ? `✓ 又快又新：命中率 ${(m.hit * 100).toFixed(0)}%，資料庫只會看到未命中的請求。` : '✓ 資料庫暫時撐得住。'; }
+  player.clock(`t = ${(S.t / 1000).toFixed(1)} s`);
+  mis.update(S);
+}
+const player = X.player($('#player'), {
+  step: () => { tick(S); render(); }, stepTicks: 5,
+  reset: () => { S = init(21, { mode: S.mode, ttl: S.ttl, size: S.size, inv: S.inv }); mis.reset(); render(); },
+});
+X.seg($('#modeSeg'), ['沒有快取', '應用程式快取', '邊緣快取（CDN）'], i => { S.mode = i; if (!i) S.cache.clear(); ticks0(); render(); }, 0);
+X.seg($('#invSeg'), ['什麼都不做（等 TTL 過期）', '刪除快取副本'], i => { S.inv = i === 1; ticks0(); render(); }, 0);
+$('#ttl').addEventListener('input', e => { S.ttl = TTLS[+e.target.value]; ticks0(); render(); });
+$('#size').addEventListener('input', e => { S.size = +e.target.value; while (S.cache.size > S.size) S.cache.delete(S.cache.keys().next().value); ticks0(); render(); });
+render();
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="key">async function</span> getConcert(id) {', null],
+  ['  <span class="key">const</span> cached = <span class="key">await</span> redis.get(<span class="s">`concert:${id}`</span>);', 'get'],
+  ['  <span class="key">if</span> (cached) <span class="key">return</span> JSON.parse(cached);', 'hit'],
+  ['  <span class="key">const</span> concert = <span class="key">await</span> db.concerts.find(id);', 'miss'],
+  ['  <span class="key">await</span> redis.set(<span class="s">`concert:${id}`</span>, JSON.stringify(concert),', 'ttl'],
+  ['                  { EX: <span class="s">10</span> });', 'ttl'],
+  ['  <span class="key">return</span> concert;', null],
+  ['}', null],
+  ['', null],
+  ['<span class="key">async function</span> buyTicket(id, fan) {', null],
+  ['  <span class="key">await</span> db.tickets.insert({ concertId: id, fan });', 'write'],
+  ['  <span class="key">await</span> redis.del(<span class="s">`concert:${id}`</span>);', 'del'],
+  ['}', null],
+  ['', null],
+  ['<span class="c"># 回應標頭：讓 CDN 保留副本 10 秒</span>', null],
+  ['<span class="key">Cache-Control</span>: public, max-age=<span class="s">10</span>', 'edge'],
+], {
+  get: ['先查快取', '每場演唱會都有自己的鍵（key）。這就是快取大小重要的原因：如果某個鍵為了騰出空間被淘汰，這次查找就會未命中。'],
+  hit: ['命中（Hit）', '找到了：完全不需要查詢資料庫。命中率儀表計算的就是這一行回傳的頻率。'],
+  miss: ['未命中（Miss）', '沒有快取（或已過期）：去問資料庫。這些就是資料庫負載條上的查詢。'],
+  ttl: ['TTL', '<code>EX: 10</code> 的意思是「10 秒後忘掉它」，也就是 TTL 滑桿。它保證副本永遠不會舊超過 10 秒。'],
+  write: ['寫入', '賣出一個座位。資料庫變了，快取副本現在是錯的。'],
+  del: ['失效', '刪除副本，讓下一次讀取抓到新資料。這就是「刪除快取副本」開關。只要有一條程式路徑忘了這一行，就會產生非常難追查的過期資料。'],
+  edge: ['邊緣快取', '告訴 CDN（和瀏覽器）可以保留並共用這個回應 10 秒。<code>public</code> 代表每個人看到的都一樣。絕對不要用在個人資料上，例如某位歌迷的訂單。'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: '演唱會頁面顯示「剩 12 個座位」，結帳卻說已經售完。最可能的原因是什麼？', opts: [
+    ['結帳有 bug', false, '結帳讀的是資料庫，它是對的。顯示舊副本的是演唱會頁面。'],
+    ['演唱會頁面顯示的是快取的座位數，座位賣出時沒有讓它失效', true, '每次售出時刪除或更新快取副本，或縮短 TTL，並且在結帳時一律重新查詢資料庫。'],
+    ['快取太小', false, '快取太小會造成未命中（變慢），而不是錯誤的答案。'],
+  ] },
+  { q: 'Dee 怕資料過期，把每個 TTL 都設成半秒。開賣湧入時會發生什麼事？', opts: [
+    ['資料很新，而且沒有任何缺點', false, '副本過期得太快，大部分讀取都會未命中。'],
+    ['命中率崩跌，資料庫負載又回來了', true, 'TTL 是在用過期程度換負載。非常短的 TTL 會放棄大部分好處。要新鮮的資料，寫入時讓快取失效通常是更好的工具。'],
+    ['快取開始回傳錯誤', false, '它還是照常運作，只是你問的時候它很少有副本。'],
+  ] },
+  { q: '下列哪一項不應該放進共用的邊緣快取（CDN）？', opts: [
+    ['演唱會海報圖片', false, '每個人看到都一樣，而且很少變動。非常適合。'],
+    ['某位歌迷個人的「我的訂單」頁面', true, '共用快取可能會把一位歌迷的訂單拿給另一位看。個人化的回應需要 <code>Cache-Control: private</code>，或乾脆不快取。'],
+    ['場館地址與座位圖', false, '每個人看到都一樣，而且很少變動。非常適合放在邊緣。'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'caching');
+})();
+</script>
+</body>
+</html>

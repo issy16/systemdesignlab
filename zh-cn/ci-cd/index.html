@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="zh-Hans-CN" data-lang="zh-cn" data-slug="ci-cd">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="一个让 CI/CD 真正搞懂的交互解说：先感受痛苦、请一个机器人、延长流水线，最后读懂设置档。">
+<title>CI/CD，终于搞懂了</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#e3e8ef; --panel:#f3f6fa; --panel-2:#e8edf4; --line:#a3adbd; --grid:#d2dae5;
+  --ink:#202736; --muted:#576074;
+  --accent:#2f6fe0; --accent-ink:#1d55b8; --accent-2:#92b4ef; --accent-3:#d5e3fb;
+  --card:#ffffff; --code:#1e2433;
+  --ok:#1f8a5b; --ok-bg:#d6f0e3; --bad:#c63a2f; --bad-bg:#f8dcd8; --wait:#a86b00; --wait-bg:#f8ebc9;
+  --label:"Silkscreen","Courier New",monospace;
+  --body:"IBM Plex Sans",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#151a23; --panel:#1d2330; --panel-2:#252d3b; --line:#45506a; --grid:#1b212c; --ink:#e8edf5; --muted:#9ea8bb; --accent:#5a92f5; --accent-ink:#8db6ff; --accent-2:#2c4c86; --accent-3:#1c2e50; --card:#232a37; --code:#0f131a; --ok:#4cc28a; --ok-bg:#173a2a; --bad:#ff7b6e; --bad-bg:#44201d; --wait:#e6b04a; --wait-bg:#3d3015; color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#151a23; --panel:#1d2330; --panel-2:#252d3b; --line:#45506a; --grid:#1b212c; --ink:#e8edf5; --muted:#9ea8bb; --accent:#5a92f5; --accent-ink:#8db6ff; --accent-2:#2c4c86; --accent-3:#1c2e50; --card:#232a37; --code:#0f131a; --ok:#4cc28a; --ok-bg:#173a2a; --bad:#ff7b6e; --bad-bg:#44201d; --wait:#e6b04a; --wait-bg:#3d3015; color-scheme:dark}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:64px}
+body{margin:0;background-color:var(--bg);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:32px 32px;color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.6;padding-bottom:64px}
+a{color:var(--accent-ink);text-decoration:underline dotted;text-underline-offset:3px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+code,.mono{font-family:var(--mono);font-size:.92em}
+
+/* top bar */
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--panel)}
+.topbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--panel);border-bottom:1.5px solid var(--line)}
+.topbar-inner{max-width:980px;margin:0 auto;padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.brand{font-family:var(--label);font-size:14px;color:var(--ink);text-decoration:none;white-space:nowrap}
+.brand b{color:var(--accent-ink);font-weight:400}
+.acts{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+.acts a{font-family:var(--label);font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-decoration:none;
+  border:1.5px solid var(--line);padding:3px 8px;background:var(--panel-2)}
+.acts a:hover{color:var(--accent-ink);border-color:var(--accent)}
+
+main{max-width:980px;margin:0 auto;padding-block:24px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.panel{position:relative;background:var(--panel);border:1.5px solid var(--line);padding:42px 22px 24px;margin:0 0 28px}
+.panel-label{position:absolute;top:10px;left:12px;right:12px;display:flex;justify-content:space-between;gap:10px;
+  font-family:var(--label);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.panel-label .hot{color:var(--accent-ink)}
+h1,h2,h3{font-family:var(--label);font-weight:400;line-height:1.2;margin:0 0 12px}
+h1{font-size:clamp(28px,5vw,44px);text-wrap:balance}
+h1 em{font-style:normal;color:var(--accent-ink)}
+h2{font-size:clamp(20px,3.4vw,26px)}
+h3{font-size:16px}
+p{margin:0 0 12px;max-width:68ch}
+.lede{font-size:18px;color:var(--muted)}
+.muted{color:var(--muted)}
+
+/* buttons */
+.btn{font-family:var(--label);font-size:13px;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;
+  border:1.5px solid var(--ink);background:var(--panel);color:var(--ink);padding:9px 14px;box-shadow:3px 3px 0 var(--ink);transition:transform .08s,box-shadow .08s}
+.btn:hover:not(:disabled){background:var(--accent-3)}
+.btn:active:not(:disabled){transform:translate(3px,3px);box-shadow:0 0 0 var(--ink)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent-ink);box-shadow:3px 3px 0 var(--accent-ink)}
+.btn.primary:hover:not(:disabled){background:var(--accent-ink)}
+.btn.bad{border-color:var(--bad);color:var(--bad);box-shadow:3px 3px 0 var(--bad)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:14px 0}
+
+/* hero */
+.hero p.lede{margin-bottom:18px}
+.promise{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-top:18px}
+.promise div{border:1.5px dashed var(--line);padding:10px 12px;background:var(--panel-2);font-size:14px}
+.promise b{font-family:var(--label);font-weight:400;color:var(--accent-ink);display:block;font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+
+/* lanes (act 0) */
+.lanes{border:1.5px solid var(--line);background:var(--card);padding:10px 12px;margin:14px 0;overflow:hidden}
+.lane{display:grid;grid-template-columns:64px 1fr;align-items:center;gap:8px;min-height:30px}
+.lane+.lane{border-top:1px dashed var(--grid)}
+.who{font-family:var(--label);font-size:12px;text-transform:uppercase}
+.track{display:flex;gap:5px;align-items:center;flex-wrap:wrap;min-height:22px;position:relative}
+.dot{width:14px;height:14px;border:1.5px solid var(--ink);background:var(--c,#999);animation:pop .25s ease-out}
+.dot.main{background:var(--ink)}
+.dot.bug{position:relative}
+.dot.bug.revealed::after{content:"🐞";position:absolute;top:-16px;left:-4px;font-size:13px}
+.lanes.merged .lane:not(.mainlane) .dot{opacity:.25}
+@keyframes pop{from{transform:scale(0)}to{transform:scale(1)}}
+.week{font-family:var(--label);font-size:12px;color:var(--muted)}
+
+.events{list-style:none;margin:10px 0;padding:0;display:grid;gap:6px}
+.events li{font-family:var(--mono);font-size:13px;padding:6px 10px;border:1.5px solid var(--bad);background:var(--bad-bg);animation:slide .3s ease-out}
+.events li.ok{border-color:var(--ok);background:var(--ok-bg)}
+.events li.warn{border-color:var(--wait);background:var(--wait-bg)}
+@keyframes slide{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:none}}
+
+.meters{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:14px 0}
+.meter{border:1.5px solid var(--line);background:var(--card);padding:10px 12px}
+.meter .k{font-family:var(--label);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:.06em}
+.meter .v{font-family:var(--mono);font-size:24px;font-weight:600}
+.meter.bad .v{color:var(--bad)} .meter.ok .v{color:var(--ok)}
+
+.checklist{list-style:none;padding:0;margin:10px 0;display:grid;gap:6px;max-width:560px}
+.checklist button{width:100%;text-align:left;font:inherit;font-size:15px;cursor:pointer;background:var(--card);border:1.5px solid var(--line);padding:8px 12px;display:flex;gap:10px;align-items:center}
+.checklist button:hover:not(:disabled){border-color:var(--accent)}
+.checklist button:disabled{cursor:default}
+.checklist .box{width:18px;height:18px;border:1.5px solid var(--ink);flex:none;display:grid;place-items:center;font-size:12px;line-height:1}
+.checklist .done .box{background:var(--ok);color:#fff;border-color:var(--ok)}
+.checklist .fail{border-color:var(--bad);background:var(--bad-bg)}
+.checklist .fail .box{background:var(--bad);color:#fff;border-color:var(--bad)}
+.checklist .next{border-color:var(--accent);box-shadow:3px 3px 0 var(--accent-2)}
+
+.callout{border-left:5px solid var(--accent);background:var(--accent-3);padding:12px 16px;margin:16px 0;font-size:16px}
+.callout b{font-family:var(--label);font-weight:400}
+.takeaway{border:2px solid var(--ink);background:var(--card);padding:14px 16px;margin:18px 0 4px;box-shadow:5px 5px 0 var(--accent-2)}
+.takeaway .t{font-family:var(--label);font-size:12px;text-transform:uppercase;color:var(--accent-ink);letter-spacing:.08em}
+.takeaway p{font-size:18px;margin:4px 0 0;font-weight:500}
+.hidden{display:none!important}
+.reveal{animation:slide .35s ease-out}
+
+/* pipeline */
+.pipe{display:flex;align-items:stretch;gap:0;flex-wrap:wrap;margin:16px 0;row-gap:10px}
+.stage{display:flex;align-items:center}
+.stage+.stage::before{content:"";width:22px;height:2px;background:var(--line);margin:0 2px}
+.chip{font-family:var(--label);font-size:12px;text-transform:uppercase;letter-spacing:.04em;border:1.5px solid var(--line);background:var(--card);
+  padding:8px 10px;min-width:84px;text-align:center;position:relative;transition:background .2s,border-color .2s}
+.chip small{display:block;font-family:var(--mono);font-size:11px;text-transform:none;color:var(--muted);letter-spacing:0;min-height:1.3em}
+.chip.run{border-color:var(--accent);background:var(--accent-3);animation:pulse 0.8s ease-in-out infinite}
+.chip.ok{border-color:var(--ok);background:var(--ok-bg)}
+.chip.fail{border-color:var(--bad);background:var(--bad-bg)}
+.chip.wait{border-color:var(--wait);background:var(--wait-bg)}
+.chip.hl{outline:3px solid var(--accent);outline-offset:2px;background:var(--accent-3)}
+.chip.gate{border-style:dashed}
+.chip.robot{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+.chip.robot small{color:inherit;opacity:.75}
+@keyframes pulse{50%{box-shadow:0 0 0 4px var(--accent-3)}}
+
+.robotbar{display:flex;gap:10px;align-items:center;font-family:var(--mono);font-size:13px;color:var(--muted);margin-top:4px}
+.feedback{min-height:52px;margin:6px 0}
+.feedback .events{margin:0}
+
+/* slider */
+.slider{border:1.5px solid var(--line);background:var(--card);padding:14px 16px;margin:18px 0}
+.slider input{width:100%;accent-color:var(--accent)}
+.ticks{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--muted)}
+.bars{display:grid;grid-template-columns:150px 1fr 64px;gap:8px 10px;align-items:center;margin-top:12px;font-size:14px}
+.bar{height:16px;background:var(--panel-2);border:1.5px solid var(--line);position:relative}
+.bar i{position:absolute;inset:0 auto 0 0;background:var(--accent);transition:width .3s}
+.bar.risk i{background:var(--bad)}
+.bars .num{font-family:var(--mono);text-align:right}
+
+/* toggle */
+.switch{display:flex;align-items:center;gap:12px;cursor:pointer;user-select:none;font-weight:500}
+.switch input{position:absolute;opacity:0}
+.switch .track2{width:52px;height:28px;border:1.5px solid var(--ink);background:var(--panel-2);position:relative;flex:none;transition:background .2s}
+.switch .track2::after{content:"";position:absolute;top:3px;left:3px;width:19px;height:19px;background:var(--ink);transition:transform .2s}
+.switch input:checked+.track2{background:var(--accent-2)}
+.switch input:checked+.track2::after{transform:translateX(24px)}
+.switch input:focus-visible+.track2{outline:2px solid var(--accent);outline-offset:2px}
+.mode{font-family:var(--label);font-size:clamp(18px,3vw,24px);color:var(--accent-ink);margin:12px 0 2px}
+.envs{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin:12px 0}
+.env{border:1.5px solid var(--line);background:var(--card);padding:10px 12px}
+.env .k{font-family:var(--label);font-size:11px;text-transform:uppercase;color:var(--muted)}
+.env .v{font-family:var(--mono);font-size:22px;font-weight:600}
+.release{animation:pulse 1s infinite}
+
+/* yaml */
+.yaml-wrap{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:16px;margin:14px 0}
+.yaml{background:var(--code);color:#e6e6ea;border:1.5px solid var(--ink);padding:10px 0;font-family:var(--mono);font-size:13px;line-height:1.55;overflow-x:auto}
+.yaml .ln{display:block;padding:0 14px;white-space:pre;border-left:3px solid transparent;cursor:default}
+.yaml .ln[data-k]{cursor:pointer}
+.yaml .ln[data-k]:hover,.yaml .ln.active{background:#24365a;border-left-color:var(--accent)}
+.yaml .c{color:#7f8aa0} .yaml .key{color:#9cc2ff} .yaml .s{color:#9fd8b8}
+.explain{border:1.5px solid var(--line);background:var(--card);padding:14px 16px;position:sticky;top:76px;align-self:start}
+.explain .t{font-family:var(--label);font-size:13px;text-transform:uppercase;color:var(--accent-ink);margin-bottom:6px}
+.explain p{font-size:15px}
+
+/* recap + quiz */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin:14px 0}
+.card{border:2px solid var(--ink);background:var(--card);padding:14px 16px;box-shadow:4px 4px 0 var(--accent-2)}
+.card .t{font-family:var(--label);font-size:16px;color:var(--accent-ink)}
+.card .sub{font-family:var(--label);font-size:11px;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.card p{font-size:15px;margin:0}
+.quiz{list-style:none;padding:0;margin:14px 0;display:grid;gap:10px;counter-reset:q}
+.quiz li{border:1.5px solid var(--line);background:var(--card);padding:12px 14px}
+.quiz .q{font-weight:500;margin-bottom:8px}
+.quiz .q::before{counter-increment:q;content:counter(q) ". ";font-family:var(--label);color:var(--accent-ink)}
+.quiz .ans{margin-top:8px;font-size:15px}
+.quiz li.right{border-color:var(--ok);background:var(--ok-bg)}
+.quiz li.wrong{border-color:var(--bad);background:var(--bad-bg)}
+.quiz .btn{font-size:12px;padding:6px 12px}
+.score{font-family:var(--label);font-size:14px}
+
+@media (max-width:720px){
+  .yaml-wrap{grid-template-columns:1fr}
+  .explain{position:static;order:-1}
+  .bars{grid-template-columns:110px 1fr 54px;font-size:13px}
+  .panel{padding:42px 16px 20px}
+  .stage+.stage::before{width:10px}
+  .chip{min-width:70px;padding:7px 7px;font-size:11px}
+  .acts{margin-left:0}
+  .panel-label span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+  .envs{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+  .env{padding:8px}
+  .env .k{font-size:9px}
+  .env .v{font-size:18px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}html{scroll-behavior:auto}}
+/* Large headings: readable mono instead of the pixel face (pixel stays for small labels) */
+h1,h2,.mode{font-family:var(--mono);font-weight:600;letter-spacing:-.01em}
+h1{font-size:clamp(28px,4.4vw,42px);line-height:1.15}
+h2{font-size:clamp(20px,3vw,26px);line-height:1.25}
+
+/* Language switcher + Chinese font stacks */
+.acts.langs{margin-left:0}
+.acts.langs a[aria-current="true"]{color:var(--accent-ink);border-color:var(--accent);background:var(--accent-3)}
+:root:lang(zh-Hant){--body:"IBM Plex Sans","Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;--mono:"IBM Plex Mono","Noto Sans TC","PingFang TC",monospace;--label:"Silkscreen","Noto Sans TC","PingFang TC",monospace}
+:root:lang(zh-Hans){--body:"IBM Plex Sans","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;--mono:"IBM Plex Mono","Noto Sans SC","PingFang SC",monospace;--label:"Silkscreen","Noto Sans SC","PingFang SC",monospace}
+:root:lang(zh) p,:root:lang(zh) li{line-height:1.75}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="../">system<b>.design.lab</b></a>
+    <nav class="acts" aria-label="章节">
+      <a href="#act0">0 · 痛点</a><a href="#act1">1 · CI</a><a href="#act2">2 · CD</a><a href="#act3">3 · 设置档</a><a href="#recap">重点整理</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+
+<section class="panel hero">
+  <div class="panel-label"><span>ci-cd.explained</span><span class="hot">● 准备好了</span></div>
+  <h1>「CI/CD」你听过一百遍了。<em>这次让它真正搞懂。</em></h1>
+  <p class="lede">定义记不住，痛才记得住。大约 5 分钟，你会用老方法带一个团队、看它崩溃，然后一次请一个机器人把它修好。</p>
+  <div class="promise">
+    <div><b>第 0 幕</b>用老方法出货，感受为什么痛</div>
+    <div><b>第 1 幕 · CI</b>请一个机器人检查每一次变更</div>
+    <div><b>第 2 幕 · CD</b>让机器人也负责打包和出货</div>
+    <div><b>第 3 幕</b>读真正的设置档。比你想的短。</div>
+  </div>
+  <div class="row"><a class="btn primary" href="#act0" style="text-decoration:none">开始 ↓</a></div>
+</section>
+
+<!-- ============ ACT 0 ============ -->
+<section class="panel" id="act0">
+  <div class="panel-label"><span>第 0 幕 · 没有 CI/CD 的日子</span><span class="week" id="weekLabel">第 0 / 3 周</span></div>
+  <h2>老方法：每个人各自写程序，最后才合并</h2>
+  <p>四位开发者各自在自己的分支上工作三周。<code>main</code> 一直没人动，直到<b>合并日</b>。在那之前没有人跑完整的测试，因为又慢又要手动。</p>
+
+  <div class="lanes" id="lanes0"></div>
+
+  <div class="row">
+    <button class="btn" id="weekBtn">工作一周 →</button>
+    <button class="btn primary" id="mergeBtn" disabled>合并日到了 😬</button>
+  </div>
+
+  <div id="mergeOut" class="hidden">
+    <h3>合并中…</h3>
+    <ul class="events" id="conflicts"></ul>
+    <div id="bugOut" class="hidden reveal">
+      <ul class="events"><li>🐞 测试终于跑了：<b>结帐总金额算错</b>。是 Ben……三周前写的。Ben：「我真的不记得我写过那段。」</li></ul>
+      <div class="meters">
+        <div class="meter bad"><div class="k">Bug 没被发现的时间</div><div class="v">21 天</div></div>
+        <div class="meter bad"><div class="k">合并冲突</div><div class="v" id="conflictCount">0</div></div>
+        <div class="meter bad"><div class="k">解开冲突的时间</div><div class="v">约 3 天</div></div>
+      </div>
+      <h3>终于修好了。现在照着 wiki 上的清单，手动部署。</h3>
+      <p class="muted">依序点击每个步骤。</p>
+      <ol class="checklist" id="deployList"></ol>
+    </div>
+  </div>
+
+  <div id="act0End" class="hidden reveal">
+    <div class="callout"><b>注意这个模式：</b>每个问题都来自两件事。变更<b>太晚才检查</b>（合并日），出货<b>靠人工</b>（那张清单）。CI 解决第一件，CD 解决第二件。</div>
+    <div class="row"><a class="btn primary" href="#act1" style="text-decoration:none">请一个机器人 → 第 1 幕</a></div>
+  </div>
+</section>
+
+<!-- ============ ACT 1 ============ -->
+<section class="panel" id="act1">
+  <div class="panel-label"><span>第 1 幕 · 持续集成</span><span class="hot">ci</span></div>
+  <h2>CI：经常合并小变更，机器人检查每一次</h2>
+  <p>同一个团队，新规则：<b>一天好几次</b>把<b>小</b>变更推上 <code>main</code>。每次推送都会叫醒一个机器人（某处的一台服务器），在几分钟内帮你合并、建置、跑测试。两个按钮都试试看。</p>
+
+  <div class="row">
+    <button class="btn" id="pushGood">推送一个小变更</button>
+    <button class="btn bad" id="pushBad">推送一个有 bug 的变更</button>
+    <button class="btn primary hidden" id="fixBtn">修好它（5 分钟）并重新推送</button>
+  </div>
+
+  <div class="pipe" id="pipe1">
+    <div class="stage"><div class="chip robot">🤖 推送<small id="p1who">等待中…</small></div></div>
+    <div class="stage"><div class="chip" data-s="merge">合并<small>进 main</small></div></div>
+    <div class="stage"><div class="chip" data-s="build">建置<small>编译</small></div></div>
+    <div class="stage"><div class="chip" data-s="test">测试<small>跑所有测试</small></div></div>
+  </div>
+  <div class="lanes"><div class="lane mainlane"><div class="who">main</div><div class="track" id="ciMain"></div></div></div>
+  <div class="feedback" id="fb1"><p class="muted">每次绿灯的推送都会在 <code>main</code> 上加一个方块。红灯的会在进去之前被挡下来。</p></div>
+
+  <div class="slider">
+    <h3>为什么要「经常」？拖拉看看。</h3>
+    <label for="freq">团队合并进 main 的频率：每 <b id="freqLabel">1 天</b></label>
+    <input type="range" id="freq" min="0" max="4" step="1" value="1">
+    <div class="ticks"><span>1 小时</span><span>1 天</span><span>3 天</span><span>1 周</span><span>3 周</span></div>
+    <div class="bars">
+      <span>每次合并改动的行数</span><div class="bar"><i id="barLines"></i></div><span class="num" id="numLines"></span>
+      <span>冲突概率</span><div class="bar risk"><i id="barRisk"></i></div><span class="num" id="numRisk"></span>
+      <span>Bug 被发现的时间</span><div class="bar risk"><i id="barFound"></i></div><span class="num" id="numFound"></span>
+    </div>
+    <p class="muted" style="margin:10px 0 0;font-size:14px">示意数字，但趋势是真的：越久才合并，每次合并就越大、越危险。</p>
+  </div>
+
+  <div class="takeaway"><div class="t">一句话说清楚 CI</div><p>经常把小变更合并进 main，由机器人建置并测试每一次，让问题在几分钟内浮现，而不是等到合并日。</p></div>
+  <p class="muted" style="margin-top:12px">「I」指的是<b>集成（integration）</b>：把所有人的代码结合起来。说它「持续」，是因为它随时都在发生，而不是最后才做一次。</p>
+</section>
+
+<!-- ============ ACT 2 ============ -->
+<section class="panel" id="act2">
+  <div class="panel-label"><span>第 2 幕 · 持续交付 / 持续部署</span><span class="hot">cd</span></div>
+  <h2>CD：同一个机器人，更长的流水线</h2>
+  <p>CI 停在「测试通过」。CD 会继续往下：机器人把 App <b>打包</b>，放到 <b>staging</b> 服务器（真实网站的私人副本），然后送上 <b>production</b>，也就是真正用户看到的网站。剩下唯一的问题：要不要先由人按一个按钮？</p>
+
+  <label class="switch"><input type="checkbox" id="gateToggle" checked><span class="track2"></span><span>每次发布都由人核准</span></label>
+  <div class="mode" id="modeName">持续交付（Continuous Delivery）</div>
+  <p class="muted" id="modeDesc">每个通过的变更都随时可以出货，由人决定<i>什么时候</i>。</p>
+
+  <div class="pipe" id="pipe2">
+    <div class="stage"><div class="chip" data-s="build">建置</div></div>
+    <div class="stage"><div class="chip" data-s="test">测试</div></div>
+    <div class="stage"><div class="chip" data-s="package">打包<small>压缩起来</small></div></div>
+    <div class="stage"><div class="chip" data-s="staging">Staging<small>私人副本</small></div></div>
+    <div class="stage" id="gateStage"><div class="chip gate" data-s="gate">🔘 人工<small>核准</small></div></div>
+    <div class="stage"><div class="chip" data-s="prod">Production<small>真实用户</small></div></div>
+  </div>
+
+  <div class="row">
+    <button class="btn" id="push2">推送一个变更</button>
+    <button class="btn primary release hidden" id="releaseBtn">发布给用户 ▶</button>
+  </div>
+
+  <div class="envs">
+    <div class="env"><div class="k">最新提交</div><div class="v" id="vCommit">v1</div></div>
+    <div class="env"><div class="k">Staging（随时可出货）</div><div class="v" id="vStaging">v1</div></div>
+    <div class="env"><div class="k">Production（用户看到的）</div><div class="v" id="vProd">v1</div></div>
+  </div>
+  <div class="feedback" id="fb2"><p class="muted">开关打开时推送几次变更，然后关掉开关，再推送。</p></div>
+
+  <div class="takeaway"><div class="t">两种 CD，一次说清楚</div><p>持续<b>交付（Delivery）</b>：每个通过的变更都随时可以出货，由人按下按钮。持续<b>部署（Deployment）</b>：没有按钮，通过的变更直接送到用户面前。</p></div>
+  <p class="muted" style="margin-top:12px">两者底下都需要 CI。没有好的测试，CD 只是更快地把 bug 送出去。</p>
+</section>
+
+<!-- ============ ACT 3 ============ -->
+<section class="panel" id="act3">
+  <div class="panel-label"><span>第 3 幕 · 真正的设置档</span><span class="hot">.yml</span></div>
+  <h2>机器人读的是一张短短的待办清单</h2>
+  <p>这是一个真实的 GitHub Actions 文件，涵盖你刚刚看到的一切。它放在 repo 的 <code>.github/workflows/ship.yml</code>。<b>把鼠标移到某一行上，或点一下</b>，看看它是哪个阶段。</p>
+
+  <div class="pipe" id="pipe3">
+    <div class="stage"><div class="chip" data-s="trigger">触发</div></div>
+    <div class="stage"><div class="chip" data-s="robot">机器人</div></div>
+    <div class="stage"><div class="chip" data-s="checkout">取出代码</div></div>
+    <div class="stage"><div class="chip" data-s="build">建置</div></div>
+    <div class="stage"><div class="chip" data-s="test">测试</div></div>
+    <div class="stage"><div class="chip" data-s="package">打包</div></div>
+    <div class="stage"><div class="chip" data-s="staging">Staging</div></div>
+    <div class="stage"><div class="chip gate" data-s="gate">关卡</div></div>
+    <div class="stage"><div class="chip" data-s="prod">Prod</div></div>
+  </div>
+
+  <div class="yaml-wrap">
+    <pre class="yaml" id="yaml" aria-label="工作流程文件范例"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 选一行</div><p id="exP">每一行反白后，都会对应到上面流水线的一个阶段。</p></div>
+  </div>
+
+  <div class="callout"><b>真相大白：</b>流水线不过就是<b>一个触发条件</b>（「有人推送时」）＋<b>一串指令</b>（就是你自己会打的那些）＋<b>一台借来的电脑</b>来运行它们。GitHub Actions、GitLab CI、Jenkins、CircleCI 都是同一个概念，只是不同的机器人，读不同格式的文件。</div>
+</section>
+
+<!-- ============ RECAP ============ -->
+<section class="panel" id="recap">
+  <div class="panel-label"><span>重点整理 · 带走这些</span><span class="hot">♥</span></div>
+  <h2>整件事浓缩在一个画面</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">持续集成（Continuous Integration）</div><div class="t">CI</div><p>经常合并小变更。机器人建置并测试每一次。Bug 在几分钟内浮现，那时修起来还很便宜。</p></div>
+    <div class="card"><div class="sub">持续交付（Continuous Delivery）</div><div class="t">CD（有按钮）</div><p>机器人还会打包并部署每一个通过的变更到 staging，所以随时可以出货。由人决定什么时候。</p></div>
+    <div class="card"><div class="sub">持续部署（Continuous Deployment）</div><div class="t">CD（没有按钮）</div><p>同样的流水线，没有按钮。每个通过的变更都直接送到用户面前。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">为什么需要这一切</div><p>写完几分钟就发现的问题，几分钟就能修好。三周后才发现，就要花好几天。CI/CD 让「几分钟后」变成默认。</p></div>
+
+  <h3 style="margin-top:28px">迷思还是事实？ <span class="score" id="score"></span></h3>
+  <ol class="quiz" id="quiz"></ol>
+
+  <div class="callout" style="margin-top:22px"><b>附注：</b>下次你在 GitHub 的提交旁边看到 ✅ 或 ❌，那就是第 1 幕的机器人在回报。后面接着的「Deploy」工作就是第 2 幕。</div>
+</section>
+
+</main>
+
+<script src="../../assets/explainer.js"></script>
+<script src="../../assets/i18n.zh-cn.js"></script>
+<script>
+(() => {
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const sleep = ms => new Promise(r => setTimeout(r, reduce ? Math.min(ms, 60) : ms));
+const $ = (s, r = document) => r.querySelector(s);
+const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+
+const devs = [
+  { n: 'Ana', c: '#8a5cd6' }, { n: 'Ben', c: '#3b82c4' },
+  { n: 'Cai', c: '#2e9e6a' }, { n: 'Dee', c: '#c58a12' }
+];
+
+/* ---------------- ACT 0 ---------------- */
+const lanes0 = $('#lanes0');
+const mainLane = el('div', 'lane mainlane'); mainLane.append(el('div', 'who', 'main'), el('div', 'track'));
+lanes0.append(mainLane);
+const devTracks = devs.map(d => {
+  const l = el('div', 'lane'); const t = el('div', 'track');
+  l.append(el('div', 'who', d.n), t); lanes0.append(l); return t;
+});
+mainLane.querySelector('.track').append(Object.assign(el('span', 'dot main'), { title: 'main' }));
+
+let week = 0, bugDot = null;
+$('#weekBtn').addEventListener('click', async () => {
+  const btn = $('#weekBtn'); btn.disabled = true; week++;
+  $('#weekLabel').textContent = `第 ${week} / 3 周`;
+  for (let k = 0; k < 3; k++) {
+    devTracks.forEach((t, i) => {
+      const d = el('span', 'dot'); d.style.setProperty('--c', devs[i].c);
+      if (week === 1 && i === 1 && k === 1) { d.classList.add('bug'); bugDot = d; }
+      t.append(d);
+    });
+    await sleep(160);
+  }
+  if (week < 3) btn.disabled = false;
+  else { btn.textContent = '3 周结束了'; $('#mergeBtn').disabled = false; }
+});
+
+const conflictList = [
+  'cart.js：Ana 和 Cai 都改写了 calculateTotal()',
+  'styles.css：对 .header 有 4 处重叠的修改',
+  'api/users.js：Ben 改了一个 Dee 还在调用的函数名称',
+  'package.json：两个不同版本的日期函数库',
+  'checkout.js：Ana 和 Ben 改了同样的 40 行',
+  'config.json：三个不同的 API 网址',
+  'auth.js：Dee 删掉了一个 Cai 改过的文件',
+  'utils/date.js：重复的辅助函数，而且稍有不同',
+  'README.md：3 个版本的安装步骤'
+];
+$('#mergeBtn').addEventListener('click', async () => {
+  $('#mergeBtn').disabled = true;
+  $('#mergeOut').classList.remove('hidden');
+  lanes0.classList.add('merged');
+  const ul = $('#conflicts');
+  for (const [i, c] of conflictList.entries()) {
+    ul.append(el('li', '', `冲突 ${c}`));
+    $('#conflictCount').textContent = i + 1;
+    await sleep(230);
+  }
+  await sleep(400);
+  if (bugDot) bugDot.classList.add('revealed');
+  $('#bugOut').classList.remove('hidden');
+  buildChecklist();
+});
+
+const steps = [
+  'SSH 登录正式服务器',
+  'git pull 新的代码',
+  '在服务器上 npm install',
+  '把设置档（.env）拷贝到位',
+  '重新启动服务器',
+  '到处点点看，确认它能用'
+];
+function buildChecklist() {
+  const ol = $('#deployList'); ol.innerHTML = '';
+  let next = 0;
+  const btns = steps.map((s, i) => {
+    const li = el('li'); const b = el('button', i === 0 ? 'next' : '', `<span class="box"></span><span>${s}</span>`);
+    b.disabled = i !== 0;
+    b.addEventListener('click', async () => {
+      if (i !== next) return;
+      b.classList.remove('next'); b.disabled = true;
+      if (i === 3) {
+        b.classList.add('fail'); b.querySelector('.box').textContent = '✕';
+        b.lastChild.innerHTML = `${s}<br><small style="color:var(--bad)">不小心拷贝成 <b>staging</b> 的设置档。网站挂了。现在是星期五晚上 6:47。</small>`;
+        btns.slice(4).forEach(x => x.disabled = true);
+        await sleep(500);
+        $('#act0End').classList.remove('hidden');
+        return;
+      }
+      b.classList.add('done'); b.querySelector('.box').textContent = '✓';
+      next++; btns[next].disabled = false; btns[next].classList.add('next');
+    });
+    li.append(b); ol.append(li); return b;
+  });
+}
+
+/* ---------------- pipeline helper ---------------- */
+function chips(pipe) { const m = {}; pipe.querySelectorAll('.chip[data-s]').forEach(c => m[c.dataset.s] = c); return m; }
+function resetChips(m) { Object.values(m).forEach(c => c.classList.remove('run', 'ok', 'fail', 'wait')); }
+
+/* ---------------- ACT 1 ---------------- */
+const c1 = chips($('#pipe1'));
+const ciMain = $('#ciMain');
+const fb1 = $('#fb1');
+let busy1 = false, pushN = 0, failedDev = null;
+const goodMsgs = ['修正登录页的错字', '添加「依价格排序」选项', '把按钮稍微放大', '替购物车加了一个测试', '更新页脚链接'];
+
+async function push1(buggy, dev) {
+  if (busy1) return; busy1 = true;
+  [$('#pushGood'), $('#pushBad'), $('#fixBtn')].forEach(b => b.disabled = true);
+  dev = dev || devs[pushN % 4]; pushN++;
+  $('#p1who').textContent = `${dev.n} · ${buggy ? '修改购物车' : goodMsgs[pushN % goodMsgs.length]}`;
+  resetChips(c1);
+  fb1.innerHTML = `<p class="muted">🤖 ${dev.n} 推送了。机器人醒来了…</p>`;
+  const order = ['merge', 'build', 'test'];
+  let t = 0;
+  for (const s of order) {
+    c1[s].classList.add('run'); await sleep(650); c1[s].classList.remove('run'); t += s === 'test' ? 27 : 8;
+    if (buggy && s === 'test') { c1[s].classList.add('fail'); break; }
+    c1[s].classList.add('ok');
+  }
+  if (buggy) {
+    failedDev = dev;
+    fb1.innerHTML = `<ul class="events"><li>❌ <b>测试失败：结帐总金额算错。</b>在 ${dev.n} 推送后 <b>${t} 秒</b>就抓到了。${dev.n} 的文件都还开着，马上就收到通知。<code>main</code> 保持干净。</li></ul>`;
+    $('#fixBtn').classList.remove('hidden'); $('#fixBtn').disabled = false;
+  } else {
+    const d = el('span', 'dot'); d.style.setProperty('--c', dev.c); d.title = dev.n; ciMain.append(d);
+    fb1.innerHTML = `<ul class="events"><li class="ok">✅ ${t} 秒内全部绿灯。${dev.n} 的变更现在已经进了 <code>main</code>，其他人可以马上在它上面继续开发。没有合并日。</li></ul>`;
+    $('#pushGood').disabled = false; $('#pushBad').disabled = false;
+  }
+  busy1 = false;
+}
+$('#pushGood').addEventListener('click', () => push1(false));
+$('#pushBad').addEventListener('click', () => push1(true));
+$('#fixBtn').addEventListener('click', async () => {
+  $('#fixBtn').classList.add('hidden');
+  await push1(false, failedDev);
+  fb1.querySelector('li').innerHTML += ' <br>这个 bug 的总成本：<b>大约 5 分钟</b>。对照：第 0 幕花了 3 天。';
+});
+
+const freqData = [
+  { l: '1 小时', lines: 30, risk: 3, found: '1 小时', f: 2 },
+  { l: '1 天', lines: 200, risk: 12, found: '1 天', f: 8 },
+  { l: '3 天', lines: 700, risk: 35, found: '3 天', f: 22 },
+  { l: '1 周', lines: 1600, risk: 60, found: '1 周', f: 45 },
+  { l: '3 周', lines: 5000, risk: 92, found: '3 周', f: 100 }
+];
+function setFreq() {
+  const d = freqData[+$('#freq').value];
+  $('#freqLabel').textContent = d.l;
+  $('#barLines').style.width = (d.lines / 50) + '%'; $('#numLines').textContent = d.lines.toLocaleString();
+  $('#barRisk').style.width = d.risk + '%'; $('#numRisk').textContent = d.risk + '%';
+  $('#barFound').style.width = d.f + '%'; $('#numFound').textContent = d.found;
+}
+$('#freq').addEventListener('input', setFreq); setFreq();
+
+/* ---------------- ACT 2 ---------------- */
+const c2 = chips($('#pipe2'));
+const fb2 = $('#fb2');
+let v = { commit: 1, staging: 1, prod: 1 }, busy2 = false;
+const gateOn = () => $('#gateToggle').checked;
+function renderV() { $('#vCommit').textContent = 'v' + v.commit; $('#vStaging').textContent = 'v' + v.staging; $('#vProd').textContent = 'v' + v.prod; }
+function setMode() {
+  const on = gateOn();
+  $('#modeName').textContent = on ? '持续交付（Continuous Delivery）' : '持续部署（Continuous Deployment）';
+  $('#modeDesc').innerHTML = on ? '每个通过的变更都随时可以出货，由人决定<i>什么时候</i>。' : '没有按钮。每个通过流水线的变更都直接送到用户面前。';
+  $('#gateStage').classList.toggle('hidden', !on);
+  if (!on) $('#releaseBtn').classList.add('hidden');
+  else if (v.staging > v.prod) { $('#releaseBtn').classList.remove('hidden'); c2.gate.classList.add('wait'); }
+}
+$('#gateToggle').addEventListener('change', setMode);
+
+$('#push2').addEventListener('click', async () => {
+  if (busy2) return; busy2 = true; $('#push2').disabled = true; $('#releaseBtn').disabled = true;
+  v.commit++; renderV(); resetChips(c2);
+  fb2.innerHTML = `<p class="muted">🤖 v${v.commit} 推送了。先跑 CI，再跑 CD 的阶段…</p>`;
+  for (const s of ['build', 'test', 'package', 'staging']) {
+    c2[s].classList.add('run'); await sleep(520); c2[s].classList.remove('run'); c2[s].classList.add('ok');
+  }
+  v.staging = v.commit; renderV();
+  if (gateOn()) {
+    c2.gate.classList.add('wait');
+    $('#releaseBtn').classList.remove('hidden'); $('#releaseBtn').disabled = false;
+    $('#releaseBtn').textContent = `把 v${v.staging} 发布给用户 ▶`;
+    const behind = v.staging - v.prod;
+    fb2.innerHTML = `<ul class="events"><li class="warn">⏸ v${v.staging} 全部通过，正<b>在 staging 待命、随时可以出货</b>。用户还在用 v${v.prod}${behind > 1 ? `（落后 ${behind} 个版本，没关系，由你决定什么时候）` : ''}。继续推送，或按下发布。</li></ul>`;
+  } else {
+    c2.prod.classList.add('run'); await sleep(520); c2.prod.classList.remove('run'); c2.prod.classList.add('ok');
+    v.prod = v.staging; renderV();
+    fb2.innerHTML = `<ul class="events"><li class="ok">🚀 v${v.prod} 已经上线给用户。没有按钮、没有清单、没有星期五晚上的 SSH。它几秒前才推送。</li></ul>`;
+  }
+  busy2 = false; $('#push2').disabled = false;
+});
+$('#releaseBtn').addEventListener('click', async () => {
+  const b = $('#releaseBtn'); b.disabled = true; $('#push2').disabled = true; busy2 = true;
+  c2.gate.classList.remove('wait'); c2.gate.classList.add('ok');
+  c2.prod.classList.add('run'); await sleep(520); c2.prod.classList.remove('run'); c2.prod.classList.add('ok');
+  v.prod = v.staging; renderV(); b.classList.add('hidden');
+  fb2.innerHTML = `<ul class="events"><li class="ok">🚀 有人按了一个按钮，v${v.prod} 就上线了。每一个实际的步骤都是机器人做的，而且每次做法都完全一样。</li></ul>`;
+  busy2 = false; $('#push2').disabled = false;
+});
+renderV(); setMode();
+
+/* ---------------- ACT 3 ---------------- */
+const Y = [
+  ['<span class="key">name</span>: ship-it', null],
+  ['<span class="key">on</span>:', 'trigger'],
+  ['  <span class="key">push</span>:', 'trigger'],
+  ['    <span class="key">branches</span>: [main]', 'trigger'],
+  ['', null],
+  ['<span class="key">jobs</span>:', null],
+  ['  <span class="key">ci</span>:', null],
+  ['    <span class="key">runs-on</span>: <span class="s">ubuntu-latest</span>', 'robot'],
+  ['    <span class="key">steps</span>:', null],
+  ['      - <span class="key">uses</span>: <span class="s">actions/checkout@v4</span>', 'checkout'],
+  ['      - <span class="key">run</span>: <span class="s">npm ci &amp;&amp; npm run build</span>', 'build'],
+  ['      - <span class="key">run</span>: <span class="s">npm test</span>', 'test'],
+  ['      - <span class="key">uses</span>: <span class="s">actions/upload-artifact@v4</span>', 'package'],
+  ['        <span class="key">with</span>: { name: app, path: dist }', 'package'],
+  ['', null],
+  ['  <span class="key">deploy-staging</span>:', 'staging'],
+  ['    <span class="key">needs</span>: ci', 'needs'],
+  ['    <span class="key">runs-on</span>: <span class="s">ubuntu-latest</span>', 'robot'],
+  ['    <span class="key">steps</span>:', null],
+  ['      - <span class="key">run</span>: <span class="s">./deploy.sh staging</span>', 'staging'],
+  ['', null],
+  ['  <span class="key">deploy-prod</span>:', 'prod'],
+  ['    <span class="key">needs</span>: deploy-staging', 'needs'],
+  ['    <span class="key">environment</span>: <span class="s">production</span>  <span class="c"># 需要核准</span>', 'gate'],
+  ['    <span class="key">runs-on</span>: <span class="s">ubuntu-latest</span>', 'robot'],
+  ['    <span class="key">steps</span>:', null],
+  ['      - <span class="key">run</span>: <span class="s">./deploy.sh production</span>', 'prod'],
+];
+const EX = {
+  trigger: ['触发：「什么时候」', '每当有人推送到 <code>main</code> 就运行。这就是「持续」的部分：不是人去启动机器人，是推送启动的。'],
+  robot: ['机器人：「在哪里」', '向 GitHub 借一台全新的 Linux 机器用几分钟。那台机器就是机器人。它每次都从干净的状态开始，所以「在我电脑上可以跑」混不进来。'],
+  checkout: ['取出代码（Checkout）', '下载最新的代码，包括刚合并的变更。这就是 CI 里的<b>集成</b>。'],
+  build: ['建置', '就是你自己会打的那些指令。如果代码连编译都过不了，就停在这里。'],
+  test: ['测试', '跑每一个自动化测试。CI 有用全靠这一行。没有测试，机器人就没有东西可以检查。'],
+  package: ['打包', '把建置好的 App 存成一个文件（「artifact」）。之后的每个阶段出货的都是<i>这个文件</i>，而不是重新建置。'],
+  needs: ['needs：「依序」', '只有前一个工作通过才会开始。只要一个阶段亮红灯，后面的全部停止。这就是它被称为流水线的原因。'],
+  staging: ['部署到 staging', '放到真实网站的私人副本上。从这里开始就是 CD：变更已经<b>随时可以出货</b>。'],
+  gate: ['人工按钮', '在 GitHub 设置中，<code>production</code> 环境可以要求审核者。<b>保留这一行，就是持续交付；删掉它，就是持续部署。</b>整个差别就在这一行。'],
+  prod: ['部署到 production', '送到真实用户面前。机器人每次都跑同一个脚本，所以没有 wiki 清单，也不会忘记设置档。'],
+};
+const yaml = $('#yaml'); const c3 = chips($('#pipe3'));
+const hlMap = { needs: [], robot: ['robot'] };
+function pick(k, line) {
+  yaml.querySelectorAll('.ln').forEach(l => l.classList.toggle('active', l.dataset.k === k));
+  Object.values(c3).forEach(c => c.classList.remove('hl'));
+  (hlMap[k] || [k]).forEach(s => c3[s] && c3[s].classList.add('hl'));
+  $('#exT').textContent = EX[k][0]; $('#exP').innerHTML = EX[k][1];
+}
+Y.forEach(([h, k]) => {
+  const s = el('span', 'ln', h || ' ');
+  if (k) {
+    s.dataset.k = k; s.tabIndex = 0; s.setAttribute('role', 'button');
+    s.addEventListener('mouseenter', () => pick(k)); s.addEventListener('focus', () => pick(k)); s.addEventListener('click', () => pick(k));
+  }
+  yaml.append(s);
+});
+Object.entries(c3).forEach(([k, c]) => {
+  if (!EX[k]) return; c.style.cursor = 'pointer'; c.addEventListener('click', () => pick(k));
+});
+
+/* ---------------- QUIZ ---------------- */
+const Q = [
+  ['CI/CD 是一种工具，就像 Jenkins 或 GitHub Actions。', false, '它是一种<b>做法</b>：经常合并、自动检查、自动出货。Jenkins 和 GitHub Actions 只是运行它的机器人。'],
+  ['没有自动化测试，CI 能做的事很有限。', true, '机器人只能检查你写了检查的东西。没有测试，「绿灯」只代表它编译过了。'],
+  ['持续交付的意思是每个提交都自动送上正式环境。', false, '那是<b>部署（Deployment）</b>。交付（Delivery）的意思是每个提交都<i>可以</i>出去，由人按下按钮。'],
+  ['CI 里的「集成」，是指经常把所有人的代码合并进 main，最好至少每天一次。', true, '一个月才合并一次的长寿分支不算 CI，即使有机器人在上面跑测试。'],
+  ['CD 只有大公司才用得上。', false, '放在 GitHub Pages 或 Vercel 上的个人项目，通常就是持续部署：推送到 main，一分钟后就上线了，而且设置起来不用花一毛钱。'],
+];
+let answered = 0, right = 0;
+const quiz = $('#quiz');
+Q.forEach(([q, fact, why]) => {
+  const li = el('li'); li.append(el('div', 'q', q));
+  const row = el('div', 'row'); row.style.margin = '0';
+  const ans = el('div', 'ans hidden');
+  ['迷思', '事实'].forEach((lab, i) => {
+    const b = el('button', 'btn', lab);
+    b.addEventListener('click', () => {
+      const ok = (i === 1) === fact;
+      li.classList.add(ok ? 'right' : 'wrong');
+      row.querySelectorAll('button').forEach(x => x.disabled = true);
+      ans.innerHTML = `<b>${ok ? '✓ 答对了' : '✕ 不太对'}：这是${fact ? '事实' : '迷思'}。</b> ${why}`;
+      ans.classList.remove('hidden');
+      answered++; if (ok) right++;
+      $('#score').textContent = `· ${right}/${answered}` + (answered === Q.length ? (right === Q.length ? '（你再也不用 Google 它了）' : '（重读一次重点卡片，你就没问题了）') : '');
+    });
+    row.append(b);
+  });
+  li.append(row, ans); quiz.append(li);
+});
+})();
+</script>
+</body>
+</html>

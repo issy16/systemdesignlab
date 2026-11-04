@@ -1,0 +1,800 @@
+{
+ "page": "n-plus-1-pooling",
+ "segments": [
+  {
+   "kind": "attr",
+   "en": "width=device-width, initial-scale=1, viewport-fit=cover",
+   "zh": "="
+  },
+  {
+   "kind": "attr",
+   "en": "See how an innocent loop turns into 101 database queries, and how a connection pool decides who waits.",
+   "zh": "看一個無害的迴圈怎麼變成 101 次資料庫查詢，以及連線池怎麼決定誰要等。"
+  },
+  {
+   "kind": "attr",
+   "en": "Sections",
+   "zh": "章節"
+  },
+  {
+   "kind": "attr",
+   "en": "Query log",
+   "zh": "查詢紀錄"
+  },
+  {
+   "kind": "attr",
+   "en": "Example ORM code",
+   "zh": "ORM 程式碼範例"
+  },
+  {
+   "kind": "attr",
+   "en": "Pages",
+   "zh": "頁面"
+  },
+  {
+   "kind": "html",
+   "en": "N+1 and Connection Pools · System Design Lab",
+   "zh": "N+1 與連線池 · System Design Lab"
+  },
+  {
+   "kind": "html",
+   "en": "system<b>.design.lab</b>",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "Pool lab",
+   "zh": "連線池實驗室"
+  },
+  {
+   "kind": "html",
+   "en": "The code",
+   "zh": "程式碼"
+  },
+  {
+   "kind": "html",
+   "en": "Recap",
+   "zh": "重點整理"
+  },
+  {
+   "kind": "html",
+   "en": "page 3 · stage 1 · one server",
+   "zh": "第 3 頁 · 階段 1 · 一台伺服器"
+  },
+  {
+   "kind": "html",
+   "en": "N+1 queries, connection pooling",
+   "zh": "N+1 查詢、連線池"
+  },
+  {
+   "kind": "html",
+   "en": "Four lines of code. <em>101 trips to the database.</em>",
+   "zh": "四行程式碼。<em>跑資料庫 101 趟。</em>"
+  },
+  {
+   "kind": "html",
+   "en": "<b>Encore</b>Cai built a “This week's concerts” page: list the concerts, show each venue's name. It looks perfect with 5 test concerts. With real data it's slow, and at busy times other pages start failing with “timed out waiting for a database connection”.",
+   "zh": "<b>Encore</b>Cai 做了一個「本週演唱會」頁面：列出演唱會，並顯示每個場館的名稱。用 5 場測試資料時看起來完美。換成真實資料就變慢了，忙碌時段其他頁面還開始出現「等待資料庫連線逾時」的錯誤。"
+  },
+  {
+   "kind": "html",
+   "en": "Start ↓",
+   "zh": "開始 ↓"
+  },
+  {
+   "kind": "html",
+   "en": "act 1 · the n+1 query",
+   "zh": "第 1 幕 · N+1 查詢"
+  },
+  {
+   "kind": "html",
+   "en": "Load the page and count the queries",
+   "zh": "載入頁面，數數有幾次查詢"
+  },
+  {
+   "kind": "html",
+   "en": "How the code fetches venues",
+   "zh": "程式碼怎麼抓場館資料"
+  },
+  {
+   "kind": "html",
+   "en": "Concerts on the page: <b id=\"nCV\">20</b>",
+   "zh": "頁面上的演唱會數：<b id=\"nCV\">20</b>"
+  },
+  {
+   "kind": "html",
+   "en": "Run it",
+   "zh": "執行"
+  },
+  {
+   "kind": "html",
+   "en": "Load the page",
+   "zh": "載入頁面"
+  },
+  {
+   "kind": "html",
+   "en": "Queries sent",
+   "zh": "送出的查詢"
+  },
+  {
+   "kind": "html",
+   "en": "Database time",
+   "zh": "資料庫時間"
+  },
+  {
+   "kind": "html",
+   "en": "~2.5 ms per round trip (simulated)",
+   "zh": "每次來回約 2.5 毫秒（模擬值）"
+  },
+  {
+   "kind": "html",
+   "en": "The query log appears here.",
+   "zh": "查詢紀錄會顯示在這裡。"
+  },
+  {
+   "kind": "html",
+   "en": "Press “Load the page”.",
+   "zh": "按「載入頁面」。"
+  },
+  {
+   "kind": "html",
+   "en": "N+1 in one line",
+   "zh": "一句話說清楚 N+1"
+  },
+  {
+   "kind": "html",
+   "en": "<b>1</b> query to get the list, then <b>N</b> more, one per item, usually hidden inside a loop or an ORM's lazy loading. Fetch related data in bulk instead.",
+   "zh": "<b>1</b> 次查詢取得清單，接著每個項目再查 <b>N</b> 次，通常藏在迴圈或 ORM 的延遲載入（lazy loading）裡。改成一次批次抓取相關資料。"
+  },
+  {
+   "kind": "html",
+   "en": "lab · the connection pool",
+   "zh": "實驗室 · 連線池"
+  },
+  {
+   "kind": "html",
+   "en": "pool of 10",
+   "zh": "連線池大小 10"
+  },
+  {
+   "kind": "html",
+   "en": "Every query needs a connection. There aren't many.",
+   "zh": "每次查詢都需要一條連線，而連線不多。"
+  },
+  {
+   "kind": "html",
+   "en": "Opening a database connection is slow (about 30 ms here: network handshake, login, setup). Encore's database plan also allows only <b>20 connections</b> in total. A <b>connection pool</b> opens a few connections once and lends them out. A request borrows one, runs its queries, and gives it back. If none are free, the request waits.",
+   "zh": "開一條資料庫連線很慢（這裡大約 30 毫秒：網路交握、登入、初始化）。Encore 的資料庫方案總共也只允許 <b>20 條連線</b>。<b>連線池（connection pool）</b>會先開好幾條連線，再借給大家用。請求借一條、跑完查詢、再還回去。沒有空閒的連線時，請求就得等。"
+  },
+  {
+   "kind": "html",
+   "en": "Traffic: <b id=\"rateV\">40</b> page loads/second",
+   "zh": "流量：每秒 <b id=\"rateV\">40</b> 次頁面載入"
+  },
+  {
+   "kind": "html",
+   "en": "Pool size: <b id=\"poolV\">10</b> connections",
+   "zh": "連線池大小：<b id=\"poolV\">10</b> 條連線"
+  },
+  {
+   "kind": "html",
+   "en": "Query pattern",
+   "zh": "查詢模式"
+  },
+  {
+   "kind": "html",
+   "en": "Connections",
+   "zh": "連線方式"
+  },
+  {
+   "kind": "html",
+   "en": "Simulation",
+   "zh": "模擬"
+  },
+  {
+   "kind": "html",
+   "en": "Pool connections (busy = filled)",
+   "zh": "連線池中的連線（填滿 = 使用中）"
+  },
+  {
+   "kind": "html",
+   "en": "Page load time",
+   "zh": "頁面載入時間"
+  },
+  {
+   "kind": "html",
+   "en": "0 ms",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "average, last 3 s",
+   "zh": "平均，最近 3 秒"
+  },
+  {
+   "kind": "html",
+   "en": "Waiting for a connection",
+   "zh": "等待連線中"
+  },
+  {
+   "kind": "html",
+   "en": "requests in line",
+   "zh": "排隊中的請求"
+  },
+  {
+   "kind": "html",
+   "en": "Connections open",
+   "zh": "已開啟的連線"
+  },
+  {
+   "kind": "html",
+   "en": "database limit is 20",
+   "zh": "資料庫上限為 20"
+  },
+  {
+   "kind": "html",
+   "en": "Errors",
+   "zh": "錯誤"
+  },
+  {
+   "kind": "html",
+   "en": "last 3 s",
+   "zh": "最近 3 秒"
+  },
+  {
+   "kind": "html",
+   "en": "Press Play to start sending traffic.",
+   "zh": "按「播放」開始送出流量。"
+  },
+  {
+   "kind": "html",
+   "en": "Try this",
+   "zh": "試試看"
+  },
+  {
+   "kind": "html",
+   "en": "The one difference",
+   "zh": "關鍵差別"
+  },
+  {
+   "kind": "html",
+   "en": "Without a pool, every request <b>opens its own connection</b>: slow, and a traffic spike blows past the database's limit. With a pool, requests <b>borrow from a fixed set</b>: fast, and the database is protected. When the pool runs out, requests wait their turn.",
+   "zh": "沒有連線池時，每個請求都<b>自己開一條連線</b>：很慢，而且流量尖峰會衝破資料庫的上限。有連線池時，請求<b>從固定的一組連線中借用</b>：很快，資料庫也受到保護。連線池用完時，請求就排隊等輪到自己。"
+  },
+  {
+   "kind": "html",
+   "en": "act 3 · the real thing",
+   "zh": "第 3 幕 · 真實世界"
+  },
+  {
+   "kind": "html",
+   "en": "orm",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "What it looks like in the code",
+   "zh": "在程式碼裡長什麼樣子"
+  },
+  {
+   "kind": "html",
+   "en": "Written with Prisma-style syntax, but every ORM (Django, Rails, Sequelize, Hibernate…) has the same trap and the same fix. <b>Hover or tap a line.</b>",
+   "zh": "這裡用 Prisma 風格的語法，但每個 ORM（Django、Rails、Sequelize、Hibernate……）都有同樣的陷阱、同樣的解法。<b>把滑鼠移到某一行上，或點一下。</b>"
+  },
+  {
+   "kind": "html",
+   "en": "👆 pick a line",
+   "zh": "👆 選一行"
+  },
+  {
+   "kind": "html",
+   "en": "Each highlighted line maps to something from the two labs.",
+   "zh": "每一行反白後，都會對應到兩個實驗室裡的某樣東西。"
+  },
+  {
+   "kind": "html",
+   "en": "recap · keep this",
+   "zh": "重點整理 · 帶走這些"
+  },
+  {
+   "kind": "html",
+   "en": "The whole page on one screen",
+   "zh": "整頁濃縮在一個畫面"
+  },
+  {
+   "kind": "html",
+   "en": "The bug",
+   "zh": "問題"
+  },
+  {
+   "kind": "html",
+   "en": "N+1 queries",
+   "zh": "N+1 查詢"
+  },
+  {
+   "kind": "html",
+   "en": "One query for the list, plus one per item. Invisible with test data, painful with real data. Look for queries inside loops.",
+   "zh": "清單一次查詢，加上每個項目各一次。測試資料看不出來，真實資料很痛。留意迴圈裡的查詢。"
+  },
+  {
+   "kind": "html",
+   "en": "The fix",
+   "zh": "解法"
+  },
+  {
+   "kind": "html",
+   "en": "Fetch in bulk",
+   "zh": "批次抓取"
+  },
+  {
+   "kind": "html",
+   "en": "A JOIN, or the ORM's eager loading (<code>include</code>, <code>select_related</code>, <code>includes</code>). 2 queries instead of 101.",
+   "zh": "用 JOIN，或 ORM 的預先載入（eager loading：<code>include</code>、<code>select_related</code>、<code>includes</code>）。2 次查詢取代 101 次。"
+  },
+  {
+   "kind": "html",
+   "en": "The guard",
+   "zh": "防護"
+  },
+  {
+   "kind": "html",
+   "en": "Connection pool",
+   "zh": "連線池"
+  },
+  {
+   "kind": "html",
+   "en": "Reuse a fixed set of open connections. Faster requests, and the database never sees more connections than it can handle.",
+   "zh": "重複使用一組固定的開啟連線。請求更快，資料庫也永遠不會收到超出它負荷的連線數。"
+  },
+  {
+   "kind": "html",
+   "en": "The tradeoff",
+   "zh": "取捨"
+  },
+  {
+   "kind": "html",
+   "en": "A bigger pool lets more requests run at once, but it can't go past what the database allows, and every app server has its own pool. Fix slow queries first: they hold connections longer and drain the pool.",
+   "zh": "連線池越大，能同時跑的請求越多，但不能超過資料庫允許的數量，而且每台應用伺服器都有自己的連線池。先修慢查詢：它們會佔住連線更久，把連線池耗光。"
+  },
+  {
+   "kind": "html",
+   "en": "Check it",
+   "zh": "考考自己"
+  },
+  {
+   "kind": "js",
+   "en": "'The Forum'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Red Rocks'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Brixton Academy'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Paradiso'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Budokan'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Fillmore'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Olympia'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Roundhouse'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Loop (N+1)'",
+   "zh": "'迴圈（N+1）'"
+  },
+  {
+   "kind": "js",
+   "en": "`concerts = SELECT * FROM concerts LIMIT ${n};\\nfor (c of concerts)\\n  c.venue = SELECT * FROM venues WHERE id = c.venue_id;`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Eager load'",
+   "zh": "'預先載入'"
+  },
+  {
+   "kind": "js",
+   "en": "`concerts = SELECT * FROM concerts LIMIT ${n};\\nvenues   = SELECT * FROM venues WHERE id IN (…${n} ids…);`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'JOIN'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "`SELECT concerts.*, venues.name\\nFROM concerts JOIN venues ON venues.id = concerts.venue_id\\nLIMIT ${n};`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'SELECT * FROM concerts LIMIT '",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "`SELECT * FROM venues WHERE id = ${101 + i}   -- ${VENUES[i % VENUES.length]}`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "`SELECT * FROM venues WHERE id IN (101, 102, … ${100 + n})`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "`SELECT concerts.*, venues.name FROM concerts JOIN venues … LIMIT ${n}`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "`${String(i + 1).padStart(3)}  ${X.esc(lines[i])}`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "`     … ${lines.length - 13} more like this …`",
+   "zh": "`     …還有 ${lines.length - 13} 條類似的…`"
+  },
+  {
+   "kind": "js",
+   "en": "' ms'",
+   "zh": "' 毫秒'"
+  },
+  {
+   "kind": "js",
+   "en": "`✕ ${q} queries for one page, ${X.fmt(ms)} ms of waiting on the database. Each one is fast. There are just too many, and the count grows with the page.`",
+   "zh": "`✕ 一個頁面 ${q} 次查詢，在資料庫上等了 ${X.fmt(ms)} 毫秒。每一次都很快，只是次數太多，而且會隨頁面內容增加。`"
+  },
+  {
+   "kind": "js",
+   "en": "`✓ ${q} ${q === 1 ? 'query' : 'queries'}, ${X.fmt(ms)} ms. Same page, same data, and the count stays the same at 5 concerts or 500.`",
+   "zh": "`✓ ${q} 次查詢，${X.fmt(ms)} 毫秒。同一個頁面、同一份資料，不管 5 場還是 500 場演唱會，查詢次數都一樣。`"
+  },
+  {
+   "kind": "js",
+   "en": "'Press <b>Play</b> with the N+1 pattern, a pool of 10, and 40 page loads/second.'",
+   "zh": "'用 N+1 模式、連線池 10、每秒 40 次頁面載入，按<b>播放</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Each page holds a connection for ~53 ms (21 queries). Only a few connections are busy at once.'",
+   "zh": "'每個頁面會佔住一條連線大約 53 毫秒（21 次查詢）。同時忙碌的連線只有幾條。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Raise traffic to <b>200</b>/second.'",
+   "zh": "'把流量提高到每秒 <b>200</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Now the pool runs dry. Requests line up waiting for a connection, and some give up after 2 s.'",
+   "zh": "'現在連線池見底了。請求排隊等連線，有些等了 2 秒後放棄。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Keep the traffic, but switch the query pattern to <b>JOIN</b>.'",
+   "zh": "'流量不變，把查詢模式切換成 <b>JOIN</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Each request now holds a connection for 5 ms instead of 53. The same pool serves 10× the traffic.'",
+   "zh": "'現在每個請求只佔住連線 5 毫秒，而不是 53 毫秒。同一個連線池能撐 10 倍的流量。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Switch to <b>New connection per request</b> and push traffic to 300.'",
+   "zh": "'切換到<b>每個請求開新連線</b>，並把流量推到 300。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Every page now pays 30 ms to connect, and the spikes go over the database\\'s 20-connection limit.'",
+   "zh": "'現在每個頁面都要花 30 毫秒建立連線，而且尖峰會超過資料庫的 20 條連線上限。'"
+  },
+  {
+   "kind": "js",
+   "en": "`pool of ${S.pool}`",
+   "zh": "`連線池大小 ${S.pool}`"
+  },
+  {
+   "kind": "js",
+   "en": "'no pool'",
+   "zh": "'沒有連線池'"
+  },
+  {
+   "kind": "js",
+   "en": "`Pool connections: ${m.busy} of ${S.pool} busy`",
+   "zh": "`連線池：${S.pool} 條中有 ${m.busy} 條使用中`"
+  },
+  {
+   "kind": "js",
+   "en": "`Open connections: ${m.busy} of the database's ${DB_LIMIT}`",
+   "zh": "`已開啟的連線：資料庫上限 ${DB_LIMIT} 條中的 ${m.busy} 條`"
+  },
+  {
+   "kind": "js",
+   "en": "`${m.open} / ${DB_LIMIT}`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Press Play to start sending traffic.'",
+   "zh": "'按「播放」開始送出流量。'"
+  },
+  {
+   "kind": "js",
+   "en": "`✕ FATAL: too many connections. Without a pool, a spike opened more than the database's ${DB_LIMIT}. ${m.err} requests failed in the last 3 s.`",
+   "zh": "`✕ 致命錯誤：連線太多（too many connections）。沒有連線池時，一次尖峰開了超過資料庫上限的 ${DB_LIMIT} 條。最近 3 秒有 ${m.err} 個請求失敗。`"
+  },
+  {
+   "kind": "js",
+   "en": "`✕ ${m.err} requests timed out waiting for a connection. All ${S.pool} are busy ${S.joined ? '' : 'running N+1 queries'}.`",
+   "zh": "`✕ 有 ${m.err} 個請求在等待連線時逾時。${S.pool} 條連線全都${S.joined ? '在忙' : '忙著跑 N+1 查詢'}。`"
+  },
+  {
+   "kind": "js",
+   "en": "`⚠ All ${S.pool} connections busy: ${m.wait} requests waiting their turn.`",
+   "zh": "`⚠ ${S.pool} 條連線全部忙碌：有 ${m.wait} 個請求在排隊等。`"
+  },
+  {
+   "kind": "js",
+   "en": "`✓ Healthy: a connection is free whenever a request needs one. Each page holds one for ~${X.fmt(holdMs(S))} ms.`",
+   "zh": "`✓ 健康：請求需要連線時隨時都有空閒的。每個頁面大約佔住一條連線 ${X.fmt(holdMs(S))} 毫秒。`"
+  },
+  {
+   "kind": "js",
+   "en": "`t = ${(S.t / 1000).toFixed(1)} s`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'N+1 (21 queries)'",
+   "zh": "'N+1（21 次查詢）'"
+  },
+  {
+   "kind": "js",
+   "en": "'JOIN (1 query)'",
+   "zh": "'JOIN（1 次查詢）'"
+  },
+  {
+   "kind": "js",
+   "en": "'Pool (reuse)'",
+   "zh": "'連線池（重複使用）'"
+  },
+  {
+   "kind": "js",
+   "en": "'New connection per request'",
+   "zh": "'每個請求開新連線'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\">// ✕ N+1: 1 query for the list…</span>'",
+   "zh": "'<span class=\"c\">// ✕ N+1：清單 1 次查詢……</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">const</span> concerts = <span class=\"key\">await</span> db.concert.findMany({ take: 20 });'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">for</span> (<span class=\"key\">const</span> c <span class=\"key\">of</span> concerts) {'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  c.venue = <span class=\"key\">await</span> db.venue.findUnique({ where: { id: c.venueId } });'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\">// ✓ 2 queries, no matter how many concerts</span>'",
+   "zh": "'<span class=\"c\">// ✓ 不管幾場演唱會，都只要 2 次查詢</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">const</span> concerts = <span class=\"key\">await</span> db.concert.findMany({'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  take: 20, <span class=\"key\">include</span>: { venue: <span class=\"s\">true</span> },'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\"># .env: the pool lives in the connection string</span>'",
+   "zh": "'<span class=\"c\"># .env：連線池設定寫在連線字串裡</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'DATABASE_URL=<span class=\"s\">\"postgresql://app@db:5432/encore</span>'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  <span class=\"s\">?connection_limit=10&amp;pool_timeout=2\"</span>'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'The “1”'",
+   "zh": "'「1」'"
+  },
+  {
+   "kind": "js",
+   "en": "'One query fetches the concerts. Nothing wrong yet.'",
+   "zh": "'一次查詢抓出所有演唱會。到這裡都還沒問題。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The “N”'",
+   "zh": "'「N」'"
+  },
+  {
+   "kind": "js",
+   "en": "'An <code>await</code> on a query inside a loop: one round trip per concert. With lazy-loading ORMs, it can even hide inside a template that just prints <code>c.venue.name</code>.'",
+   "zh": "'在迴圈裡對查詢 <code>await</code>：每場演唱會一次來回。使用延遲載入的 ORM 時，它甚至會藏在只是印出 <code>c.venue.name</code> 的樣板裡。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Eager loading'",
+   "zh": "'預先載入'"
+  },
+  {
+   "kind": "js",
+   "en": "'<code>include</code> tells the ORM to fetch all the venues in one extra query (<code>WHERE id IN (…)</code>). Django calls it <code>select_related</code>, Rails calls it <code>includes</code>.'",
+   "zh": "'<code>include</code> 告訴 ORM 用一次額外查詢（<code>WHERE id IN (…)</code>）抓出所有場館。Django 叫它 <code>select_related</code>，Rails 叫它 <code>includes</code>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'One app, one pool'",
+   "zh": "'一個應用程式，一個連線池'"
+  },
+  {
+   "kind": "js",
+   "en": "'The app opens its connections once at startup and keeps them. Every request borrows from this set.'",
+   "zh": "'應用程式在啟動時就把連線開好並保留著。每個請求都從這組連線裡借用。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Pool settings'",
+   "zh": "'連線池設定'"
+  },
+  {
+   "kind": "js",
+   "en": "'<code>connection_limit=10</code> is the pool size from the lab. <code>pool_timeout=2</code> is how long a request waits for a free connection before failing (the timeouts you saw).'",
+   "zh": "'<code>connection_limit=10</code> 就是實驗室裡的連線池大小。<code>pool_timeout=2</code> 是請求在失敗前等待空閒連線的時間（你看到的那些逾時）。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The query log for one page shows 1 query on <code>orders</code> followed by 50 nearly identical queries on <code>users</code>. What\\'s going on?'",
+   "zh": "'某個頁面的查詢紀錄顯示：先對 <code>orders</code> 查詢 1 次，接著對 <code>users</code> 做了 50 次幾乎一模一樣的查詢。發生什麼事？'"
+  },
+  {
+   "kind": "js",
+   "en": "'An N+1: the code loads each order\\'s user one at a time'",
+   "zh": "'N+1：程式碼一次載入一筆訂單的使用者'"
+  },
+  {
+   "kind": "js",
+   "en": "'The give-away pattern: one list query, then one query per row. Eager-load users or JOIN them.'",
+   "zh": "'一看就知道的模式：一次清單查詢，接著每一列一次查詢。改成預先載入 users，或用 JOIN。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The database is retrying a failed query'",
+   "zh": "'資料庫在重試失敗的查詢'"
+  },
+  {
+   "kind": "js",
+   "en": "'Retries would repeat the same query. These differ only by the id. That\\'s a loop.'",
+   "zh": "'重試會重複同一條查詢。這些查詢只有 id 不同，那是迴圈。'"
+  },
+  {
+   "kind": "js",
+   "en": "'It\\'s normal: ORMs always run one query per row'",
+   "zh": "'很正常：ORM 本來就每一列查一次'"
+  },
+  {
+   "kind": "js",
+   "en": "'Only when you let them lazy-load. Every ORM has a way to fetch related rows in bulk.'",
+   "zh": "'只有在你讓它延遲載入時才會。每個 ORM 都有批次抓取相關資料的方法。'"
+  },
+  {
+   "kind": "js",
+   "en": "'At peak, Encore logs “timed out waiting for a connection from the pool”. The database CPU is at 15%. What\\'s the best first step?'",
+   "zh": "'尖峰時 Encore 的日誌出現「等待連線池的連線逾時」，資料庫 CPU 只有 15%。最好的第一步是什麼？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Raise the pool size to 500'",
+   "zh": "'把連線池調到 500'"
+  },
+  {
+   "kind": "js",
+   "en": "'The database only allows so many connections, and each app server has its own pool. It also hides the real problem.'",
+   "zh": "'資料庫只允許這麼多連線，而且每台應用伺服器都有自己的連線池。這樣也會把真正的問題藏起來。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Find what holds connections for a long time (slow or N+1 queries) and fix it'",
+   "zh": "'找出長時間佔住連線的東西（慢查詢或 N+1），把它修好'"
+  },
+  {
+   "kind": "js",
+   "en": "'Low database CPU with an exhausted pool means connections are mostly being held, not used. Shorter holds free the pool.'",
+   "zh": "'資料庫 CPU 很低、連線池卻用光，代表連線大多是被佔住，而不是在使用。縮短佔用時間就能釋放連線池。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Turn off pooling so each request opens its own connection'",
+   "zh": "'關掉連線池，讓每個請求自己開連線'"
+  },
+  {
+   "kind": "js",
+   "en": "'That makes every request slower, and spikes hit the database\\'s connection limit instead.'",
+   "zh": "'這會讓每個請求都變慢，而且尖峰會改成撞上資料庫的連線上限。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Encore runs 6 app servers, each with a pool of 10. The database allows 50 connections. What happens at peak?'",
+   "zh": "'Encore 跑 6 台應用伺服器，每台的連線池是 10。資料庫允許 50 條連線。尖峰時會怎樣？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Nothing: pools are shared across servers'",
+   "zh": "'沒事：連線池是所有伺服器共用的'"
+  },
+  {
+   "kind": "js",
+   "en": "'Each server process has its own pool. 6 × 10 = 60 connections can be requested.'",
+   "zh": "'每個伺服器行程都有自己的連線池。總共可能要求 6 × 10 = 60 條連線。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Up to 60 connections are requested, so some fail against the 50 limit'",
+   "zh": "'最多會要求 60 條連線，所以有些會因為 50 條的上限而失敗'"
+  },
+  {
+   "kind": "js",
+   "en": "'Size pools so that servers × pool size stays under the database limit, or put a shared pooler (like PgBouncer) in front.'",
+   "zh": "'設定連線池大小時，要讓「伺服器數 × 連線池大小」低於資料庫上限，或在前面放一個共用的連線池代理（例如 PgBouncer）。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The database queues the extra 10 automatically'",
+   "zh": "'資料庫會自動把多出來的 10 條排隊'"
+  },
+  {
+   "kind": "js",
+   "en": "'Most databases refuse connections over the limit with an error rather than queueing them.'",
+   "zh": "'大多數資料庫會直接以錯誤拒絕超過上限的連線，而不是排隊。'"
+  }
+ ]
+}

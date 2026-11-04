@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW" data-lang="zh-tw" data-slug="database-indexing">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="同一條查詢，分別在有索引和沒索引的情況下執行，看資料庫要讀多少列。">
+<title>資料庫索引 · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/explainer.css">
+</head>
+<body>
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="章節"><a href="#lab">實驗室</a><a href="#optimize">用得上嗎？</a><a href="#cost">代價</a><a href="#real">EXPLAIN</a><a href="#recap">重點整理</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>第 2 頁 · 階段 1 · 一台伺服器</span><span class="hot">25 · 26</span></div>
+  <div class="eyebrow">資料庫索引、查詢最佳化</div>
+  <h1>同一條查詢、同一份資料。<em>4 秒 vs 0.1 毫秒。</em></h1>
+  <div class="scenario"><b>Encore</b>Ana 的「我的票券」頁面只跑一條查詢：找出這個 email 的所有訂單。2,000 筆訂單時一下就好。現在 Encore 有 500 萬筆訂單，這個頁面要跑 4 秒。程式碼沒有人改過。</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">打開實驗室 ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>實驗室 · 先弄壞，再修好</span><span class="hot" id="modeTag">沒有索引</span></div>
+  <h2>找出 Ana 的 3 筆訂單</h2>
+  <pre class="sqlbox">SELECT * FROM orders WHERE email = 'ana@encore.example';</pre>
+
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">資料表中的訂單數</span><div id="sizeSeg"></div></div>
+      <div class="ctl"><span class="lab-k">索引</span><div id="idxSeg"></div></div>
+      <div class="ctl"><span class="lab-k">執行查詢</span><div id="player"></div></div>
+    </div>
+
+    <div class="compare" style="margin:0">
+      <div>
+        <h3>資料表 <span class="muted" id="cellNote" style="font-family:var(--body);text-transform:none;font-size:13px"></span></h3>
+        <div class="cells" id="rows" style="--cols:20" aria-hidden="true"></div>
+      </div>
+      <div id="treeBox">
+        <h3>email 索引</h3>
+        <div class="tree" id="tree"></div>
+        <p class="muted" id="treeNote" style="font-size:13px;margin:10px 0 0"></p>
+      </div>
+    </div>
+
+    <div class="meters" style="margin:0">
+      <div class="meter"><div class="k">讀取列數</div><div class="v" id="mRows">0</div><div class="d" id="mRowsD">共 5,000,000 列</div></div>
+      <div class="meter"><div class="k">找到的符合項</div><div class="v" id="mHits">0 / 3</div><div class="d">Ana 的訂單</div></div>
+      <div class="meter"><div class="k">查詢時間</div><div class="v" id="mTime">0 ms</div><div class="d">模擬值</div></div>
+    </div>
+    <div class="status" id="status" role="status">按「播放」（或「單步」）執行查詢。</div>
+    <ul class="log" id="runs" aria-label="已完成的執行"><li class="mut">完成的執行會列在這裡，方便你比較。</li></ul>
+  </div>
+
+  <h3>試試看</h3>
+  <ol class="missions" id="missions"></ol>
+
+  <div class="takeaway"><div class="t">一句話說清楚索引</div><p>沒有索引時，資料庫必須讀<b>每一列</b>，才能確定找到了所有符合的資料。索引（index）是一種排序好的查找結構（通常是 B-tree），能直接跳到符合的那幾列。</p></div>
+</section>
+
+<section class="panel" id="optimize">
+  <div class="panel-label"><span>第 2 幕 · 查詢最佳化</span><span class="hot">26</span></div>
+  <h2>光有索引還不夠，查詢本身也要用得上它。</h2>
+  <p>索引會把 email 依照原本的寫法排序存好。選一條查詢，看看資料庫還能不能用上索引。</p>
+  <div id="qSeg" class="row" style="margin:10px 0"></div>
+  <pre class="sqlbox" id="qSql"></pre>
+  <div class="compare">
+    <div><h3>執行計畫 <span id="qPill"></span></h3><p id="qWhy" style="margin:0"></p></div>
+    <div><h3>修法</h3><p id="qFix" style="margin:0"></p></div>
+  </div>
+  <div class="takeaway"><div class="t">關鍵差別</div><p>只有當資料庫能用<b>跟排序相同的方式</b>搜尋欄位時，索引才幫得上忙。把欄位包進函式，或用萬用字元開頭搜尋，都會讓它退回去逐列讀取。</p></div>
+</section>
+
+<section class="panel" id="cost">
+  <div class="panel-label"><span>第 3 幕 · 代價</span><span class="hot">取捨</span></div>
+  <h2>那為什麼不幫每個欄位都建索引？</h2>
+  <p>每個索引都是部分資料的一份額外排序副本。每筆新訂單都得寫進資料表，<i>還要</i>寫進每一個索引。</p>
+  <div class="ctl" style="max-width:420px">
+    <label for="nIdx">orders 資料表上的索引數：<b id="nIdxV">1</b></label>
+    <input type="range" id="nIdx" min="0" max="8" step="1" value="1">
+  </div>
+  <div class="bars" style="max-width:640px">
+    <span>每筆新訂單的寫入次數</span><div class="bar"><i id="bW"></i></div><span class="num" id="nW"></span>
+    <span>額外磁碟空間</span><div class="bar"><i id="bD"></i></div><span class="num" id="nD"></span>
+    <span>變快的查找</span><div class="bar"><i id="bL" style="background:var(--ok)"></i></div><span class="num" id="nL"></span>
+  </div>
+  <p class="status" id="costTxt" style="margin-top:12px"></p>
+  <p class="muted" style="font-size:14px">示意比例。實際成本取決於資料庫、欄位型別與工作負載。</p>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>第 4 幕 · 真實世界</span><span class="hot">explain</span></div>
+  <h2>問資料庫它做了什麼</h2>
+  <p><code>EXPLAIN ANALYZE</code>（Postgres）會顯示一條查詢實際使用的執行計畫。下面是實驗室那條查詢在執行一次 <code>CREATE INDEX</code> 前後的示意輸出。<b>把滑鼠移到某一行上，或點一下。</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="EXPLAIN ANALYZE 輸出範例"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 選一行</div><p id="exP">每一行反白後，都會告訴你一件在實驗室看過的事。</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>重點整理 · 帶走這些</span><span class="hot">♥</span></div>
+  <h2>整頁濃縮在一個畫面</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">沒有索引</div><div class="t">全表掃描</div><p>資料庫讀取每一列。成本隨資料表成長，所以同一條查詢每個月都更慢。</p></div>
+    <div class="card"><div class="sub">有索引</div><div class="t">索引</div><p>在欄位上建一棵排序好的樹。不管資料表有一千列還是十億列，一次查找只要讀少數幾個頁面。</p></div>
+    <div class="card"><div class="sub">驗證</div><div class="t">EXPLAIN</div><p>不要用猜的。<code>EXPLAIN ANALYZE</code> 會告訴你有沒有用到索引、讀了多少列。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">取捨</div><p>索引讓讀取變快、寫入變慢，還會佔空間。替重要查詢會拿來篩選或排序的欄位建索引，而不是每個欄位都建。</p></div>
+
+  <h3 style="margin-top:26px">考考自己 <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="頁面"></nav>
+</main>
+
+<script src="../../assets/explainer.js"></script>
+<script src="../../assets/i18n.zh-tw.js"></script>
+<script>
+(() => {
+const { $, el } = X;
+const SIZES = [2000, 100000, 5000000];
+const MATCH_CELLS = [13, 97, 188];
+const CELLS = 200, CELLS_PER_TICK = 5, ROW_US = 0.8;
+
+/* ---------- query simulation: pure state + step ---------- */
+const depthFor = n => Math.max(2, Math.ceil(Math.log(n) / Math.log(300)));
+function init(size, indexed) {
+  return { size, indexed, step: 0, cell: 0, rowsRead: 0, hits: 0, done: false, depth: depthFor(size) };
+}
+function step(s) {
+  if (s.done) return s;
+  if (!s.indexed) {
+    const next = Math.min(CELLS, s.cell + CELLS_PER_TICK);
+    for (let c = s.cell; c < next; c++) if (MATCH_CELLS.includes(c)) s.hits++;
+    s.cell = next;
+    s.rowsRead = Math.round((s.cell / CELLS) * s.size);
+    if (s.cell >= CELLS) s.done = true;
+  } else {
+    s.step++;
+    if (s.step <= s.depth) s.rowsRead = 0;
+    else { s.hits = 3; s.rowsRead = 3; s.done = true; }
+  }
+  return s;
+}
+const timeMs = s => s.indexed ? (s.step * 0.02 + (s.done ? 0.03 : 0)) : s.rowsRead * ROW_US / 1000;
+const fmtMs = ms => ms < 1 ? ms.toFixed(2) + ' 毫秒' : X.fmt(ms) + ' 毫秒';
+
+/* ---------- UI ---------- */
+let S = init(SIZES[2], false), runs = [];
+const rowsBox = $('#rows');
+for (let i = 0; i < CELLS; i++) rowsBox.append(el('div', 'cell'));
+const cells = [...rowsBox.children];
+
+const mis = X.missions($('#missions'), [
+  { text: '在 <b>5,000,000</b> 筆訂單、<b>沒有索引</b>的情況下，把查詢跑完。', hint: '它很早就找到 Ana 的 3 筆訂單，但不能停下來：後面可能還有更多。', check: () => runs.some(r => !r.indexed && r.size === 5000000) },
+  { text: '切換到<b>email 索引</b>，再跑一次。', hint: '比較實驗室下方執行紀錄裡讀取的列數。', check: () => runs.some(r => r.indexed && r.size === 5000000) },
+  { text: '現在試試 <b>2,000</b> 筆訂單、<b>沒有索引</b>。', hint: '還是全表掃描，但幾乎沒差。資料表越大，索引越划算。', check: () => runs.some(r => !r.indexed && r.size === 2000) },
+]);
+
+function drawTree() {
+  const box = $('#tree'); box.innerHTML = '';
+  const lv = [];
+  for (let d = 0; d < S.depth; d++) {
+    const row = el('div', 'lvl');
+    const labels = d === 0 ? ['a…m', 'n…z'] : d === S.depth - 1 ? ['aaron… alex', 'ana@encore… → 3 列', 'andre… anya'] : ['a…f', 'g…m'];
+    labels.forEach((t, i) => {
+      const hot = (d === 0 && i === 0) || (d === S.depth - 1 && i === 1) || (d > 0 && d < S.depth - 1 && i === 0);
+      const n = el('div', 'node', t);
+      if (S.indexed && hot && S.step > d) n.classList.add('hl');
+      row.append(n);
+    });
+    lv.push(row); box.append(row);
+  }
+  $('#treeNote').textContent = S.indexed
+    ? `${X.fmt(S.size)} 列需要 ${S.depth} 層。每一層大約把搜尋範圍縮小 300 倍，所以就算十億列也只需要大約 4 層。`
+    : '還沒有索引。開啟它才能使用。';
+  $('#treeBox').style.opacity = S.indexed ? 1 : 0.5;
+}
+function render() {
+  const per = S.size / CELLS;
+  $('#cellNote').textContent = `（每個方塊 ≈ ${X.fmt(per)} 列）`;
+  cells.forEach((c, i) => {
+    const match = MATCH_CELLS.includes(i);
+    let cls = 'cell';
+    if (!S.indexed) { if (i < S.cell) cls += match ? ' hit' : ' on'; }
+    else if (S.done && match) cls += ' hit';
+    c.className = cls;
+  });
+  drawTree();
+  $('#mRows').textContent = X.fmt(S.rowsRead);
+  $('#mRowsD').textContent = S.indexed ? `另外讀了 ${Math.min(S.step, S.depth)} 個索引頁` : `共 ${X.fmt(S.size)} 列`;
+  $('#mHits').textContent = `${S.hits} / 3`;
+  $('#mTime').textContent = fmtMs(timeMs(S));
+  $('#mTime').parentElement.className = 'meter' + (timeMs(S) > 1000 ? ' bad' : timeMs(S) > 50 ? ' wait' : '');
+  $('#modeTag').textContent = S.indexed ? 'email 索引' : '沒有索引';
+  const st = $('#status');
+  if (!S.step && !S.cell) { st.className = 'status'; st.textContent = '按「播放」（或「單步」）執行查詢。'; }
+  else if (!S.done) {
+    st.className = 'status wait';
+    st.textContent = S.indexed ? `讀取索引第 ${S.step} / ${S.depth} 層：比對「ana@encore.example」，決定往左還是往右。`
+      : `循序掃描：正在讀第 ${X.fmt(S.rowsRead)} / ${X.fmt(S.size)} 列。${S.hits ? `目前找到 ${S.hits} 筆，但必須繼續讀完才能確定。` : ''}`;
+  } else {
+    st.className = 'status ' + (timeMs(S) > 1000 ? 'bad' : 'ok');
+    st.textContent = S.indexed ? `✓ 完成：讀了 ${S.depth} 個索引頁，接著剛好 3 列。${fmtMs(timeMs(S))}。` : `${timeMs(S) > 1000 ? '✕' : '✓'} 完成：為了回傳 3 列，讀完全部 ${X.fmt(S.size)} 列。${fmtMs(timeMs(S))}。`;
+  }
+  mis.update(S);
+}
+function finish() {
+  player.pause();
+  runs.push({ size: S.size, indexed: S.indexed, rows: S.rowsRead, ms: timeMs(S) });
+  const log = $('#runs'); if (runs.length === 1) log.innerHTML = '';
+  log.append(el('li', S.indexed ? 'ok' : (timeMs(S) > 1000 ? 'bad' : ''), `${S.indexed ? '有索引  ' : '沒有索引'} · ${X.fmt(S.size).padStart(9)} 筆訂單 · 讀了 ${X.fmt(S.rows || S.rowsRead).padStart(9)} 列 · ${fmtMs(timeMs(S))}`));
+  mis.update(S);
+}
+const player = X.player($('#player'), {
+  ms: 70,
+  step: () => { if (S.done) { S = init(S.size, S.indexed); } step(S); render(); if (S.done) finish(); },
+  reset: () => { S = init(S.size, S.indexed); render(); },
+});
+const resetRun = () => { player.pause(); S = init(SIZES[sizeSeg.value], idxSeg.value === 1); render(); };
+const sizeSeg = X.seg($('#sizeSeg'), ['2,000', '100,000', '5,000,000'], resetRun, 2);
+const idxSeg = X.seg($('#idxSeg'), ['沒有索引', 'email 索引'], resetRun, 0);
+render();
+
+/* ---------- act 2: can it use the index? ---------- */
+const QV = [
+  ['= 精確比對', "WHERE email = 'ana@encore.example'", true, '直接比對欄位，所以資料庫可以沿著排序好的索引直接走到符合的地方。', '不需要修。'],
+  ['LOWER(email)', "WHERE LOWER(email) = 'ana@encore.example'", false, '索引是依 <code>email</code> 排序的，不是依 <code>LOWER(email)</code>。為了比較，資料庫必須對每一列計算 LOWER()。', '儲存 email 時就先轉成小寫，或建立運算式索引：<code>CREATE INDEX ON orders (LOWER(email))</code>。'],
+  ["LIKE '%@gmail.com'", "WHERE email LIKE '%@gmail.com'", false, '開頭的萬用字元代表「結尾是」。排序好的清單沒辦法幫你找出所有<i>結尾</i>是某個字的資料，就像電話簿沒辦法找出所有名字以「明」結尾的人。', '改搜尋開頭已知的欄位（例如把網域另外存一欄），或使用全文索引、trigram 索引。'],
+  ["LIKE 'ana%'", "WHERE email LIKE 'ana%'", true, '「開頭是」可以利用排序：跳到「ana」，往後讀到前綴不再符合為止。', 'B-tree 索引可以處理。在 Postgres 中需要 C 定序（collation）或 <code>text_pattern_ops</code> 索引。'],
+];
+const showQ = i => {
+  const [, w, ok, why, fix] = QV[i];
+  $('#qSql').textContent = 'SELECT * FROM orders ' + w + ';';
+  $('#qPill').innerHTML = ok ? '<span class="pill ok">✓ 索引掃描</span>' : '<span class="pill bad">✕ 全表掃描</span>';
+  $('#qWhy').innerHTML = why; $('#qFix').innerHTML = fix;
+};
+X.seg($('#qSeg'), QV.map(q => q[0]), showQ, 0); showQ(0);
+
+/* ---------- act 3: write cost ---------- */
+function drawCost() {
+  const n = +$('#nIdx').value;
+  $('#nIdxV').textContent = n;
+  $('#bW').style.width = ((1 + n) / 9) * 100 + '%'; $('#nW').textContent = 1 + n;
+  $('#bD').style.width = Math.min(100, n * 14) + '%'; $('#nD').textContent = '+' + n * 15 + '%';
+  $('#bL').style.width = (n / 8) * 100 + '%'; $('#nL').textContent = n + ' 欄';
+  $('#costTxt').innerHTML = n === 0 ? '沒有索引：寫入成本最低，但每次查找都是全表掃描。'
+    : n <= 3 ? `${n} 個索引：每筆新訂單要寫 ${1 + n} 次。用來換取你真正會搜尋的欄位快速查找，這個代價很合理。`
+    : `${n} 個索引：現在每賣一張票都要寫 ${1 + n} 次。開賣湧入時，這會拖慢你最想賣的東西。把沒有查詢用到的索引刪掉。`;
+}
+$('#nIdx').addEventListener('input', drawCost); drawCost();
+
+/* ---------- act 4: EXPLAIN ---------- */
+X.codeMap($('#code'), [
+  ['<span class="c">-- 之前：沒有索引</span>', null],
+  ['<span class="key">Seq Scan</span> on orders  (actual time=0.4..3912.5 rows=3)', 'seq'],
+  ['  Filter: (email = <span class="s">\'ana@encore.example\'</span>)', 'filter'],
+  ['  <span class="key">Rows Removed by Filter</span>: 4999997', 'removed'],
+  ['Execution Time: <span class="s">3912.6 ms</span>', 'time'],
+  ['', null],
+  ['<span class="key">CREATE INDEX</span> orders_email_idx ON orders (email);', 'create'],
+  ['', null],
+  ['<span class="c">-- 之後</span>', null],
+  ['<span class="key">Index Scan</span> using orders_email_idx on orders', 'idx'],
+  ['  <span class="key">Index Cond</span>: (email = <span class="s">\'ana@encore.example\'</span>)', 'cond'],
+  ['Execution Time: <span class="s">0.08 ms</span>', 'time2'],
+], {
+  seq: ['Seq Scan', '循序掃描（Seq Scan）：從頭到尾讀整張資料表。這就是實驗室裡把索引關掉的情況。'],
+  filter: ['Filter', '每一列都先讀出來再檢查。篩選（Filter）是在讀完<i>之後</i>才把資料丟掉。'],
+  removed: ['Rows Removed by Filter', '破綻就在這裡：為了回傳 3 列，讀了將近 500 萬列再丟掉。熱門查詢這裡的數字很大，就代表它需要索引。'],
+  time: ['Execution Time', '示意值，不是效能基準。重點是趨勢：這個數字會隨資料表成長。'],
+  create: ['CREATE INDEX', '一次建好排序樹。之後每次新增、更新、刪除，資料庫都會維護它（第 3 幕）。'],
+  idx: ['Index Scan', '查詢規劃器選擇了索引：沿著樹走，然後只抓符合的列。'],
+  cond: ['Index Cond', '條件是由索引本身回答的，而不是逐列檢查。跟上面的「Filter」比較看看。'],
+  time2: ['之後', '不管是 5 千列還是 50 億列都差不多，因為樹只會稍微變深一點。'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: '「用 email 搜尋訂單」在開發環境很快，在正式環境很慢，程式碼完全一樣。最可能的原因是什麼？', opts: [
+    ['正式環境的伺服器 CPU 比較慢', false, '有可能，但無法解釋從瞬間變成好幾秒。會隨資料量成長的全表掃描才解釋得了。'],
+    ['email 沒有索引，而正式環境的資料列多太多了', true, '全表掃描在 2,000 列時很便宜，在 500 萬列時很昂貴。開發環境的資料把問題藏起來了。'],
+    ['查詢要改成 SELECT email 而不是 SELECT *', false, '少選幾個欄位有一點幫助，但資料庫還是得讀每一列才能找到符合的資料。'],
+  ] },
+  { q: 'email 有索引，但 EXPLAIN 對 <code>WHERE LOWER(email) = ?</code> 還是顯示 Seq Scan。為什麼？', opts: [
+    ['索引壞了，需要重建', false, '索引沒問題，只是它不是依照查詢比對的值排序的。'],
+    ['索引是依 email 排序，不是依 LOWER(email)', true, '把欄位包進函式，索引就看不到它了。替運算式建索引，或把 email 存成小寫。'],
+    ['Postgres 從來不會對文字欄位使用索引', false, '會的，而且隨時都在用。實驗室裡的精確比對查詢就用了。'],
+  ] },
+  { q: 'Ben 想「保險起見」替 orders 資料表的 12 個欄位全部建索引。會發生什麼事？', opts: [
+    ['每條查詢都變快，其他什麼都沒變', false, '用得上索引的讀取會變快，但現在每次新增都要多更新 12 個結構。'],
+    ['賣票（新增）變慢，而且資料表佔用更多磁碟空間', true, '索引會增加寫入與儲存成本。依真實的查詢模式建立索引，並刪掉沒人用的。'],
+    ['資料庫不允許一張資料表有超過一個索引', false, '它會很樂意讓你建。這正是這個錯誤很常見的原因。'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'database-indexing');
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW" data-lang="zh-tw" data-slug="rate-limiting">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="讓突發請求通過令牌桶，擋下搶票機器人，並了解為什麼限額應該屬於每一位使用者。">
+<title>限流 · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/explainer.css">
+</head>
+<body>
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="章節"><a href="#lab">實驗室</a><a href="#real">回應內容</a><a href="#recap">重點整理</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>第 7 頁 · 階段 2 · 更多流量</span><span class="hot">1</span></div>
+  <div class="eyebrow">限流、令牌桶</div>
+  <h1>一個機器人，不該能<em>讓所有人都上不了網站。</em></h1>
+  <div class="scenario"><b>Encore</b>黃牛的機器人每秒打座位圖 150 次，想找便宜的座位轉賣。伺服器每秒大約只能處理 50 個請求。Ana 是真正的歌迷，只想順利結帳。你的任務：讓機器人慢下來，但不拖慢 Ana。</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">打開實驗室 ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>實驗室 · 先弄壞，再修好</span><span class="hot" id="tag">沒有限流</span></div>
+  <h2>令牌桶（token bucket）</h2>
+  <p>每個桶子最多裝 <b>B</b> 個令牌，每秒補充 <b>R</b> 個。每個請求花掉一個令牌。沒有令牌，請求就會立刻被 <code>429 Too Many Requests</code> 拒絕，伺服器完全不用做那份工作。數字是模擬的。</p>
+
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">限流器</span><div id="modeSeg"></div></div>
+      <div class="ctl">
+        <label for="cap">桶子大小 B（突發量）：<b id="capV">10</b> 個令牌</label>
+        <input type="range" id="cap" min="1" max="30" step="1" value="10">
+      </div>
+      <div class="ctl">
+        <label for="refill">補充速率 R：每秒 <b id="refillV">5</b> 個令牌</label>
+        <input type="range" id="refill" min="1" max="30" step="1" value="5">
+      </div>
+      <div class="ctl"><span class="lab-k">流量</span>
+        <div class="presets"><button class="btn sm bad" id="bot" type="button" aria-pressed="false">🤖 機器人：關</button><button class="btn sm" id="burst" type="button">Ana：連點 15 下</button></div>
+      </div>
+      <div class="ctl"><span class="lab-k">模擬</span><div id="player"></div></div>
+    </div>
+
+    <div class="compare" style="margin:0">
+      <div><h3 id="bA">Ana 的桶子</h3><div class="tokens" id="tA" aria-hidden="true"></div><p class="muted" style="font-size:13px;margin:6px 0 0" id="tAt"></p></div>
+      <div><h3 id="bB">機器人的桶子</h3><div class="tokens" id="tB" aria-hidden="true"></div><p class="muted" style="font-size:13px;margin:6px 0 0" id="tBt"></p></div>
+    </div>
+
+    <div class="meters" style="margin:0">
+      <div class="meter"><div class="k">Ana 的請求</div><div class="v" id="mAna">–</div><div class="d" id="mAnaD">成功率，最近 5 秒</div></div>
+      <div class="meter"><div class="k">機器人的請求</div><div class="v" id="mBot">–</div><div class="d" id="mBotD">成功率，最近 5 秒</div></div>
+      <div class="meter"><div class="k">伺服器負載</div><div class="v" id="mLoad">0%</div><div class="d">容量約每秒 50 個請求</div></div>
+    </div>
+    <div>
+      <div class="lab-k" style="font-size:14px;font-weight:500;margin-bottom:6px">Ana 的請求紀錄</div>
+      <ul class="log" id="log" aria-label="Ana 的請求紀錄"><li class="mut">Ana 大約每秒載入一次頁面。</li></ul>
+    </div>
+    <div class="status" id="status" role="status">按「播放」開始。</div>
+  </div>
+
+  <h3>試試看</h3>
+  <ol class="missions" id="missions"></ol>
+
+  <div class="takeaway"><div class="t">關鍵差別</div><p><b>單一共用限額</b>能保護伺服器，卻讓所有人一起為機器人的行為受罰。<b>每位使用者各自的限額</b>（依帳號、API 金鑰或 IP）既能保護伺服器，<i>又</i>能讓機器人的行為只影響機器人自己。</p></div>
+  <div class="takeaway"><div class="t">一句話說清楚限流</div><p>限制每個客戶端在一段時間內能發出的請求數，並在多出來的請求耗費真正的工作之前，用 429 便宜地拒絕它們。桶子大小允許短暫的突發；補充速率決定長期的上限。</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>第 2 幕 · 真實世界</span><span class="hot">http 429</span></div>
+  <h2>機器人實際收到什麼，以及背後的程式碼</h2>
+  <p><b>把滑鼠移到某一行上，或點一下。</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="429 回應與令牌桶程式碼範例"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 選一行</div><p id="exP">每一行反白後，都會對應到實驗室。</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>重點整理 · 帶走這些</span><span class="hot">♥</span></div>
+  <h2>整頁濃縮在一個畫面</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">是什麼</div><div class="t">限流</div><p>限制每個客戶端在每段時間內的請求數。多出來的請求會很快拿到 429，而不是耗掉伺服器容量。</p></div>
+    <div class="card"><div class="sub">怎麼做</div><div class="t">令牌桶</div><p>桶子大小＝允許多大的突發。補充速率＝持續的上限。簡單、便宜，也是最常見的演算法。</p></div>
+    <div class="card"><div class="sub">針對誰</div><div class="t">每個客戶端各自計算</div><p>依使用者、API 金鑰或 IP 建立桶子，這樣一個重度客戶端就不能用光所有人的額度。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">取捨</div><p>限額太緊，會在最忙的那一刻擋掉真正的歌迷；限額太鬆，什麼都保護不了。允許合理的突發、依客戶端限流，並告訴客戶端什麼時候可以再來（<code>Retry-After</code>）。</p></div>
+
+  <h3 style="margin-top:26px">考考自己 <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="頁面"></nav>
+</main>
+
+<script src="../../assets/explainer.js"></script>
+<script src="../../assets/i18n.zh-tw.js"></script>
+<script>
+(() => {
+const { $, el } = X;
+const DT = 100, SERVER_CAP = 50, QMAX = 40, WIN = 5000, BOT_RATE = 150;
+
+/* ---------- simulation: pure state + tick ---------- */
+function init(seed, o = {}) {
+  const s = Object.assign({ r: seed, t: 0, mode: 0, cap: 10, refill: 5, bot: false, burst: 0, burstDone: false, ticks: 0, busy: 0, queue: [], ev: [], log: [] }, o);
+  s.b = { ana: s.cap, bot: s.cap, shared: s.cap };
+  return s;
+}
+function take(s, who) {
+  if (s.mode === 0) return true;
+  const k = s.mode === 1 ? 'shared' : who;
+  if (s.b[k] >= 1) { s.b[k] -= 1; return true; }
+  return false;
+}
+function tick(s) {
+  const t0 = s.t, t1 = t0 + DT;
+  for (const k of ['ana', 'bot', 'shared']) s.b[k] = Math.min(s.cap, s.b[k] + s.refill * DT / 1000);
+  const reqs = [];
+  for (let i = 0, n = X.poisson(s, 1 * DT / 1000); i < n; i++) reqs.push(['ana', t0 + X.rnd(s) * DT]);
+  if (s.burst > 0) { const k = Math.min(s.burst, 5); for (let i = 0; i < k; i++) reqs.push(['ana', t0 + i * 15]); s.burst -= k; if (!s.burst) s.burstDone = true; }
+  if (s.bot) for (let i = 0, n = X.poisson(s, BOT_RATE * DT / 1000); i < n; i++) reqs.push(['bot', t0 + X.rnd(s) * DT]);
+  reqs.sort((a, b) => a[1] - b[1]);
+  const drain = until => {
+    while (s.queue.length) {
+      const start = Math.max(s.busy, s.queue[0]);
+      if (start >= until) break;
+      s.queue.shift(); s.busy = start + 1000 / SERVER_CAP;
+    }
+  };
+  for (const [who, at] of reqs) {
+    drain(at);
+    let code;
+    if (!take(s, who)) code = 429;
+    else if (s.queue.length >= QMAX) code = 503;
+    else { s.queue.push(at); code = 200; }
+    s.ev.push({ t: at, who, code });
+    if (who === 'ana') {
+      const k = s.mode === 1 ? 'shared' : 'ana';
+      s.log.push({ t: at, code, wait: code === 429 ? (1 - s.b[k]) / s.refill : 0 });
+    }
+  }
+  drain(t1);
+  s.t = t1; s.ticks++;
+  s.ev = s.ev.filter(e => e.t > t1 - WIN);
+  s.log = s.log.slice(-12);
+  return s;
+}
+function metrics(s) {
+  const of = who => { const e = s.ev.filter(x => x.who === who); return { n: e.length, ok: e.filter(x => x.code === 200).length, r429: e.filter(x => x.code === 429).length, r503: e.filter(x => x.code === 503).length }; };
+  const accepted = s.ev.filter(e => e.code === 200 && e.t > s.t - 1000).length;
+  return { ana: of('ana'), bot: of('bot'), load: Math.min(1, accepted / SERVER_CAP), q: s.queue.length };
+}
+
+/* ---------- UI ---------- */
+let S = init(41);
+const t0 = () => { S.ticks = 0; };
+const mis = X.missions($('#missions'), [
+  { text: '在沒有限流、機器人關閉的情況下按<b>播放</b>。', hint: 'Ana 大約每秒載入一次頁面。一切正常。', check: s => s.ticks >= 20 && !s.bot && s.mode === 0 },
+  { text: '把<b>機器人打開</b>。', hint: '每秒 150 個請求，伺服器卻只能處理 50 個。隊伍塞滿，Ana 開始收到 503。', check: s => s.bot && s.mode === 0 && metrics(s).ana.r503 > 0 },
+  { text: '切換到<b>一個共用的桶子</b>。', hint: '伺服器現在安全了，但機器人花光了共用的令牌，所以 Ana 也收到 429。', check: s => s.bot && s.mode === 1 && metrics(s).ana.r429 > 0 },
+  { text: '切換到<b>每位使用者一個桶子</b>。', hint: '現在機器人只會掏空自己的桶子。Ana 持續收到 200。', check: s => s.bot && s.mode === 2 && s.ticks > 50 && metrics(s).ana.ok >= 3 && metrics(s).ana.r429 === 0 && metrics(s).ana.r503 === 0 },
+  { text: '點<b>Ana：連點 15 下</b>。', hint: '前 10 下會通過（這就是桶子大小，也就是允許的突發量）。其餘的要等令牌補充。', check: s => s.mode === 2 && s.burstDone },
+]);
+function drawBucket(box, txt, tokens, label) {
+  box.innerHTML = '';
+  for (let i = 0; i < S.cap; i++) box.append(el('span', 'tok' + (i < Math.floor(tokens) ? '' : ' empty')));
+  txt.textContent = `${S.cap} 個令牌中剩 ${Math.floor(tokens)} 個${label ? ' · ' + label : ''}`;
+}
+function render() {
+  const m = metrics(S);
+  $('#capV').textContent = S.cap; $('#refillV').textContent = S.refill;
+  $('#tag').textContent = ['沒有限流', '一個共用的桶子', '每位使用者一個桶子'][S.mode];
+  $('#bot').textContent = S.bot ? '🤖 機器人：開（每秒 150 次）' : '🤖 機器人：關';
+  $('#bot').setAttribute('aria-pressed', S.bot ? 'true' : 'false');
+  if (S.mode === 0) {
+    $('#bA').textContent = '沒有限流器'; $('#bB').textContent = ' ';
+    $('#tA').innerHTML = ''; $('#tB').innerHTML = ''; $('#tAt').textContent = '每個請求都直接送到伺服器。'; $('#tBt').textContent = '';
+  } else if (S.mode === 1) {
+    $('#bA').textContent = '所有人共用一個桶子'; $('#bB').textContent = ' ';
+    drawBucket($('#tA'), $('#tAt'), S.b.shared, 'Ana 和機器人共用'); $('#tB').innerHTML = ''; $('#tBt').textContent = '';
+  } else {
+    $('#bA').textContent = 'Ana 的桶子'; $('#bB').textContent = '機器人的桶子';
+    drawBucket($('#tA'), $('#tAt'), S.b.ana); drawBucket($('#tB'), $('#tBt'), S.b.bot);
+  }
+  const pct = x => (x.n ? Math.round((x.ok / x.n) * 100) + '%' : '–');
+  $('#mAna').textContent = pct(m.ana);
+  $('#mAnaD').textContent = m.ana.n ? `${m.ana.ok} 成功 · ${m.ana.r429} × 429 · ${m.ana.r503} × 503` : '成功率，最近 5 秒';
+  $('#mAna').parentElement.className = 'meter' + (m.ana.n && m.ana.ok < m.ana.n ? ' bad' : m.ana.n ? ' ok' : '');
+  $('#mBot').textContent = S.bot ? pct(m.bot) : 'off';
+  $('#mBotD').textContent = S.bot && m.bot.n ? `${m.bot.ok} 成功 · ${m.bot.r429} × 429 · ${m.bot.r503} × 503` : '成功率，最近 5 秒';
+  $('#mLoad').textContent = Math.round(m.load * 100) + '%';
+  $('#mLoad').parentElement.className = 'meter' + (m.q >= QMAX * 0.8 ? ' bad' : m.load > 0.8 ? ' wait' : '');
+  const log = $('#log');
+  if (S.log.length) {
+    log.innerHTML = '';
+    S.log.slice(-8).forEach(l => {
+      const ts = (l.t / 1000).toFixed(1).padStart(5) + 's';
+      const line = l.code === 200 ? `${ts}  GET /seats → 200 OK` : l.code === 429 ? `${ts}  GET /seats → 429 Too Many Requests（${Math.max(0.1, l.wait).toFixed(1)} 秒後重試）` : `${ts}  GET /seats → 503 Service Unavailable（伺服器超載）`;
+      log.append(el('li', l.code === 200 ? 'ok' : l.code === 429 ? 'wait' : 'bad', line));
+    });
+  }
+  const st = $('#status');
+  if (!S.t) { st.className = 'status'; st.textContent = '按「播放」開始。'; }
+  else if (m.ana.r503) { st.className = 'status bad'; st.textContent = '✕ 伺服器超載。機器人的請求塞滿了隊伍，所以 Ana 的請求也以 503 失敗。'; }
+  else if (m.ana.r429 && S.mode === 1) { st.className = 'status bad'; st.textContent = '✕ 伺服器安全了，但 Ana 被擋住。Ana 和機器人共用一個桶子，而機器人幾乎花光了每一個令牌。'; }
+  else if (m.ana.r429) { st.className = 'status wait'; st.textContent = '⚠ 剛才那波連點超過了 Ana 自己的限額。多出來的點擊只要等令牌補充，機器人影響不了 Ana。'; }
+  else if (S.bot && S.mode === 2) { st.className = 'status ok'; st.textContent = `✓ 機器人從自己的桶子收到 429（每秒大約只有 ${S.refill} 個請求能通過）。Ana 不受影響，伺服器負載也維持在低檔。`; }
+  else { st.className = 'status ok'; st.textContent = '✓ 全部都順利通過。'; }
+  player.clock(`t = ${(S.t / 1000).toFixed(1)} s`);
+  mis.update(S);
+}
+const player = X.player($('#player'), {
+  step: () => { tick(S); render(); }, stepTicks: 5,
+  reset: () => { S = init(41, { mode: S.mode, cap: S.cap, refill: S.refill, bot: S.bot }); mis.reset(); render(); },
+});
+X.seg($('#modeSeg'), ['沒有限流', '一個共用的桶子', '每位使用者一個桶子'], i => { S.mode = i; S.b = { ana: S.cap, bot: S.cap, shared: S.cap }; t0(); render(); }, 0);
+$('#cap').addEventListener('input', e => { S.cap = +e.target.value; for (const k in S.b) S.b[k] = Math.min(S.b[k], S.cap); t0(); render(); });
+$('#refill').addEventListener('input', e => { S.refill = +e.target.value; t0(); render(); });
+$('#bot').addEventListener('click', () => { S.bot = !S.bot; t0(); if (!player.running && S.bot) player.play(); render(); });
+$('#burst').addEventListener('click', () => { S.burst = 15; S.burstDone = false; if (!player.running) player.play(); render(); });
+render();
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="key">HTTP/1.1 429 Too Many Requests</span>', 'status'],
+  ['<span class="key">Retry-After</span>: <span class="s">2</span>', 'retry'],
+  ['<span class="key">RateLimit-Limit</span>: <span class="s">10</span>', 'headers'],
+  ['<span class="key">RateLimit-Remaining</span>: <span class="s">0</span>', 'headers'],
+  ['', null],
+  ['<span class="c">// 令牌桶，每位使用者一個</span>', null],
+  ['<span class="key">function</span> allow(userId, now) {', null],
+  ['  <span class="key">const</span> b = buckets.get(userId) ?? { tokens: B, last: now };', 'key'],
+  ['  b.tokens = Math.min(B, b.tokens + (now - b.last) * R);', 'refill'],
+  ['  b.last = now;', 'refill'],
+  ['  buckets.set(userId, b);', 'key'],
+  ['  <span class="key">if</span> (b.tokens &lt; 1) <span class="key">return false</span>;  <span class="c">// → 429</span>', 'reject'],
+  ['  b.tokens -= 1;', 'spend'],
+  ['  <span class="key">return true</span>;', 'spend'],
+  ['}', null],
+], {
+  status: ['429', '代表「你送出太多請求了」的標準狀態碼。伺服器送出它幾乎不花成本，這正是重點。'],
+  retry: ['Retry-After', '告訴客戶端要等幾秒。守規矩的客戶端會等。這就是 Ana 紀錄裡的「… 秒後重試」。'],
+  headers: ['限額標頭', '讓客戶端在碰到上限前就知道自己的額度。這些名稱來自 IETF 的標準草案，很多 API 則使用 <code>X-RateLimit-*</code>。'],
+  key: ['每位使用者一個桶子', '桶子是用 <code>userId</code> 查出來的。所有人共用同一個鍵，就是實驗室裡的共用桶子。真實系統會把桶子存在 Redis 裡，讓每台伺服器都共用。'],
+  refill: ['補充', '不用計時器，而是延遲補充：依照距離上一個請求過了幾秒，補上 R 個令牌，最多不超過 B。'],
+  reject: ['拒絕', '令牌用完了：在任何昂貴的工作開始之前就先拒絕。'],
+  spend: ['花費', '一個請求，一個令牌。昂貴的端點可以花不只一個。'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: '一個桶子裝 10 個令牌，每秒補充 1 個。桶子滿的歌迷瞬間點了 10 下，之後每秒點一下。會發生什麼事？', opts: [
+    ['10 下快速點擊全部通過，之後每秒一下的點擊也持續通過', true, '桶子大小允許了這次突發。之後補充速率剛好等於每秒點一下。'],
+    ['只有第一下通過', false, '那是桶子大小為 1 的情況。桶子做大就是為了允許突發。'],
+    ['全部都收到 429', false, '桶子一開始是滿的，所以突發是被允許的。'],
+  ] },
+  { q: 'Encore 的 API 有一個每秒 1,000 個請求的全域限額。某個合作夥伴有 bug 的腳本把它全部用光了。怎麼修？', opts: [
+    ['把全域限額提高到 10,000', false, '腳本只會用得更多。問題在於一個客戶端可以用光所有人的額度。'],
+    ['給每個客戶端（API 金鑰）各自的限額', true, '每個客戶端各自一個桶子，有 bug 的腳本就只會撞上自己的上限，其他合作夥伴照常運作。'],
+    ['拿掉限額，加更多伺服器', false, '那樣有 bug 的腳本只會讓你花更多錢買伺服器。'],
+  ] },
+  { q: '你的 App 從金流服務收到 <code>429</code> 加上 <code>Retry-After: 5</code>。它該怎麼做？', opts: [
+    ['在迴圈裡立刻重試，直到成功', false, '這會讓所有人的情況更糟，有些服務商還會封鎖你。'],
+    ['等大約 5 秒，再重試', true, '遵守 Retry-After。連續失敗時，每次等更久（指數退避，第 9 頁）。'],
+    ['當成永久失敗，直接放棄', false, '429 本來就是暫時性的，只是要求你放慢速度。'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'rate-limiting');
+})();
+</script>
+</body>
+</html>

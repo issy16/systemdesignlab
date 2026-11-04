@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="zh-Hans-CN" data-lang="zh-cn" data-slug="n-plus-1-pooling">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="看一个无害的循环怎么变成 101 次数据库查找，以及连接池怎么决定谁要等。">
+<title>N+1 与连接池 · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/explainer.css">
+</head>
+<body>
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="章节"><a href="#n1">N+1</a><a href="#lab">连接池实验室</a><a href="#real">代码</a><a href="#recap">重点整理</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>第 3 页 · 阶段 1 · 一台服务器</span><span class="hot">27 · 28</span></div>
+  <div class="eyebrow">N+1 查找、连接池</div>
+  <h1>四进代码。<em>跑数据库 101 趟。</em></h1>
+  <div class="scenario"><b>Encore</b>Cai 做了一个「本周演唱会」页面：列出演唱会，并显示每个场馆的名称。用 5 场测试数据时看起来完美。换成真实数据就变慢了，忙碌时段其他页面还开始出现「等待数据库连接超时」的错误。</div>
+  <div class="row"><a class="btn primary" href="#n1" style="text-decoration:none">开始 ↓</a></div>
+</section>
+
+<section class="panel" id="n1">
+  <div class="panel-label"><span>第 1 幕 · N+1 查找</span><span class="hot">27</span></div>
+  <h2>加载页面，数数有几次查找</h2>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">代码怎么抓场馆数据</span><div id="patSeg"></div></div>
+      <div class="ctl">
+        <label for="nC">页面上的演唱会数：<b id="nCV">20</b></label>
+        <input type="range" id="nC" min="5" max="100" step="5" value="20">
+      </div>
+      <div class="ctl"><span class="lab-k">运行</span><div><button class="btn primary" id="load" type="button">加载页面</button></div></div>
+    </div>
+    <pre class="sqlbox" id="patCode"></pre>
+    <div class="meters" style="margin:0">
+      <div class="meter"><div class="k">送出的查找</div><div class="v" id="mQ">–</div></div>
+      <div class="meter"><div class="k">数据库时间</div><div class="v" id="mT">–</div><div class="d">每次来回约 2.5 毫秒（模拟值）</div></div>
+    </div>
+    <ul class="log" id="qlog" aria-label="查找纪录"><li class="mut">查找纪录会显示在这里。</li></ul>
+    <div class="status" id="n1Status" role="status">按「加载页面」。</div>
+  </div>
+  <div class="takeaway"><div class="t">一句话说清楚 N+1</div><p><b>1</b> 次查找取得清单，接着每个项目再查 <b>N</b> 次，通常藏在循环或 ORM 的延迟加载（lazy loading）里。改成一次批量抓取相关数据。</p></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>实验室 · 连接池</span><span class="hot" id="poolTag">连接池大小 10</span></div>
+  <h2>每次查找都需要一条连接，而连接不多。</h2>
+  <p>开一条数据库连接很慢（这里大约 30 毫秒：网络交握、登录、初始化）。Encore 的数据库方案总共也只允许 <b>20 条连接</b>。<b>连接池（connection pool）</b>会先开好几条连接，再借给大家用。请求借一条、跑完查找、再还回去。没有空闲的连接时，请求就得等。</p>
+
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl">
+        <label for="rate">流量：每秒 <b id="rateV">40</b> 次页面加载</label>
+        <input type="range" id="rate" min="10" max="300" step="10" value="40">
+      </div>
+      <div class="ctl">
+        <label for="pool">连接池大小：<b id="poolV">10</b> 条连接</label>
+        <input type="range" id="pool" min="1" max="20" step="1" value="10">
+      </div>
+      <div class="ctl"><span class="lab-k">查找模式</span><div id="qSeg"></div></div>
+      <div class="ctl"><span class="lab-k">连接方式</span><div id="cSeg"></div></div>
+      <div class="ctl"><span class="lab-k">模拟</span><div id="player"></div></div>
+    </div>
+    <div>
+      <div class="lab-k" style="font-size:14px;font-weight:500;margin-bottom:6px" id="slotLbl">连接池中的连接（填满 = 使用中）</div>
+      <div class="tokens" id="slots" aria-hidden="true"></div>
+    </div>
+    <div class="meters" style="margin:0">
+      <div class="meter"><div class="k">页面加载时间</div><div class="v" id="mLat">0 ms</div><div class="d">平均，最近 3 秒</div></div>
+      <div class="meter"><div class="k">等待连接中</div><div class="v" id="mWait">0</div><div class="d">排队中的请求</div></div>
+      <div class="meter"><div class="k">已打开的连接</div><div class="v" id="mOpen">0 / 20</div><div class="d">数据库上限为 20</div></div>
+      <div class="meter"><div class="k">错误</div><div class="v" id="mErr">0</div><div class="d">最近 3 秒</div></div>
+    </div>
+    <div class="status" id="status" role="status">按「播放」开始送出流量。</div>
+  </div>
+
+  <h3>试试看</h3>
+  <ol class="missions" id="missions"></ol>
+
+  <div class="takeaway"><div class="t">关键差别</div><p>没有连接池时，每个请求都<b>自己开一条连接</b>：很慢，而且流量尖峰会冲破数据库的上限。有连接池时，请求<b>从固定的一组连接中借用</b>：很快，数据库也受到保护。连接池用完时，请求就排队等轮到自己。</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>第 3 幕 · 真实世界</span><span class="hot">orm</span></div>
+  <h2>在代码里长什么样子</h2>
+  <p>这里用 Prisma 风格的语法，但每个 ORM（Django、Rails、Sequelize、Hibernate……）都有同样的陷阱、同样的解法。<b>把鼠标移到某一行上，或点一下。</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="ORM 代码范例"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 选一行</div><p id="exP">每一行反白后，都会对应到两个实验室里的某样东西。</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>重点整理 · 带走这些</span><span class="hot">♥</span></div>
+  <h2>整页浓缩在一个画面</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">问题</div><div class="t">N+1 查找</div><p>清单一次查找，加上每个项目各一次。测试数据看不出来，真实数据很痛。留意循环里的查找。</p></div>
+    <div class="card"><div class="sub">解法</div><div class="t">批量抓取</div><p>用 JOIN，或 ORM 的预先加载（eager loading：<code>include</code>、<code>select_related</code>、<code>includes</code>）。2 次查找取代 101 次。</p></div>
+    <div class="card"><div class="sub">防护</div><div class="t">连接池</div><p>重复使用一组固定的打开连接。请求更快，数据库也永远不会收到超出它负荷的连接数。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">取舍</div><p>连接池越大，能同时跑的请求越多，但不能超过数据库允许的数量，而且每台应用服务器都有自己的连接池。先修慢查找：它们会占住连接更久，把连接池耗光。</p></div>
+
+  <h3 style="margin-top:26px">考考自己 <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="页面"></nav>
+</main>
+
+<script src="../../assets/explainer.js"></script>
+<script src="../../assets/i18n.zh-cn.js"></script>
+<script>
+(() => {
+const { $, el } = X;
+const RT = 2.5, CONNECT = 30, DB_LIMIT = 20, RENDER = 20, DT = 100, WAIT_MAX = 2000;
+const VENUES = ['The Forum', 'Red Rocks', 'Brixton Academy', 'Paradiso', 'Budokan', 'Fillmore', 'Olympia', 'Roundhouse'];
+
+/* ---------- act 1: N+1 ---------- */
+const PATS = [
+  { label: '循环（N+1）', code: n => `concerts = SELECT * FROM concerts LIMIT ${n};\nfor (c of concerts)\n  c.venue = SELECT * FROM venues WHERE id = c.venue_id;`, queries: n => 1 + n },
+  { label: '预先加载', code: n => `concerts = SELECT * FROM concerts LIMIT ${n};\nvenues   = SELECT * FROM venues WHERE id IN (…${n} ids…);`, queries: () => 2 },
+  { label: 'JOIN', code: n => `SELECT concerts.*, venues.name\nFROM concerts JOIN venues ON venues.id = concerts.venue_id\nLIMIT ${n};`, queries: () => 1 },
+];
+let pat = 0, busy = false;
+const showPat = () => { $('#patCode').textContent = PATS[pat].code(+$('#nC').value); $('#nCV').textContent = $('#nC').value; };
+X.seg($('#patSeg'), PATS.map(p => p.label), i => { pat = i; showPat(); }, 0);
+$('#nC').addEventListener('input', showPat); showPat();
+$('#load').addEventListener('click', async () => {
+  if (busy) return; busy = true; $('#load').disabled = true;
+  const n = +$('#nC').value, q = PATS[pat].queries(n);
+  const log = $('#qlog'); log.innerHTML = '';
+  const lines = pat === 0
+    ? ['SELECT * FROM concerts LIMIT ' + n, ...Array.from({ length: n }, (_, i) => `SELECT * FROM venues WHERE id = ${101 + i}   -- ${VENUES[i % VENUES.length]}`)]
+    : pat === 1 ? ['SELECT * FROM concerts LIMIT ' + n, `SELECT * FROM venues WHERE id IN (101, 102, … ${100 + n})`]
+    : [`SELECT concerts.*, venues.name FROM concerts JOIN venues … LIMIT ${n}`];
+  for (let i = 0; i < lines.length; i++) {
+    if (i < 12 || i === lines.length - 1) log.append(el('li', i ? '' : 'mut', `${String(i + 1).padStart(3)}  ${X.esc(lines[i])}`));
+    else if (i === 12) log.append(el('li', 'wait', `     …还有 ${lines.length - 13} 条类似的…`));
+    $('#mQ').textContent = i + 1;
+    $('#mT').textContent = X.fmt((i + 1) * RT) + ' 毫秒';
+    if (i < 40) await X.sleep(35);
+  }
+  const ms = q * RT;
+  $('#mQ').parentElement.className = 'meter' + (q > 10 ? ' bad' : ' ok');
+  const st = $('#n1Status');
+  st.className = 'status ' + (q > 10 ? 'bad' : 'ok');
+  st.textContent = q > 10
+    ? `✕ 一个页面 ${q} 次查找，在数据库上等了 ${X.fmt(ms)} 毫秒。每一次都很快，只是次数太多，而且会随页面内容增加。`
+    : `✓ ${q} 次查找，${X.fmt(ms)} 毫秒。同一个页面、同一份数据，不管 5 场还是 500 场演唱会，查找次数都一样。`;
+  busy = false; $('#load').disabled = false;
+});
+
+/* ---------- pool simulation: pure state + tick ---------- */
+function init(seed) { return { r: seed, t: 0, rate: 40, pool: 10, joined: false, pooled: true, slots: Array(10).fill(0), active: [], queue: [], done: [], errs: [], ticks: 0 }; }
+const holdMs = s => (s.joined ? 2 : 21) * RT + (s.pooled ? 0 : CONNECT);
+function tick(s) {
+  const t0 = s.t, t1 = t0 + DT;
+  if (s.t % 1000 === 0) s.mod = 0.6 + 0.8 * X.rnd(s);
+  const arr = [];
+  for (let i = 0, n = X.poisson(s, s.rate * (s.mod || 1) * DT / 1000); i < n; i++) arr.push(t0 + X.rnd(s) * DT);
+  arr.sort((a, b) => a - b);
+  if (s.pooled) {
+    while (s.slots.length < s.pool) s.slots.push(t0);
+    if (s.slots.length > s.pool) s.slots = s.slots.sort((a, b) => a - b).slice(0, s.pool);
+    s.queue.push(...arr);
+    while (s.queue.length) {
+      let wi = 0;
+      for (let i = 1; i < s.slots.length; i++) if (s.slots[i] < s.slots[wi]) wi = i;
+      const start = Math.max(s.slots[wi], s.queue[0]);
+      if (start >= t1) break;
+      const a = s.queue.shift();
+      const fin = start + holdMs(s);
+      s.slots[wi] = fin;
+      s.done.push([fin, fin - a + RENDER]);
+    }
+    while (s.queue.length && t1 - s.queue[0] > WAIT_MAX) { s.queue.shift(); s.errs.push(t1); }
+  } else {
+    s.queue = [];
+    for (const a of arr) {
+      s.active = s.active.filter(f => f > a);
+      if (s.active.length >= DB_LIMIT) { s.errs.push(a); continue; }
+      const fin = a + holdMs(s);
+      s.active.push(fin);
+      s.done.push([fin, fin - a + RENDER]);
+    }
+  }
+  s.t = t1; s.ticks++;
+  s.active = s.active.filter(f => f > t1);
+  s.done = s.done.filter(d => d[0] > t1 - 4000);
+  s.errs = s.errs.filter(t => t > t1 - 3000);
+  return s;
+}
+function metrics(s) {
+  const win = s.done.filter(d => d[0] <= s.t && d[0] > s.t - 3000).map(d => d[1]);
+  const busySlots = s.pooled ? s.slots.filter(f => f > s.t).length : s.active.length;
+  return { lat: X.avg(win), wait: s.queue.length, open: s.pooled ? s.pool : busySlots, busy: busySlots, err: s.errs.length };
+}
+
+/* ---------- pool UI ---------- */
+let S = init(11);
+const mis = X.missions($('#missions'), [
+  { text: '用 N+1 模式、连接池 10、每秒 40 次页面加载，按<b>播放</b>。', hint: '每个页面会占住一条连接大约 53 毫秒（21 次查找）。同时忙碌的连接只有几条。', check: s => s.ticks >= 30 && !s.joined && s.pooled },
+  { text: '把流量提高到每秒 <b>200</b>。', hint: '现在连接池见底了。请求排队等连接，有些等了 2 秒后放弃。', check: s => s.rate >= 200 && !s.joined && s.pooled && (s.queue.length > 20 || s.errs.length > 0) },
+  { text: '流量不变，把查找模式切换成 <b>JOIN</b>。', hint: '现在每个请求只占住连接 5 毫秒，而不是 53 毫秒。同一个连接池能撑 10 倍的流量。', check: s => s.joined && s.rate >= 200 && s.pooled && s.queue.length < 5 && s.ticks > 20 },
+  { text: '切换到<b>每个请求开新连接</b>，并把流量推到 300。', hint: '现在每个页面都要花 30 毫秒创建连接，而且尖峰会超过数据库的 20 条连接上限。', check: s => !s.pooled && s.rate >= 300 && s.errs.length > 0 },
+]);
+const resetTicks = () => { S.ticks = 0; };
+function render() {
+  const m = metrics(S);
+  $('#rateV').textContent = S.rate; $('#poolV').textContent = S.pool;
+  $('#poolTag').textContent = S.pooled ? `连接池大小 ${S.pool}` : '没有连接池';
+  $('#pool').disabled = !S.pooled;
+  const slots = $('#slots'); slots.innerHTML = '';
+  if (S.pooled) {
+    $('#slotLbl').textContent = `连接池：${S.pool} 条中有 ${m.busy} 条使用中`;
+    for (let i = 0; i < S.pool; i++) slots.append(el('span', 'tok' + (i < m.busy ? '' : ' empty')));
+  } else {
+    $('#slotLbl').textContent = `已打开的连接：数据库上限 ${DB_LIMIT} 条中的 ${m.busy} 条`;
+    for (let i = 0; i < DB_LIMIT; i++) slots.append(el('span', 'tok' + (i < m.busy ? '' : ' empty')));
+  }
+  $('#mLat').textContent = X.fmt(m.lat) + ' 毫秒';
+  $('#mWait').textContent = X.fmt(m.wait);
+  $('#mOpen').textContent = `${m.open} / ${DB_LIMIT}`;
+  $('#mErr').textContent = X.fmt(m.err);
+  $('#mErr').parentElement.className = 'meter' + (m.err ? ' bad' : '');
+  $('#mWait').parentElement.className = 'meter' + (m.wait > 20 ? ' bad' : m.wait > 0 ? ' wait' : '');
+  const st = $('#status');
+  if (!S.t) { st.className = 'status'; st.textContent = '按「播放」开始送出流量。'; }
+  else if (m.err && !S.pooled) { st.className = 'status bad'; st.textContent = `✕ 致命错误：连接太多（too many connections）。没有连接池时，一次尖峰开了超过数据库上限的 ${DB_LIMIT} 条。最近 3 秒有 ${m.err} 个请求失败。`; }
+  else if (m.err) { st.className = 'status bad'; st.textContent = `✕ 有 ${m.err} 个请求在等待连接时超时。${S.pool} 条连接全都${S.joined ? '在忙' : '忙着跑 N+1 查找'}。`; }
+  else if (m.wait > 0) { st.className = 'status wait'; st.textContent = `⚠ ${S.pool} 条连接全部忙碌：有 ${m.wait} 个请求在排队等。`; }
+  else { st.className = 'status ok'; st.textContent = `✓ 健康：请求需要连接时随时都有空闲的。每个页面大约占住一条连接 ${X.fmt(holdMs(S))} 毫秒。`; }
+  player.clock(`t = ${(S.t / 1000).toFixed(1)} s`);
+  mis.update(S);
+}
+const player = X.player($('#player'), {
+  step: () => { tick(S); render(); }, stepTicks: 5,
+  reset: () => { const keep = { rate: S.rate, pool: S.pool, joined: S.joined, pooled: S.pooled }; S = Object.assign(init(11), keep); S.slots = Array(S.pool).fill(0); mis.reset(); render(); },
+});
+$('#rate').addEventListener('input', e => { S.rate = +e.target.value; resetTicks(); render(); });
+$('#pool').addEventListener('input', e => { S.pool = +e.target.value; resetTicks(); render(); });
+X.seg($('#qSeg'), ['N+1（21 次查找）', 'JOIN（1 次查找）'], i => { S.joined = i === 1; resetTicks(); render(); }, 0);
+X.seg($('#cSeg'), ['连接池（重复使用）', '每个请求开新连接'], i => { S.pooled = i === 0; S.queue = []; S.active = []; resetTicks(); render(); }, 0);
+render();
+
+/* ---------- act 3: code ---------- */
+X.codeMap($('#code'), [
+  ['<span class="c">// ✕ N+1：清单 1 次查找……</span>', null],
+  ['<span class="key">const</span> concerts = <span class="key">await</span> db.concert.findMany({ take: 20 });', 'list'],
+  ['<span class="key">for</span> (<span class="key">const</span> c <span class="key">of</span> concerts) {', 'loop'],
+  ['  c.venue = <span class="key">await</span> db.venue.findUnique({ where: { id: c.venueId } });', 'loop'],
+  ['}', null],
+  ['', null],
+  ['<span class="c">// ✓ 不管几场演唱会，都只要 2 次查找</span>', null],
+  ['<span class="key">const</span> concerts = <span class="key">await</span> db.concert.findMany({', 'fix'],
+  ['  take: 20, <span class="key">include</span>: { venue: <span class="s">true</span> },', 'fix'],
+  ['});', null],
+  ['', null],
+  ['<span class="c"># .env：连接池设置写在连接字符串里</span>', null],
+  ['DATABASE_URL=<span class="s">"postgresql://app@db:5432/encore</span>', 'url'],
+  ['  <span class="s">?connection_limit=10&amp;pool_timeout=2"</span>', 'pool'],
+], {
+  list: ['「1」', '一次查找抓出所有演唱会。到这里都还没问题。'],
+  loop: ['「N」', '在循环里对查找 <code>await</code>：每场演唱会一次来回。使用延迟加载的 ORM 时，它甚至会藏在只是印出 <code>c.venue.name</code> 的样板里。'],
+  fix: ['预先加载', '<code>include</code> 告诉 ORM 用一次额外查找（<code>WHERE id IN (…)</code>）抓出所有场馆。Django 叫它 <code>select_related</code>，Rails 叫它 <code>includes</code>。'],
+  url: ['一个应用程序，一个连接池', '应用程序在启动时就把连接开好并保留着。每个请求都从这组连接里借用。'],
+  pool: ['连接池设置', '<code>connection_limit=10</code> 就是实验室里的连接池大小。<code>pool_timeout=2</code> 是请求在失败前等待空闲连接的时间（你看到的那些超时）。'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: '某个页面的查找纪录显示：先对 <code>orders</code> 查找 1 次，接着对 <code>users</code> 做了 50 次几乎一模一样的查找。发生什么事？', opts: [
+    ['N+1：代码一次加载一笔订单的用户', true, '一看就知道的模式：一次清单查找，接着每一列一次查找。改成预先加载 users，或用 JOIN。'],
+    ['数据库在重试失败的查找', false, '重试会重复同一条查找。这些查找只有 id 不同，那是循环。'],
+    ['很正常：ORM 本来就每一列查一次', false, '只有在你让它延迟加载时才会。每个 ORM 都有批量抓取相关数据的方法。'],
+  ] },
+  { q: '尖峰时 Encore 的日志出现「等待连接池的连接超时」，数据库 CPU 只有 15%。最好的第一步是什么？', opts: [
+    ['把连接池调到 500', false, '数据库只允许这么多连接，而且每台应用服务器都有自己的连接池。这样也会把真正的问题藏起来。'],
+    ['找出长时间占住连接的东西（慢查找或 N+1），把它修好', true, '数据库 CPU 很低、连接池却用光，代表连接大多是被占住，而不是在使用。缩短占用时间就能释放连接池。'],
+    ['关掉连接池，让每个请求自己开连接', false, '这会让每个请求都变慢，而且尖峰会改成撞上数据库的连接上限。'],
+  ] },
+  { q: 'Encore 跑 6 台应用服务器，每台的连接池是 10。数据库允许 50 条连接。尖峰时会怎样？', opts: [
+    ['没事：连接池是所有服务器共用的', false, '每个服务器进程都有自己的连接池。总共可能要求 6 × 10 = 60 条连接。'],
+    ['最多会要求 60 条连接，所以有些会因为 50 条的上限而失败', true, '设置连接池大小时，要让「服务器数 × 连接池大小」低于数据库上限，或在前面放一个共用的连接池代理（例如 PgBouncer）。'],
+    ['数据库会自动把多出来的 10 条排队', false, '大多数数据库会直接以错误拒绝超过上限的连接，而不是排队。'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'n-plus-1-pooling');
+})();
+</script>
+</body>
+</html>

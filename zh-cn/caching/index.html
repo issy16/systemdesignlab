@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="zh-Hans-CN" data-lang="zh-cn" data-slug="caching">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="在吃力的数据库前面加一层缓存，再找出它造成的过期数据，并用缓存失效修好它。">
+<title>缓存 · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/explainer.css">
+</head>
+<body>
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="章节"><a href="#lab">实验室</a><a href="#real">代码</a><a href="#recap">重点整理</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>第 5 页 · 阶段 2 · 更多流量</span><span class="hot">2 · 49 · 50</span></div>
+  <div class="eyebrow">缓存、边缘缓存、缓存失效</div>
+  <h1>缓存很简单。<em>难的是知道副本什么时候错了。</em></h1>
+  <div class="scenario"><b>Encore</b>演唱会页面上的每位歌迷，都在问数据库同一个问题：「还剩几个位子？」每秒 200 次页面浏览时，数据库撑不住了。Ana 加了一层缓存，数据库恢复了，接着歌迷开始买到早就卖掉的座位。</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">打开实验室 ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>实验室 · 先弄坏，再修好</span><span class="hot" id="modeTag">没有缓存</span></div>
+  <h2>每秒 200 次页面浏览，一个数据库</h2>
+  <p>Encore 有 20 场演唱会，其中几场比其他场热门得多。歌迷每秒大约买 2 张票，每次购买都会改变座位数。数据库大约能处理<b>每秒 100 次查找</b>，超过就会变慢。歌迷距离 Encore 的服务器 150 毫秒。所有数字都是模拟的。</p>
+
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">缓存</span><div id="modeSeg"></div></div>
+      <div class="ctl">
+        <label for="ttl">TTL（副本保留多久）：<b id="ttlV">10 s</b></label>
+        <input type="range" id="ttl" min="0" max="5" step="1" value="2">
+      </div>
+      <div class="ctl">
+        <label for="size">缓存大小：<b id="sizeV">20</b> 场演唱会</label>
+        <input type="range" id="size" min="1" max="20" step="1" value="20">
+      </div>
+      <div class="ctl"><span class="lab-k">卖出一张票时</span><div id="invSeg"></div></div>
+      <div class="ctl"><span class="lab-k">模拟</span><div id="player"></div></div>
+    </div>
+
+    <div class="compare" style="margin:0">
+      <div>
+        <h3>重聚巡演 · 第 1 晚</h3>
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-family:var(--mono);font-size:14px">
+          <span class="muted">歌迷看到</span><b id="seen">500 个空位</b>
+          <span class="muted">数据库</span><b id="truth">500 个空位</b>
+        </div>
+        <div style="margin-top:8px" id="stalePill"><span class="pill ok">✓ 一致</span></div>
+      </div>
+      <div>
+        <h3>数据库负载</h3>
+        <div class="bar" style="height:18px"><i id="dbBar"></i></div>
+        <p class="muted" style="font-size:13px;margin:6px 0 0" id="dbTxt">每秒 0 次查找，上限约 100</p>
+      </div>
+    </div>
+
+    <div class="meters" style="margin:0">
+      <div class="meter"><div class="k">命中率</div><div class="v" id="mHit">–</div><div class="d">由缓存回答</div></div>
+      <div class="meter"><div class="k">页面延迟</div><div class="v" id="mLat">0 ms</div><div class="d">歌迷的平均值</div></div>
+      <div class="meter"><div class="k">过期读取</div><div class="v" id="mStale">0%</div><div class="d" id="mOff">显示错误的座位数</div></div>
+      <div class="meter"><div class="k">数据库查找</div><div class="v" id="mDb">0/s</div><div class="d">上限约每秒 100 次</div></div>
+    </div>
+    <div class="status" id="status" role="status">按「播放」开始送出流量。</div>
+  </div>
+
+  <h3>试试看</h3>
+  <ol class="missions" id="missions"></ol>
+
+  <div class="compare">
+    <div><h3>只靠 TTL</h3><p style="margin:0">每份副本在固定时间后过期。很简单，任何缓存都能用，但歌迷可能在整段 TTL 期间都看到旧答案。TTL 长，负载低但更容易过期；TTL 短则相反。</p></div>
+    <div><h3>写入时删除</h3><p style="margin:0">数据变更时，删除（或更新）缓存副本。读取依然又快又新。但<i>每一条</i>会改到数据的程序路径都要记得这么做。这就是缓存<b>失效（invalidation）</b>。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">关键差别</div><p>缓存是一份<b>副本</b>。真正的问题不是「快不快？」而是「<b>副本可以错得多离谱、错多久？</b>」TTL 限制错多久；失效则在副本一出错就把它移除。</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>第 2 幕 · 真实世界</span><span class="hot">redis</span></div>
+  <h2>旁路缓存（cache-aside）模式，加上一个边缘标头</h2>
+  <p>这是 App 使用 Redis 或 Memcached 这类缓存最常见的方式。<b>把鼠标移到某一行上，或点一下。</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="缓存代码范例"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 选一行</div><p id="exP">每一行反白后，都会对应到实验室里的一个控制项。</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>重点整理 · 带走这些</span><span class="hot">♥</span></div>
+  <h2>整页浓缩在一个画面</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">是什么</div><div class="t">缓存</div><p>把答案留一份副本，就不必重新计算或重新抓取。数据库查找更少，页面更快。</p></div>
+    <div class="card"><div class="sub">放哪里</div><div class="t">边缘缓存</div><p>把副本放在离歌迷很近的 CDN，命中时完全不用跑到你的服务器。只适用于每个人看到都一样的数据。</p></div>
+    <div class="card"><div class="sub">错了怎么办</div><div class="t">缓存失效</div><p>数据变更时删除或更新副本，并用 TTL 当作最后防线。决定每一种数据可以容忍多旧。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">取舍</div><p>每一种缓存都在用新鲜度换速度。演唱会页面上的座位数可以晚几秒，但结帐一定要问数据库。缓存可以稍微错一点的东西，绝不缓存必须完全正确的东西。</p></div>
+
+  <h3 style="margin-top:26px">考考自己 <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="页面"></nav>
+</main>
+
+<script src="../../assets/explainer.js"></script>
+<script src="../../assets/i18n.zh-cn.js"></script>
+<script>
+(() => {
+const { $ } = X;
+const TTLS = [1, 5, 10, 30, 60, 300], N = 20, DT = 100, DB_CAP = 100, FAR = 150, EDGE = 15, WIN = 3000;
+const W = Array.from({ length: N }, (_, i) => 1 / (i + 1)), WSUM = W.reduce((a, b) => a + b, 0);
+const pick = s => { let u = X.rnd(s) * WSUM; for (let i = 0; i < N; i++) { u -= W[i]; if (u <= 0) return i; } return N - 1; };
+
+/* ---------- simulation: pure state + tick ---------- */
+function init(seed, o = {}) {
+  return Object.assign({ r: seed, t: 0, rate: 200, mode: 0, ttl: 10, size: 20, inv: false, seats: Array(N).fill(500), ver: Array(N).fill(0), cache: new Map(), ev: [], dbq: [], ticks: 0 }, o);
+}
+function dbLatency(s) {
+  const load = s.dbq.filter(t => t > s.t - 1000).length / DB_CAP;
+  return load >= 1 ? 1500 : Math.min(1500, 20 / (1 - load));
+}
+function tick(s) {
+  const t0 = s.t, t1 = t0 + DT;
+  for (let i = 0, n = X.poisson(s, 2 * DT / 1000); i < n; i++) {
+    const k = pick(s);
+    if (s.seats[k] > 0) { s.seats[k]--; s.ver[k]++; }
+    if (s.inv) s.cache.delete(k);
+  }
+  const reads = X.poisson(s, s.rate * DT / 1000);
+  for (let i = 0; i < reads; i++) {
+    const at = t0 + (i / Math.max(1, reads)) * DT, k = pick(s);
+    const e = s.mode ? s.cache.get(k) : null;
+    if (e && e.exp > at) {
+      e.used = at;
+      s.ev.push({ t: at, hit: 1, stale: e.ver < s.ver[k] ? 1 : 0, off: s.ver[k] - e.ver, lat: s.mode === 2 ? EDGE : FAR + 2 });
+    } else {
+      const lat = FAR + dbLatency(s);
+      s.dbq.push(at);
+      s.ev.push({ t: at, hit: 0, stale: 0, off: 0, lat });
+      if (s.mode) {
+        if (!s.cache.has(k) && s.cache.size >= s.size) {
+          let lru = null; for (const [kk, v] of s.cache) if (!lru || v.used < lru[1].used) lru = [kk, v];
+          s.cache.delete(lru[0]);
+        }
+        s.cache.set(k, { seats: s.seats[k], ver: s.ver[k], exp: at + s.ttl * 1000, used: at });
+      }
+    }
+  }
+  s.t = t1; s.ticks++;
+  s.ev = s.ev.filter(e => e.t > t1 - WIN);
+  s.dbq = s.dbq.filter(t => t > t1 - 1000);
+  return s;
+}
+function metrics(s) {
+  const e = s.ev, n = e.length || 1, hits = e.filter(x => x.hit), stale = e.filter(x => x.stale);
+  return {
+    hit: s.mode ? hits.length / n : null, lat: X.avg(e.map(x => x.lat)), stale: stale.length / n,
+    off: stale.length ? X.avg(stale.map(x => x.off)) : 0, dbqps: s.dbq.length,
+  };
+}
+
+/* ---------- UI ---------- */
+let S = init(21);
+const ticks0 = () => { S.ticks = 0; };
+const mis = X.missions($('#missions'), [
+  { text: '在<b>没有缓存</b>的情况下按<b>播放</b>。', hint: '每次页面浏览都是一次数据库查找：每秒 200 次，上限却只有约 100 次。看看延迟。', check: s => s.mode === 0 && s.ticks >= 25 },
+  { text: '打开<b>应用程序缓存</b>。', hint: '热门演唱会直接从内存回答。数据库在一秒内就冷静下来。', check: s => s.mode > 0 && s.ticks >= 25 && metrics(s).hit > 0.9 },
+  { text: '把 <b>TTL 调到 60 秒</b>，比较「歌迷看到」和「数据库」。', hint: '座位一直在卖，但缓存副本不知道。歌迷现在看到的是根本不存在的座位。', check: s => s.mode > 0 && s.ttl >= 60 && !s.inv && s.ticks >= 30 && metrics(s).stale > 0.2 },
+  { text: '把「卖出一张票时」切换成<b>删除缓存副本</b>。', hint: '过期读取几乎降到零，命中率依然很高。', check: s => s.mode > 0 && s.inv && s.ticks >= 30 && metrics(s).stale < 0.01 },
+  { text: '切换到<b>边缘缓存</b>。', hint: '现在命中的请求由歌迷身边的 CDN 回答，省下到 Encore 的 150 毫秒路程。', check: s => s.mode === 2 && s.ticks >= 25 },
+]);
+function render() {
+  const m = metrics(S);
+  $('#ttlV').textContent = S.ttl + ' s'; $('#sizeV').textContent = S.size;
+  $('#modeTag').textContent = ['没有缓存', '应用程序缓存', '边缘缓存'][S.mode];
+  ['ttl', 'size'].forEach(id => ($('#' + id).disabled = !S.mode));
+  $('#mHit').textContent = m.hit == null ? '–' : (m.hit * 100).toFixed(0) + '%';
+  $('#mLat').textContent = X.fmt(m.lat) + ' 毫秒';
+  $('#mLat').parentElement.className = 'meter' + (m.lat > 600 ? ' bad' : m.lat > 250 ? ' wait' : ' ok');
+  $('#mStale').textContent = (m.stale * 100).toFixed(1) + '%';
+  $('#mStale').parentElement.className = 'meter' + (m.stale > 0.2 ? ' bad' : m.stale > 0.01 ? ' wait' : '');
+  $('#mOff').textContent = m.stale ? `平均差了 ${m.off.toFixed(1)} 个座位` : '显示错误的座位数';
+  $('#mDb').textContent = m.dbqps + '/s';
+  const load = Math.min(1, m.dbqps / DB_CAP);
+  $('#dbBar').style.width = load * 100 + '%';
+  $('#dbBar').style.background = load >= 1 ? 'var(--bad)' : load > 0.7 ? 'var(--wait)' : 'var(--ok)';
+  $('#dbTxt').textContent = `每秒 ${m.dbqps} 次查找，上限约 ${DB_CAP}${load >= 1 ? '：超载' : ''}`;
+  const e = S.mode ? S.cache.get(0) : null;
+  const seen = e && e.exp > S.t ? e.seats : S.seats[0];
+  $('#seen').textContent = seen + ' 个空位';
+  $('#truth').textContent = S.seats[0] + ' 个空位';
+  $('#stalePill').innerHTML = seen === S.seats[0] ? '<span class="pill ok">✓ 一致</span>' : `<span class="pill bad">✕ 差了 ${seen - S.seats[0]} 个</span> 歌迷可能会去买已经卖掉的座位`;
+  const st = $('#status');
+  if (!S.t) { st.className = 'status'; st.textContent = '按「播放」开始送出流量。'; }
+  else if (load >= 1) { st.className = 'status bad'; st.textContent = `✕ 数据库超载：每秒 ${m.dbqps} 次查找。每次页面浏览都排在别人后面等。`; }
+  else if (m.stale > 0.2) { st.className = 'status bad'; st.textContent = `✕ 很快，但是错的：${(m.stale * 100).toFixed(0)}% 的页面浏览显示旧的座位数。副本存活 ${S.ttl} 秒，而座位每秒都在卖。`; }
+  else if (m.stale > 0.01) { st.className = 'status wait'; st.textContent = `⚠ 大致新鲜，但有 ${(m.stale * 100).toFixed(1)}% 的页面浏览显示过时的座位数。`; }
+  else { st.className = 'status ok'; st.textContent = S.mode ? `✓ 又快又新：命中率 ${(m.hit * 100).toFixed(0)}%，数据库只会看到未命中的请求。` : '✓ 数据库暂时撑得住。'; }
+  player.clock(`t = ${(S.t / 1000).toFixed(1)} s`);
+  mis.update(S);
+}
+const player = X.player($('#player'), {
+  step: () => { tick(S); render(); }, stepTicks: 5,
+  reset: () => { S = init(21, { mode: S.mode, ttl: S.ttl, size: S.size, inv: S.inv }); mis.reset(); render(); },
+});
+X.seg($('#modeSeg'), ['没有缓存', '应用程序缓存', '边缘缓存（CDN）'], i => { S.mode = i; if (!i) S.cache.clear(); ticks0(); render(); }, 0);
+X.seg($('#invSeg'), ['什么都不做（等 TTL 过期）', '删除缓存副本'], i => { S.inv = i === 1; ticks0(); render(); }, 0);
+$('#ttl').addEventListener('input', e => { S.ttl = TTLS[+e.target.value]; ticks0(); render(); });
+$('#size').addEventListener('input', e => { S.size = +e.target.value; while (S.cache.size > S.size) S.cache.delete(S.cache.keys().next().value); ticks0(); render(); });
+render();
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="key">async function</span> getConcert(id) {', null],
+  ['  <span class="key">const</span> cached = <span class="key">await</span> redis.get(<span class="s">`concert:${id}`</span>);', 'get'],
+  ['  <span class="key">if</span> (cached) <span class="key">return</span> JSON.parse(cached);', 'hit'],
+  ['  <span class="key">const</span> concert = <span class="key">await</span> db.concerts.find(id);', 'miss'],
+  ['  <span class="key">await</span> redis.set(<span class="s">`concert:${id}`</span>, JSON.stringify(concert),', 'ttl'],
+  ['                  { EX: <span class="s">10</span> });', 'ttl'],
+  ['  <span class="key">return</span> concert;', null],
+  ['}', null],
+  ['', null],
+  ['<span class="key">async function</span> buyTicket(id, fan) {', null],
+  ['  <span class="key">await</span> db.tickets.insert({ concertId: id, fan });', 'write'],
+  ['  <span class="key">await</span> redis.del(<span class="s">`concert:${id}`</span>);', 'del'],
+  ['}', null],
+  ['', null],
+  ['<span class="c"># 响应标头：让 CDN 保留副本 10 秒</span>', null],
+  ['<span class="key">Cache-Control</span>: public, max-age=<span class="s">10</span>', 'edge'],
+], {
+  get: ['先查缓存', '每场演唱会都有自己的键（key）。这就是缓存大小重要的原因：如果某个键为了腾出空间被淘汰，这次查找就会未命中。'],
+  hit: ['命中（Hit）', '找到了：完全不需要查找数据库。命中率仪表计算的就是这一行返回的频率。'],
+  miss: ['未命中（Miss）', '没有缓存（或已过期）：去问数据库。这些就是数据库负载条上的查找。'],
+  ttl: ['TTL', '<code>EX: 10</code> 的意思是「10 秒后忘掉它」，也就是 TTL 滑块。它保证副本永远不会旧超过 10 秒。'],
+  write: ['写入', '卖出一个座位。数据库变了，缓存副本现在是错的。'],
+  del: ['失效', '删除副本，让下一次读取抓到新数据。这就是「删除缓存副本」开关。只要有一条程序路径忘了这一行，就会产生非常难追查的过期数据。'],
+  edge: ['边缘缓存', '告诉 CDN（和浏览器）可以保留并共用这个响应 10 秒。<code>public</code> 代表每个人看到的都一样。绝对不要用在个人数据上，例如某位歌迷的订单。'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: '演唱会页面显示「剩 12 个座位」，结帐却说已经售完。最可能的原因是什么？', opts: [
+    ['结帐有 bug', false, '结帐读的是数据库，它是对的。显示旧副本的是演唱会页面。'],
+    ['演唱会页面显示的是缓存的座位数，座位卖出时没有让它失效', true, '每次售出时删除或更新缓存副本，或缩短 TTL，并且在结帐时一律重新查找数据库。'],
+    ['缓存太小', false, '缓存太小会造成未命中（变慢），而不是错误的答案。'],
+  ] },
+  { q: 'Dee 怕数据过期，把每个 TTL 都设成半秒。开卖涌入时会发生什么事？', opts: [
+    ['数据很新，而且没有任何缺点', false, '副本过期得太快，大部分读取都会未命中。'],
+    ['命中率崩跌，数据库负载又回来了', true, 'TTL 是在用过期程度换负载。非常短的 TTL 会放弃大部分好处。要新鲜的数据，写入时让缓存失效通常是更好的工具。'],
+    ['缓存开始返回错误', false, '它还是照常运作，只是你问的时候它很少有副本。'],
+  ] },
+  { q: '下列哪一项不应该放进共用的边缘缓存（CDN）？', opts: [
+    ['演唱会海报图片', false, '每个人看到都一样，而且很少变动。非常适合。'],
+    ['某位歌迷个人的「我的订单」页面', true, '共用缓存可能会把一位歌迷的订单拿给另一位看。个人化的响应需要 <code>Cache-Control: private</code>，或干脆不缓存。'],
+    ['场馆地址与座位图', false, '每个人看到都一样，而且很少变动。非常适合放在边缘。'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'caching');
+})();
+</script>
+</body>
+</html>

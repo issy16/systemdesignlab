@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh-Hans-CN" data-lang="zh-cn" data-slug="message-queues">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="把慢工作移到队列上，看它塞车、加开工作者、套用背压，并用死信队列接住毒药消息。">
+<title>消息队列 · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/explainer.css">
+</head>
+<body>
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="章节"><a href="#sync">为什么要队列</a><a href="#lab">队列实验室</a><a href="#real">代码</a><a href="#recap">重点整理</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>第 8 页 · 阶段 2 · 更多流量</span><span class="hot">15 · 20 · 44</span></div>
+  <div class="eyebrow">消息队列、死信队列、背压</div>
+  <h1>歌迷不需要等<em>email 寄出去。</em></h1>
+  <div class="scenario"><b>Encore</b>结帐要做三件事：刷卡、寄出票券 email，然后告诉歌迷「完成」。今天 email 服务商特别慢，每次结帐都在等它。有些歌迷等不下去，又按了一次「购买」。</div>
+  <div class="row"><a class="btn primary" href="#sync" style="text-decoration:none">开始 ↓</a></div>
+</section>
+
+<section class="panel" id="sync">
+  <div class="panel-label"><span>第 1 幕 · 现在做，还是晚点做</span><span class="hot" id="syncTag">在结帐流程内</span></div>
+  <h2>买一张票</h2>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl">
+        <label for="prov">Email 服务商响应时间：<b id="provV">300 ms</b></label>
+        <input type="range" id="prov" min="0" max="6" step="1" value="1">
+        <div class="presets"><button class="btn sm" type="button" data-prov="1">平常日</button><button class="btn sm" type="button" data-prov="5">很慢的一天</button></div>
+      </div>
+      <div class="ctl"><span class="lab-k">Email 何时寄出</span><div id="syncSeg"></div></div>
+      <div class="ctl"><span class="lab-k">&nbsp;</span><div><button class="btn primary" id="buy" type="button">买一张票</button></div></div>
+    </div>
+    <div class="pipe" id="pipe" style="margin:0"></div>
+    <div class="status" id="syncRes" role="status">按「买一张票」。</div>
+  </div>
+  <div class="takeaway"><div class="t">一句话说清楚消息队列</div><p>与其在有人等待时做慢工作，App 会把一张小纸条（一则<b>消息</b>）放到<b>队列（queue）</b>上，然后马上响应。另外的<b>工作者（worker）</b>会从队列取出消息，依自己的步调处理。</p></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>实验室 · 先弄坏，再修好</span><span class="hot" id="tag">队列</span></div>
+  <h2>忙碌日的 email 队列</h2>
+  <p>每笔订单会在队列中加入一则消息。每个工作者每秒大约寄出 <b>4 封 email</b>。这台小型 broker（队列服务器）的内存可以容纳 <b>200 则消息</b>。所有数字都是模拟的。</p>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl">
+        <label for="rate">订单：每秒 <b id="rateV">4</b> 笔</label>
+        <input type="range" id="rate" min="1" max="40" step="1" value="4">
+        <div class="presets"><button class="btn sm" type="button" data-rate="4">平常日</button><button class="btn sm" type="button" data-rate="30">开卖</button></div>
+      </div>
+      <div class="ctl">
+        <label for="workers">工作者：<b id="workersV">3</b> 个（≈ <span id="capV">12</span> 封 email/秒）</label>
+        <input type="range" id="workers" min="1" max="10" step="1" value="3">
+      </div>
+      <div class="ctl"><span class="lab-k">队列满了的时候</span><div id="limSeg"></div></div>
+      <div class="ctl"><span class="lab-k">一直失败的消息</span><div id="dlqSeg"></div>
+        <button class="btn sm bad" id="poison" type="button" style="margin-top:6px">＋ 加入一则坏掉的消息</button></div>
+      <div class="ctl"><span class="lab-k">模拟</span><div id="player"></div></div>
+    </div>
+    <div>
+      <div class="lab-k" style="font-size:14px;font-weight:500;margin-bottom:6px" id="qLbl">队列</div>
+      <div class="queue" id="queue" aria-hidden="true"></div>
+      <div class="bar risk" style="margin-top:8px"><i id="memBar"></i></div>
+      <p class="muted" style="font-size:13px;margin:4px 0 0" id="memTxt"></p>
+    </div>
+    <div class="compare" style="margin:0">
+      <div><h3>工作者</h3><div class="tokens" id="wk" aria-hidden="true"></div><p class="muted" style="font-size:13px;margin:6px 0 0" id="wkTxt"></p></div>
+      <div><h3>死信队列</h3><div class="queue" id="dlq" aria-hidden="true"></div><p class="muted" style="font-size:13px;margin:6px 0 0" id="dlqTxt">空的。</p></div>
+    </div>
+    <div class="meters" style="margin:0">
+      <div class="meter"><div class="k">等待中</div><div class="v" id="mQ">0</div><div class="d">队列中的消息</div></div>
+      <div class="meter"><div class="k">Email 延迟</div><div class="v" id="mAge">0 s</div><div class="d">最旧消息的年龄</div></div>
+      <div class="meter"><div class="k">已寄出</div><div class="v" id="mSent">0/s</div><div class="d">已送达的 email</div></div>
+      <div class="meter"><div class="k">遗失</div><div class="v" id="mLost">0</div><div class="d" id="mLostD">broker 当机时</div></div>
+    </div>
+    <div class="status" id="status" role="status">按「播放」开始接订单。</div>
+  </div>
+
+  <h3>试试看</h3>
+  <ol class="missions" id="missions"></ol>
+
+  <div class="compare">
+    <div><h3>背压（Backpressure）</h3><p style="margin:0">当消费者跟不上时，系统会叫生产者<b>放慢速度</b>（拒绝、等待或稍后重试），而不是无止尽地缓冲。没有上限的队列，只会把「慢」变成「内存不足」。</p></div>
+    <div><h3>死信队列</h3><p style="margin:0">一再失败的消息（<b>毒药消息</b>，poison message）在试过几次后会被移到一旁，不再卡住工作者。之后由人或工具来检查死信队列。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">关键差别</div><p>没有队列时，<b>歌迷要等最慢的那一步</b>。有了队列，歌迷只要等此刻真正重要的步骤，其他的稍后补上。队列能吸收尖峰，但前提是它的大小有上限，而且失败的消息有地方去。</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>第 3 幕 · 真实世界</span><span class="hot">代码＋设置</span></div>
+  <h2>生产者、工作者，以及两个设置</h2>
+  <p>语法是通用的。BullMQ、Celery、Sidekiq、SQS 和 RabbitMQ 都遵循同样的模式。<b>把鼠标移到某一行上，或点一下。</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="队列代码与设置范例"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 选一行</div><p id="exP">每一行反白后，都会对应到实验室里的一个控制项。</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>重点整理 · 带走这些</span><span class="hot">♥</span></div>
+  <h2>整页浓缩在一个画面</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">解耦</div><div class="t">消息队列</div><p>生产者丢出消息，工作者稍后处理。响应快速，尖峰被吸收而不是被往下传。</p></div>
+    <div class="card"><div class="sub">放慢</div><div class="t">背压（Backpressure）</div><p>限制队列大小，满了就把压力推回给生产者。有上限，好过内存不足。</p></div>
+    <div class="card"><div class="sub">搁置</div><div class="t">死信队列</div><p>失败 N 次后把消息移开，这样一则坏消息就不会永远占住一个工作者。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">取舍</div><p>队列让工作<b>最终</b>会完成，而不是<b>现在</b>完成。这非常适合 email、PDF 和分析数据，但歌迷的座位仍然必须在结帐时保留。盯着队列的长度和年龄：它们是你的早期警讯。</p></div>
+
+  <h3 style="margin-top:26px">考考自己 <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="页面"></nav>
+</main>
+
+<script src="../../assets/explainer.js"></script>
+<script src="../../assets/i18n.zh-cn.js"></script>
+<script>
+(() => {
+const { $, $$, el } = X;
+
+/* ---------- act 1: sync vs queue ---------- */
+const PROV = [100, 300, 800, 1500, 2500, 4000, 6000], CHARGE = 300, TIMEOUT = 3000;
+let viaQueue = false, buying = false;
+const stages = viaQ => viaQ
+  ? [['charge', '刷卡', CHARGE], ['enqueue', '加入队列', 5], ['respond', '告诉歌迷', 0]]
+  : [['charge', '刷卡', CHARGE], ['email', '寄出 email', PROV[+$('#prov').value]], ['respond', '告诉歌迷', 0]];
+function drawPipe() {
+  const p = $('#pipe'); p.innerHTML = '';
+  stages(viaQueue).forEach(([k, label, ms]) => {
+    const st = el('div', 'stage'); const c = el('div', 'chip', `${label}<small>${ms ? X.fmt(ms) + ' 毫秒' : ''}</small>`);
+    c.dataset.s = k; st.append(c); p.append(st);
+  });
+  if (viaQueue) { const st = el('div', 'stage'); st.append(el('div', 'chip gate', '工作者：寄出 email<small>稍后</small>')); p.append(st); }
+  $('#provV').textContent = X.fmt(PROV[+$('#prov').value]) + ' 毫秒';
+  $('#syncTag').textContent = viaQueue ? '通过队列' : '在结帐流程内';
+}
+X.seg($('#syncSeg'), ['在结帐流程内', '稍后，通过队列'], i => { viaQueue = i === 1; drawPipe(); }, 0);
+$('#prov').addEventListener('input', drawPipe);
+$$('[data-prov]').forEach(b => b.addEventListener('click', () => { $('#prov').value = b.dataset.prov; drawPipe(); }));
+drawPipe();
+$('#buy').addEventListener('click', async () => {
+  if (buying) return; buying = true; $('#buy').disabled = true;
+  drawPipe();
+  const chips = X.$$('#pipe .chip');
+  let total = 0, timedOut = false;
+  const st = stages(viaQueue);
+  for (let i = 0; i < st.length; i++) {
+    const [, , ms] = st[i];
+    X.chip(chips[i], 'run');
+    await X.sleep(Math.min(1400, 250 + ms / 4));
+    total += ms;
+    if (!viaQueue && total > TIMEOUT && i === 1) { X.chip(chips[i], 'fail', '✕ 超时'); timedOut = true; break; }
+    X.chip(chips[i], 'ok', '✓ 完成');
+  }
+  const res = $('#syncRes');
+  if (timedOut) {
+    res.className = 'status bad';
+    res.innerHTML = `✕ 歌迷等了超过 ${TIMEOUT / 1000} 秒，最后收到超时，但<b>卡片其实已经刷过了</b>。很多人会再按一次「购买」。（重复扣款就是这样发生的：见第 10 页〈幂等性〉。）`;
+  } else if (viaQueue) {
+    X.chip(chips[3], 'wait', '⏸ 已排入');
+    res.className = 'status ok';
+    res.innerHTML = `✓ 不管 email 服务商多慢，歌迷都在 <b>${X.fmt(total)} 毫秒</b>后看到「完成」。工作者会在片刻之后寄出 email${PROV[+$('#prov').value] > 2000 ? '（今天要等一下，但没关系）' : ''}。`;
+    await X.sleep(Math.min(1500, PROV[+$('#prov').value] / 3));
+    X.chip(chips[3], 'ok', '✓ 已寄出');
+  } else {
+    res.className = 'status ' + (total > 1500 ? 'wait' : 'ok');
+    res.innerHTML = `${total > 1500 ? '⚠' : '✓'} 歌迷等了 <b>${X.fmt(total)} 毫秒</b>：刷卡 ${X.fmt(CHARGE)} 毫秒，再加上 ${X.fmt(total - CHARGE)} 毫秒等一封他们现在还不需要的 email。`;
+  }
+  buying = false; $('#buy').disabled = false;
+});
+
+/* ---------- queue simulation: pure state + tick ---------- */
+const DT = 100, PER_WORKER = 4, MEM = 200, LIMIT = 100, MAX_TRIES = 3;
+function init(seed, o = {}) {
+  return Object.assign({ r: seed, t: 0, rate: 4, workers: 3, bounded: false, dlqOn: false, q: [], w: [], dlq: [], sent: [], lost: 0, crashes: 0, down: 0, pushed: [], ticks: 0, poisonTries: 0, id: 0 }, o);
+}
+function tick(s) {
+  const t0 = s.t, t1 = t0 + DT;
+  if (s.down > t0) { s.t = t1; s.ticks++; return s; }
+  for (let i = 0, n = X.poisson(s, s.rate * DT / 1000); i < n; i++) {
+    if (s.bounded && s.q.length >= LIMIT) { s.pushed.push(t0); continue; }
+    s.q.push({ id: s.id++, at: t0 + X.rnd(s) * DT, poison: false, tries: 0 });
+  }
+  if (!s.bounded && s.q.length >= MEM) { s.lost += s.q.length; s.q = []; s.w = []; s.crashes++; s.down = t1 + 2000; s.t = t1; s.ticks++; return s; }
+  while (s.w.length < s.workers) s.w.push({ busy: 0, job: null });
+  if (s.w.length > s.workers) s.w.length = s.workers;
+  for (const w of s.w) {
+    while (true) {
+      if (w.job && w.busy <= t1) {
+        const j = w.job; w.job = null;
+        if (j.poison) {
+          j.tries++; s.poisonTries = Math.max(s.poisonTries, j.tries);
+          if (s.dlqOn && j.tries >= MAX_TRIES) s.dlq.push(j); else s.q.push(j);
+        } else s.sent.push(w.busy);
+      }
+      if (w.job || !s.q.length) break;
+      const start = Math.max(w.busy, t0);
+      if (start >= t1) break;
+      w.job = s.q.shift(); w.busy = start + 1000 / PER_WORKER;
+    }
+  }
+  s.t = t1; s.ticks++;
+  s.sent = s.sent.filter(t => t > t1 - 3000);
+  s.pushed = s.pushed.filter(t => t > t1 - 3000);
+  return s;
+}
+function metrics(s) {
+  const real = s.q.filter(j => !j.poison);
+  return { q: s.q.length, age: real.length ? (s.t - Math.min(...real.map(j => j.at))) / 1000 : 0, sent: s.sent.length / 3, pushed: s.pushed.length, down: s.down > s.t };
+}
+
+/* ---------- UI ---------- */
+let S = init(51);
+const t0 = () => { S.ticks = 0; };
+const mis = X.missions($('#missions'), [
+  { text: '在平常日按<b>播放</b>：每秒 4 笔订单、3 个工作者。', hint: '工作者寄信的速度比订单进来得快，队列几乎是空的。', check: s => s.ticks >= 20 && s.rate <= 6 },
+  { text: '按下<b>开卖</b>（每秒 30 笔订单），看队列变长。', hint: '对歌迷来说结帐还是很快。代价显现在 email 延迟上，而且每秒都在增加。', check: s => s.rate >= 25 && s.q.length > 60 },
+  { text: '让队列维持<b>无上限</b>，继续跑。', hint: 'broker 被塞满、内存用光，所有等待中的消息全部遗失。', check: s => s.crashes > 0 },
+  { text: '把「队列满了的时候」切换成<b>满 100 就推回</b>。', hint: '队列不再变长。新消息会收到「忙碌中，请稍后再试」，而不是让一切当机。', check: s => s.bounded && s.ticks > 20 && s.pushed.length > 0 },
+  { text: '加开<b>工作者</b>，直到队列消化完。', hint: '每秒 30 笔订单、每个工作者每秒寄 4 封，至少需要 8 个工作者。开到 10 个能更快清掉积压。', check: s => s.workers * PER_WORKER >= s.rate && s.rate >= 25 && s.q.length < 10 && s.ticks > 20 },
+  { text: '在设置为无限重试时，按<b>加入一则坏掉的消息</b>。', hint: '它失败、回到队列、又失败……每次都占住一个工作者。', check: s => !s.dlqOn && s.poisonTries >= 5 },
+  { text: '切换到<b>重试 3 次后移到死信队列</b>。', hint: '坏掉的消息被移到一旁，工作者回去寄真正的 email。', check: s => s.dlqOn && s.dlq.length > 0 },
+]);
+function render() {
+  const m = metrics(S);
+  $('#rateV').textContent = S.rate; $('#workersV').textContent = S.workers; $('#capV').textContent = S.workers * PER_WORKER;
+  $('#tag').textContent = S.bounded ? '有上限的队列' : '无上限的队列';
+  const qb = $('#queue'); qb.innerHTML = '';
+  S.q.slice(0, 120).forEach(j => qb.append(el('span', 'msg' + (j.poison ? ' bad' : ''))));
+  if (S.q.length > 120) qb.append(el('span', 'more', `另外还有 ${S.q.length - 120} 则`));
+  $('#qLbl').textContent = m.down ? '队列：broker 重新启动中…' : `队列：${S.q.length} 则消息${S.bounded ? `（上限 ${LIMIT}）` : ''}`;
+  const memPct = Math.min(1, S.q.length / MEM);
+  $('#memBar').style.width = memPct * 100 + '%';
+  $('#memTxt').textContent = m.down ? 'broker 当机：内存不足。正以空队列重新启动。' : `broker 内存：${Math.round(memPct * 100)}%（可容纳 ${MEM} 则消息）${m.pushed ? ` · 最近 3 秒推回了 ${m.pushed} 则新消息` : ''}`;
+  const wk = $('#wk'); wk.innerHTML = '';
+  let poisonBusy = 0;
+  S.w.forEach(w => { const busy = w.job && w.busy > S.t; if (busy && w.job.poison) poisonBusy++; wk.append(el('span', 'tok' + (busy ? (w.job.poison ? '' : '') : ' empty'))); });
+  X.$$('#wk .tok').forEach((tk, i) => { const w = S.w[i]; if (w && w.job && w.job.poison && w.busy > S.t) tk.style.background = 'var(--bad)'; });
+  $('#wkTxt').textContent = `${S.workers} 个中有 ${S.w.filter(w => w.job && w.busy > S.t).length} 个忙碌${poisonBusy ? ` · ${poisonBusy} 个卡在坏掉的消息上` : ''}`;
+  const d = $('#dlq'); d.innerHTML = '';
+  S.dlq.forEach(() => d.append(el('span', 'msg bad')));
+  $('#dlqTxt').textContent = S.dlq.length ? `${S.dlq.length} 则消息在失败 ${MAX_TRIES} 次后被搁置：「收件人地址无效」。修好后再重新投递。` : (S.dlqOn ? '空的。坏掉的消息在 3 次尝试后会落到这里。' : '关闭：坏掉的消息会被无限重试。');
+  $('#mQ').textContent = X.fmt(m.q);
+  $('#mQ').parentElement.className = 'meter' + (m.q > 200 ? ' bad' : m.q > 30 ? ' wait' : '');
+  $('#mAge').textContent = m.age.toFixed(1) + ' s';
+  $('#mAge').parentElement.className = 'meter' + (m.age > 10 ? ' bad' : m.age > 3 ? ' wait' : '');
+  $('#mSent').textContent = m.sent.toFixed(1) + '/s';
+  $('#mLost').textContent = X.fmt(S.lost);
+  $('#mLost').parentElement.className = 'meter' + (S.lost ? ' bad' : '');
+  $('#mLostD').textContent = S.crashes ? `broker 当机 ${S.crashes} 次` : 'broker 当机时';
+  const st = $('#status');
+  if (!S.t) { st.className = 'status'; st.textContent = '按「播放」开始接订单。'; }
+  else if (m.down) { st.className = 'status bad'; st.textContent = `✕ broker 内存用光而当机。${X.fmt(S.lost)} 封票券 email 永远消失了。`; }
+  else if (poisonBusy && !S.dlqOn && S.poisonTries >= 3) { st.className = 'status bad'; st.textContent = `✕ 一则坏掉的消息已经失败 ${S.poisonTries} 次，还一直回来，每次都用掉一个工作者。`; }
+  else if (m.pushed) { st.className = 'status wait'; st.textContent = `⚠ 背压：队列满了，所以新消息被拒绝（「请稍后再试」）。内存是安全的。加开工作者才能追上进度。`; }
+  else if (m.q > 30) { st.className = 'status wait'; st.textContent = `⚠ 订单进来的速度比工作者寄信的速度快（每秒进 ${S.rate}、出约 ${S.workers * PER_WORKER}）。Email 落后 ${m.age.toFixed(0)} 秒，而且延迟还在增加。`; }
+  else { st.className = 'status ok'; st.textContent = `✓ 跟得上：email 大约在下单后 ${Math.max(0.3, m.age).toFixed(1)} 秒寄出。`; }
+  player.clock(`t = ${(S.t / 1000).toFixed(1)} s`);
+  mis.update(S);
+}
+const player = X.player($('#player'), {
+  step: () => { tick(S); render(); }, stepTicks: 5,
+  reset: () => { S = init(51, { rate: S.rate, workers: S.workers, bounded: S.bounded, dlqOn: S.dlqOn }); mis.reset(); render(); },
+});
+$('#rate').addEventListener('input', e => { S.rate = +e.target.value; t0(); render(); });
+$$('[data-rate]').forEach(b => b.addEventListener('click', () => { $('#rate').value = b.dataset.rate; $('#rate').dispatchEvent(new Event('input')); if (!player.running) player.play(); }));
+$('#workers').addEventListener('input', e => { S.workers = +e.target.value; t0(); render(); });
+X.seg($('#limSeg'), ['无上限', '满 100 就推回'], i => { S.bounded = i === 1; t0(); render(); }, 0);
+X.seg($('#dlqSeg'), ['无限重试', '重试 3 次后移到死信队列'], i => {
+  S.dlqOn = i === 1;
+  if (S.dlqOn) S.q = S.q.filter(j => { if (j.poison && j.tries >= MAX_TRIES) { S.dlq.push(j); return false; } return true; });
+  t0(); render();
+}, 0);
+$('#poison').addEventListener('click', () => { S.q.unshift({ id: S.id++, at: S.t, poison: true, tries: 0 }); if (!player.running) player.play(); render(); });
+render();
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="c">// 结帐：现在只做重要的，其他排进队列</span>', null],
+  ['<span class="key">await</span> payments.charge(order);', 'charge'],
+  ['<span class="key">await</span> queue.send(<span class="s">"send-ticket-email"</span>, { orderId: order.id });', 'send'],
+  ['<span class="key">return</span> res.json({ ok: <span class="s">true</span> });', 'respond'],
+  ['', null],
+  ['<span class="c">// 工作者：独立的进程。需要几份就跑几份。</span>', null],
+  ['queue.process(<span class="s">"send-ticket-email"</span>, <span class="key">async</span> (job) =&gt; {', 'worker'],
+  ['  <span class="key">await</span> email.sendTicket(job.data.orderId);  <span class="c">// 抛出错误 → 重试</span>', 'retry'],
+  ['});', null],
+  ['', null],
+  ['<span class="c">// SQS 重新投递政策：接收 3 次后移到 DLQ</span>', null],
+  ['{ <span class="key">"deadLetterTargetArn"</span>: <span class="s">"arn:aws:sqs:…:emails-dlq"</span>,', 'dlq'],
+  ['  <span class="key">"maxReceiveCount"</span>: <span class="s">3</span> }', 'dlq'],
+  ['', null],
+  ['<span class="c">// RabbitMQ 队列上限：满了就拒绝新消息</span>', null],
+  ['{ <span class="key">"x-max-length"</span>: <span class="s">100</span>, <span class="key">"x-overflow"</span>: <span class="s">"reject-publish"</span> }', 'limit'],
+], {
+  charge: ['现在就做关键的部分', '刷卡（以及保留座位）必须在歌迷听到「完成」之前成功。这部分留在请求里。'],
+  send: ['产生消息', '一张只有 id 的小纸条。加入队列只要几毫秒，所以歌迷不用等 email 服务商。这就是第 1 幕的「加入队列」步骤。'],
+  respond: ['快速响应', '结帐的响应时间不再取决于今天 email 服务商有多慢。'],
+  worker: ['消费', '工作者拉取消息并处理慢工作。份数越多，吞吐量越高。这就是「工作者」滑块。'],
+  retry: ['重试', '寄送时抛出错误，队列就会把消息还回去再试一次。对暂时性的失败很好用，对永久性的失败则是陷阱（那则坏掉的消息）。'],
+  dlq: ['死信队列', '失败 <code>maxReceiveCount</code> 次后，消息会移到另一个队列，让人或工具检查并重新投递。'],
+  limit: ['背压', '替队列设上限，满了就拒绝新消息，让生产者学会放慢或稍后重试。不再「内存不足」。'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: '票券 email 走队列。Email 服务商挂了 10 分钟。歌迷会遇到什么？', opts: [
+    ['结帐失败 10 分钟', false, '结帐只是在队列中加一则消息，它不需要 email 服务商。'],
+    ['结帐正常，等服务商恢复后 email 才晚点寄到', true, '消息在队列里等待，工作者会重试。故障变成延迟，而不是购买失败。'],
+    ['Email 遗失了', false, '消息会留在队列中，直到被处理。这就是持久化队列的意义。'],
+  ] },
+  { q: '有一则消息的地址格式错误。它失败、回到队列、再失败，重复了上千次。怎么修？', opts: [
+    ['更多任务作者', false, '更多任务作者只会更频繁地让同一则消息失败。'],
+    ['设置最大重试次数，然后把它移到死信队列', true, '试几次后把它搁置、通知某人，之后修好或重新投递。'],
+    ['删掉队列重来', false, '你会连同坏消息把所有好消息一起丢掉。'],
+  ] },
+  { q: '队列长度一整天稳定成长，从来没有降下来。这代表什么？', opts: [
+    ['队列在做它该做的事，所以没有问题', false, '队列应该吸收短暂的尖峰。永不停止的成长，代表积压永远处理不完。'],
+    ['消费者比生产者慢。加开工作者、加快处理速度，或套用背压。', true, '队列长度和最旧消息的年龄，是两个该设告警的数字。'],
+    ['broker 需要更多磁盘空间', false, '更多空间只会延后问题。进出的速率根本对不上。'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'message-queues');
+})();
+</script>
+</body>
+</html>

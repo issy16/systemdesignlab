@@ -6,6 +6,8 @@ Each page is a small in-browser simulation of **Encore**, a fictional ticket app
 
 **Live pages:** latency and throughput, database indexing, N+1 and connection pools, SQL injection and XSS, caching, load balancing and scaling, rate limiting, message queues, and CI/CD (partial).
 
+**Languages:** English, [繁體中文](https://issy16.github.io/systemdesignlab/zh-tw/), [简体中文](https://issy16.github.io/systemdesignlab/zh-cn/). The Chinese pages are generated from the English ones; see `CLAUDE.md` → Translations.
+
 ## Run it locally
 
 It's a static site with no build step. Open `index.html` in a browser, or serve the folder:

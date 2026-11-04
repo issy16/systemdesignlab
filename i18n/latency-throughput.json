@@ -1,0 +1,665 @@
+{
+ "page": "latency-throughput",
+ "segments": [
+  {
+   "kind": "attr",
+   "en": "width=device-width, initial-scale=1, viewport-fit=cover",
+   "zh": "="
+  },
+  {
+   "kind": "attr",
+   "en": "Push traffic into a simulated server and watch average latency, P99 and throughput change. Learn why the average lies.",
+   "zh": "把流量灌進模擬伺服器，看平均延遲、P99 與吞吐量怎麼變化。了解為什麼平均值會騙人。"
+  },
+  {
+   "kind": "attr",
+   "en": "Sections",
+   "zh": "章節"
+  },
+  {
+   "kind": "attr",
+   "en": "Average and P99 latency over the last 15 seconds",
+   "zh": "最近 15 秒的平均延遲與 P99 延遲"
+  },
+  {
+   "kind": "attr",
+   "en": "Example monitoring queries",
+   "zh": "監控查詢範例"
+  },
+  {
+   "kind": "attr",
+   "en": "Pages",
+   "zh": "頁面"
+  },
+  {
+   "kind": "html",
+   "en": "Latency and Throughput · System Design Lab",
+   "zh": "延遲與吞吐量 · System Design Lab"
+  },
+  {
+   "kind": "html",
+   "en": "system<b>.design.lab</b>",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "Lab",
+   "zh": "實驗室"
+  },
+  {
+   "kind": "html",
+   "en": "Avg vs P99",
+   "zh": "平均 vs P99"
+  },
+  {
+   "kind": "html",
+   "en": "Tail",
+   "zh": "尾端"
+  },
+  {
+   "kind": "html",
+   "en": "Real query",
+   "zh": "真實查詢"
+  },
+  {
+   "kind": "html",
+   "en": "Recap",
+   "zh": "重點整理"
+  },
+  {
+   "kind": "html",
+   "en": "page 1 · stage 1 · one server",
+   "zh": "第 1 頁 · 階段 1 · 一台伺服器"
+  },
+  {
+   "kind": "html",
+   "en": "Latency, throughput, P99, tail latency",
+   "zh": "延遲、吞吐量、P99、尾端延遲"
+  },
+  {
+   "kind": "html",
+   "en": "“The average is 90 ms.” <em>So why are fans furious?</em>",
+   "zh": "「平均才 90 毫秒。」<em>那歌迷為什麼氣炸了？</em>"
+  },
+  {
+   "kind": "html",
+   "en": "<b>Encore</b>Tickets for the reunion tour go on sale at 10:00. At 9:59 the site feels instant. At 10:01 support is flooded with “checkout is frozen”, but Dee's dashboard still shows a healthy average. You're about to find out who's right.",
+   "zh": "<b>Encore</b>重聚巡演的門票 10:00 開賣。9:59 網站快得像沒延遲；10:01 客服被「結帳卡住了」的訊息淹沒，但 Dee 的儀表板上平均值看起來還很健康。接下來你會知道誰是對的。"
+  },
+  {
+   "kind": "html",
+   "en": "Open the lab ↓",
+   "zh": "打開實驗室 ↓"
+  },
+  {
+   "kind": "html",
+   "en": "lab · break it, then fix it",
+   "zh": "實驗室 · 先弄壞，再修好"
+  },
+  {
+   "kind": "html",
+   "en": "1 server",
+   "zh": "1 台伺服器"
+  },
+  {
+   "kind": "html",
+   "en": "One server, rising traffic",
+   "zh": "一台伺服器，流量節節上升"
+  },
+  {
+   "kind": "html",
+   "en": "Each request is a fan loading a page, and fans arrive in bursts, like real traffic. The server works on 2 requests at a time, and each needs about 20 ms of work. That comes out to roughly <b>100 requests per second</b> (simulated numbers, not a benchmark). Every response also spends 40 ms on the network. Requests that arrive while both workers are busy wait in line.",
+   "zh": "每個請求代表一位歌迷在載入頁面，而且歌迷會一波一波湧進來，就像真實的流量。這台伺服器一次能處理 2 個請求，每個請求大約需要 20 毫秒的運算，換算起來大約是<b>每秒 100 個請求</b>（模擬數字，不是效能基準）。每個回應還要花 40 毫秒在網路上。兩個工作者都在忙的時候進來的請求，只能排隊等。"
+  },
+  {
+   "kind": "html",
+   "en": "Traffic: <b id=\"rateV\">40</b> requests/second",
+   "zh": "流量：每秒 <b id=\"rateV\">40</b> 個請求"
+  },
+  {
+   "kind": "html",
+   "en": "Normal day",
+   "zh": "平常日"
+  },
+  {
+   "kind": "html",
+   "en": "On-sale spike",
+   "zh": "開賣尖峰"
+  },
+  {
+   "kind": "html",
+   "en": "Simulation",
+   "zh": "模擬"
+  },
+  {
+   "kind": "html",
+   "en": "+ Add a second server",
+   "zh": "＋ 加開第二台伺服器"
+  },
+  {
+   "kind": "html",
+   "en": "Throughput",
+   "zh": "吞吐量"
+  },
+  {
+   "kind": "html",
+   "en": "finished / second",
+   "zh": "每秒完成數"
+  },
+  {
+   "kind": "html",
+   "en": "Average latency",
+   "zh": "平均延遲"
+  },
+  {
+   "kind": "html",
+   "en": "0 ms",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "last 4 seconds",
+   "zh": "最近 4 秒"
+  },
+  {
+   "kind": "html",
+   "en": "P99 latency",
+   "zh": "P99 延遲"
+  },
+  {
+   "kind": "html",
+   "en": "slowest 1 in 100",
+   "zh": "最慢的百分之一"
+  },
+  {
+   "kind": "html",
+   "en": "Waiting in line",
+   "zh": "排隊中"
+  },
+  {
+   "kind": "html",
+   "en": "gave up (5 s timeout)",
+   "zh": "放棄（5 秒逾時）"
+  },
+  {
+   "kind": "html",
+   "en": "<i style=\"background:var(--accent)\"></i>average",
+   "zh": "<i style=\"background:var(--accent)\"></i>平均"
+  },
+  {
+   "kind": "html",
+   "en": "last 15 s of simulated time",
+   "zh": "最近 15 秒的模擬時間"
+  },
+  {
+   "kind": "html",
+   "en": "Press Play to start sending traffic.",
+   "zh": "按「播放」開始送出流量。"
+  },
+  {
+   "kind": "html",
+   "en": "Try this",
+   "zh": "試試看"
+  },
+  {
+   "kind": "html",
+   "en": "Latency vs throughput in one line",
+   "zh": "一句話說清楚延遲與吞吐量"
+  },
+  {
+   "kind": "html",
+   "en": "<b>Latency</b> is how long one request takes. <b>Throughput</b> is how many requests finish per second. Near a server's limit, throughput stops rising and latency shoots up.",
+   "zh": "<b>延遲（latency）</b>是一個請求花多久。<b>吞吐量（throughput）</b>是每秒完成多少個請求。接近伺服器的極限時，吞吐量停止成長，延遲則會暴衝。"
+  },
+  {
+   "kind": "html",
+   "en": "act 2 · why the average lies",
+   "zh": "第 2 幕 · 為什麼平均值會騙人"
+  },
+  {
+   "kind": "html",
+   "en": "100 real requests, sorted from fastest to slowest",
+   "zh": "100 個真實請求，從快排到慢"
+  },
+  {
+   "kind": "html",
+   "en": "These are the last 100 requests your simulated server finished. (If you haven't run the lab yet, this is a sample at 100 requests/second.) Switch between the two lines.",
+   "zh": "這是你的模擬伺服器最近完成的 100 個請求。（如果你還沒跑過實驗室，這裡顯示的是每秒 100 個請求的樣本。）切換看看兩條線。"
+  },
+  {
+   "kind": "html",
+   "en": "↻ Grab the latest 100",
+   "zh": "↻ 抓最新的 100 個"
+  },
+  {
+   "kind": "html",
+   "en": "The one difference",
+   "zh": "關鍵差別"
+  },
+  {
+   "kind": "html",
+   "en": "The <b>average</b> blends everyone into one number that describes nobody. <b>P99</b> is the time the slowest 1% of users waited. Those are the fans writing to support.",
+   "zh": "<b>平均值</b>把所有人混成一個數字，結果誰也描述不了。<b>P99</b> 是最慢那 1% 使用者等待的時間，也就是寫信給客服的那些歌迷。"
+  },
+  {
+   "kind": "html",
+   "en": "act 3 · tail latency multiplies",
+   "zh": "第 3 幕 · 尾端延遲會被放大"
+  },
+  {
+   "kind": "html",
+   "en": "fan-out",
+   "zh": "扇出"
+  },
+  {
+   "kind": "html",
+   "en": "One page, many calls",
+   "zh": "一個頁面，很多次呼叫"
+  },
+  {
+   "kind": "html",
+   "en": "Encore's concert page doesn't make one request. It calls the seat map, prices, recommendations, reviews… Each call is slow only 1% of the time. But the page is slow if <i>any</i> of its calls is slow.",
+   "zh": "Encore 的演唱會頁面不只發出一個請求。它會呼叫座位圖、票價、推薦、評論……每次呼叫只有 1% 的機率很慢。但只要<i>任何一個</i>呼叫慢了，整個頁面就慢了。"
+  },
+  {
+   "kind": "html",
+   "en": "Backend calls per page load: <b id=\"fanV\">10</b>",
+   "zh": "每次載入頁面的後端呼叫數：<b id=\"fanV\">10</b>"
+  },
+  {
+   "kind": "html",
+   "en": "Tail latency",
+   "zh": "尾端延遲"
+  },
+  {
+   "kind": "html",
+   "en": "The rare slow requests at the end of the distribution are the <b>tail</b>. With fan-out, rare per call becomes common per page, so big systems watch P99 and even P99.9.",
+   "zh": "分布最末端那些罕見的慢請求，就是<b>尾端（tail）</b>。有了扇出（fan-out），每次呼叫的「罕見」會變成每個頁面的「常見」，所以大型系統會盯著 P99，甚至 P99.9。"
+  },
+  {
+   "kind": "html",
+   "en": "act 4 · the real thing",
+   "zh": "第 4 幕 · 真實世界"
+  },
+  {
+   "kind": "html",
+   "en": "promql",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "What these numbers look like on a real dashboard",
+   "zh": "這些數字在真實儀表板上長什麼樣子"
+  },
+  {
+   "kind": "html",
+   "en": "Most teams graph latency with Prometheus or a similar tool. These are the three queries behind the three meters you just watched. <b>Hover or tap a line.</b>",
+   "zh": "大多數團隊用 Prometheus 或類似工具畫延遲圖。下面就是你剛剛看到的三個儀表背後的三條查詢。<b>把滑鼠移到某一行上，或點一下。</b>"
+  },
+  {
+   "kind": "html",
+   "en": "👆 pick a line",
+   "zh": "👆 選一行"
+  },
+  {
+   "kind": "html",
+   "en": "Each highlighted line maps to one meter from the lab.",
+   "zh": "每一行反白後，會對應到實驗室裡的一個儀表。"
+  },
+  {
+   "kind": "html",
+   "en": "recap · keep this",
+   "zh": "重點整理 · 帶走這些"
+  },
+  {
+   "kind": "html",
+   "en": "The whole page on one screen",
+   "zh": "整頁濃縮在一個畫面"
+  },
+  {
+   "kind": "html",
+   "en": "How long",
+   "zh": "多久"
+  },
+  {
+   "kind": "html",
+   "en": "Latency",
+   "zh": "延遲"
+  },
+  {
+   "kind": "html",
+   "en": "Time from request to response for one request. What a single fan feels.",
+   "zh": "一個請求從送出到收到回應的時間，也就是單一歌迷的感受。"
+  },
+  {
+   "kind": "html",
+   "en": "How many",
+   "zh": "多少"
+  },
+  {
+   "kind": "html",
+   "en": "Requests finished per second. What the server delivers overall. It has a ceiling.",
+   "zh": "每秒完成的請求數，也就是伺服器整體的產出。它有天花板。"
+  },
+  {
+   "kind": "html",
+   "en": "How bad for the unlucky",
+   "zh": "倒楣的人有多慘"
+  },
+  {
+   "kind": "html",
+   "en": "P99 / tail",
+   "zh": "P99 / 尾端"
+  },
+  {
+   "kind": "html",
+   "en": "99% of requests were faster than this. The tail grows first when a server gets busy, and fan-out makes it everyone's problem.",
+   "zh": "99% 的請求都比這個快。伺服器一忙，尾端最先變長；而扇出會讓它變成每個人的問題。"
+  },
+  {
+   "kind": "html",
+   "en": "The tradeoff",
+   "zh": "取捨"
+  },
+  {
+   "kind": "html",
+   "en": "Running a server closer to 100% busy gets more throughput per dollar, but latency explodes near the limit. Leave headroom, and judge speed by P99, not the average.",
+   "zh": "讓伺服器跑在接近 100% 忙碌，每一塊錢能換到更多吞吐量，但接近極限時延遲會爆炸。保留餘裕，並且用 P99 而不是平均值來評斷速度。"
+  },
+  {
+   "kind": "html",
+   "en": "Check it",
+   "zh": "考考自己"
+  },
+  {
+   "kind": "js",
+   "en": "'Press <b>Play</b> at normal traffic (40 requests/second).'",
+   "zh": "'在正常流量（每秒 40 個請求）下按<b>播放</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Average and P99 sit close together. Nobody waits.'",
+   "zh": "'平均和 P99 很接近，沒有人在等。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Slide traffic up to <b>100</b> requests/second and keep it there for a few seconds.'",
+   "zh": "'把流量拉到每秒 <b>100</b> 個請求，維持幾秒鐘。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The server is about 95% busy, so short lines form at random. Watch P99 pull away from the average.'",
+   "zh": "'伺服器大約 95% 忙碌，所以會隨機出現短暫的排隊。看 P99 怎麼跟平均值拉開距離。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Hit <b>On-sale spike</b> (130/s).'",
+   "zh": "'按下<b>開賣尖峰</b>（每秒 130 個）。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Throughput gets stuck near 100/s. The line grows every second, so every request waits longer.'",
+   "zh": "'吞吐量卡在每秒 100 左右。隊伍每秒都在變長，所以每個請求都等得更久。'"
+  },
+  {
+   "kind": "js",
+   "en": "'<b>Add a second server</b> while the spike is still running.'",
+   "zh": "'尖峰還在進行時，<b>加開第二台伺服器</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Double the capacity, and the line drains. This is horizontal scaling (page 6).'",
+   "zh": "'容量加倍，隊伍就會消化掉。這就是水平擴展（第 6 頁）。'"
+  },
+  {
+   "kind": "js",
+   "en": "' ms'",
+   "zh": "' 毫秒'"
+  },
+  {
+   "kind": "js",
+   "en": "'Press Play to start sending traffic.'",
+   "zh": "'按「播放」開始送出流量。'"
+  },
+  {
+   "kind": "js",
+   "en": "`✕ Saturated: ${S.rate} requests/s arrive but the ${S.servers === 1 ? 'server' : 'servers'} can only finish about ${cap}/s. The line grows every second, so latency keeps climbing.`",
+   "zh": "`✕ 飽和：每秒進來 ${S.rate} 個請求，但${S.servers === 1 ? '伺服器' : '伺服器們'}每秒只能完成大約 ${cap} 個。隊伍每秒都在變長，所以延遲持續攀升。`"
+  },
+  {
+   "kind": "js",
+   "en": "`⚠ Busy: requests are starting to queue. The slowest ones (P99 ${X.fmt(m.p99)} ms) feel it long before the average (${X.fmt(m.avg)} ms) does.`",
+   "zh": "`⚠ 忙碌：請求開始排隊了。最慢的那些（P99 ${X.fmt(m.p99)} 毫秒）會比平均值（${X.fmt(m.avg)} 毫秒）早很多感受到。`"
+  },
+  {
+   "kind": "js",
+   "en": "`✓ Healthy: requests start almost as soon as they arrive. P99 ${X.fmt(m.p99)} ms.`",
+   "zh": "`✓ 健康：請求幾乎一到就開始處理。P99 ${X.fmt(m.p99)} 毫秒。`"
+  },
+  {
+   "kind": "js",
+   "en": "`t = ${(S.t / 1000).toFixed(1)} s`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Average'",
+   "zh": "'平均'"
+  },
+  {
+   "kind": "js",
+   "en": "'Both'",
+   "zh": "'兩者'"
+  },
+  {
+   "kind": "js",
+   "en": "`flex:1;min-width:0;height:${(v / max) * 100}%;background:var(${v >= p99 ? '--bad' : '--accent-2'})`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "`<span style=\"position:absolute;right:4px;top:-18px;font-family:var(--mono);font-size:11px;color:var(${token});background:var(--card);padding:0 3px\">${label} ${X.fmt(v)} ms</span>`",
+   "zh": "`<span style=\"position:absolute;right:4px;top:-18px;font-family:var(--mono);font-size:11px;color:var(${token});background:var(--card);padding:0 3px\">${label} ${X.fmt(v)} 毫秒</span>`"
+  },
+  {
+   "kind": "js",
+   "en": "`position:absolute;left:0;right:0;bottom:${(v / max) * 164}px;border-top:2px dashed var(${token})`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "`Average: <b>${X.fmt(avg)} ms</b>. Half of these requests finished under ${X.fmt(p50)} ms, and the slowest took ${X.fmt(sample[99])} ms. The average hides that.`",
+   "zh": "`平均：<b>${X.fmt(avg)} 毫秒</b>。一半的請求在 ${X.fmt(p50)} 毫秒內完成，最慢的花了 ${X.fmt(sample[99])} 毫秒。平均值把這件事藏起來了。`"
+  },
+  {
+   "kind": "js",
+   "en": "`P99: <b>${X.fmt(p99)} ms</b>. 99 of 100 requests were faster than this. The red bar${slow > 1 ? 's are' : ' is'} the fan${slow > 1 ? 's' : ''} who emailed support. The average (${X.fmt(avg)} ms) is ${(p99 / Math.max(avg, 1)).toFixed(1)}× smaller.`",
+   "zh": "`P99：<b>${X.fmt(p99)} 毫秒</b>。100 個請求中有 99 個比這個快。紅色長條就是寫信給客服的歌迷。平均值（${X.fmt(avg)} 毫秒）小了 ${(p99 / Math.max(avg, 1)).toFixed(1)} 倍。`"
+  },
+  {
+   "kind": "js",
+   "en": "`Each square is one page load. <b>${slow} of these 100</b> hit at least one slow call (red). On average, ${exp.toFixed(1)}% of page loads would. With 1 call it's 1%.`",
+   "zh": "`每個方塊代表一次頁面載入。<b>這 100 次中有 ${slow} 次</b>碰到至少一個慢呼叫（紅色）。平均而言，${exp.toFixed(1)}% 的頁面載入會這樣。只有 1 次呼叫時是 1%。`"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\"># Throughput: requests finished per second</span>'",
+   "zh": "'<span class=\"c\"># 吞吐量：每秒完成的請求數</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'sum(<span class=\"key\">rate</span>(http_requests_total<span class=\"s\">[1m]</span>))'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\"># Average latency: total time ÷ number of requests</span>'",
+   "zh": "'<span class=\"c\"># 平均延遲：總時間 ÷ 請求數</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'sum(rate(http_request_duration_seconds_<span class=\"key\">sum</span>[1m]))'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  / sum(rate(http_request_duration_seconds_<span class=\"key\">count</span>[1m]))'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\"># P99: 99% of requests were faster than this</span>'",
+   "zh": "'<span class=\"c\"># P99：99% 的請求都比這個快</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">histogram_quantile</span>(<span class=\"s\">0.99</span>,'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  sum by (le) (rate(http_request_duration_seconds_<span class=\"key\">bucket</span><span class=\"s\">[5m]</span>)))'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Throughput'",
+   "zh": "'吞吐量'"
+  },
+  {
+   "kind": "js",
+   "en": "'Counts finished requests and turns the count into “per second”, averaged over the last minute. This is the <b>Throughput</b> meter.'",
+   "zh": "'計算已完成的請求數，並換算成「每秒」，取最近一分鐘的平均。這就是<b>吞吐量</b>儀表。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Average latency'",
+   "zh": "'平均延遲'"
+  },
+  {
+   "kind": "js",
+   "en": "'Total seconds spent on requests ÷ number of requests. Simple, and the reason dashboards can look calm while fans suffer.'",
+   "zh": "'花在請求上的總秒數 ÷ 請求數。很簡單，也正是儀表板看起來風平浪靜、歌迷卻在受苦的原因。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Asks for the 99th percentile. Change <code>0.99</code> to <code>0.5</code> and you get the median, or to <code>0.999</code> for the deeper tail.'",
+   "zh": "'要求第 99 百分位數。把 <code>0.99</code> 改成 <code>0.5</code> 就是中位數，改成 <code>0.999</code> 就能看更深的尾端。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Buckets and window'",
+   "zh": "'分桶與時間窗'"
+  },
+  {
+   "kind": "js",
+   "en": "'Servers count requests into time buckets (under 50 ms, under 100 ms, …). The quantile is estimated from those buckets over the last 5 minutes. Short windows react faster, long ones are smoother.'",
+   "zh": "'伺服器會把請求依時間分進不同的桶（50 毫秒以內、100 毫秒以內……）。百分位數是根據最近 5 分鐘的分桶估算出來的。時間窗短反應快，時間窗長比較平滑。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The dashboard shows an average latency of 90 ms, but fans say checkout “hangs”. What do you check first?'",
+   "zh": "'儀表板顯示平均延遲 90 毫秒，但歌迷說結帳「卡住」。你第一個該看什麼？'"
+  },
+  {
+   "kind": "js",
+   "en": "'P99 latency for checkout'",
+   "zh": "'結帳的 P99 延遲'"
+  },
+  {
+   "kind": "js",
+   "en": "'The average blends a few very slow requests in with many fast ones. P99 shows what the unlucky fans are actually waiting.'",
+   "zh": "'平均值把少數很慢的請求和大量快速的請求混在一起。P99 才會顯示倒楣的歌迷實際等了多久。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The average over a longer time window'",
+   "zh": "'拉長時間窗的平均值'"
+  },
+  {
+   "kind": "js",
+   "en": "'A longer window smooths things even more. It hides the slow requests instead of revealing them.'",
+   "zh": "'更長的時間窗會讓數字更平滑，反而把慢請求藏起來，而不是揭露它們。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Whether the server CPU is at 100%'",
+   "zh": "'伺服器 CPU 是不是到 100%'"
+  },
+  {
+   "kind": "js",
+   "en": "'Useful later, but it doesn\\'t tell you what users feel. Latency percentiles do.'",
+   "zh": "'之後有用，但它無法告訴你使用者的感受。延遲百分位數才能。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Traffic grows from 50 to 120 requests/second on a server that tops out around 100/s. What happens?'",
+   "zh": "'一台上限大約每秒 100 個請求的伺服器，流量從每秒 50 成長到 120。會發生什麼事？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Latency roughly doubles and then stays steady'",
+   "zh": "'延遲大約翻倍，然後維持穩定'"
+  },
+  {
+   "kind": "js",
+   "en": "'Past the limit it doesn\\'t settle. Requests pile up faster than they finish, so the wait keeps growing every second.'",
+   "zh": "'超過極限後不會穩定下來。請求堆積的速度比完成的速度快，所以等待時間每秒都在增加。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Throughput gets stuck near 100/s and latency keeps climbing as the line grows'",
+   "zh": "'吞吐量卡在每秒 100 左右，而且隊伍越來越長、延遲持續攀升'"
+  },
+  {
+   "kind": "js",
+   "en": "'Throughput has a ceiling. Everything above it waits in line, and the line grows until requests time out.'",
+   "zh": "'吞吐量有天花板。超出的部分全都在排隊，隊伍會一直變長，直到請求逾時。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Nothing changes until the CPU reaches 100%'",
+   "zh": "'CPU 到 100% 之前什麼都不會變'"
+  },
+  {
+   "kind": "js",
+   "en": "'Queuing starts well before 100%. You saw P99 rise at around 90% busy.'",
+   "zh": "'排隊在 100% 之前很久就開始了。你已經看到 P99 在大約 90% 忙碌時上升。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Encore\\'s concert page calls 20 backend services. Each one is slow 1% of the time. Roughly how often is the page slow?'",
+   "zh": "'Encore 的演唱會頁面會呼叫 20 個後端服務，每個都有 1% 的機率很慢。頁面大約多常會變慢？'"
+  },
+  {
+   "kind": "js",
+   "en": "'About 1%, same as each call'",
+   "zh": "'大約 1%，跟每次呼叫一樣'"
+  },
+  {
+   "kind": "js",
+   "en": "'The page waits for all 20. Any one of them being slow makes the page slow.'",
+   "zh": "'頁面要等全部 20 個都回來。只要其中一個慢，頁面就慢。'"
+  },
+  {
+   "kind": "js",
+   "en": "'About 18%'",
+   "zh": "'大約 18%'"
+  },
+  {
+   "kind": "js",
+   "en": "'1 − 0.99²⁰ ≈ 0.18. That\\'s why big systems care so much about the tail.'",
+   "zh": "'1 − 0.99²⁰ ≈ 0.18。這就是大型系統這麼在意尾端的原因。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Exactly 20%'",
+   "zh": "'剛好 20%'"
+  },
+  {
+   "kind": "js",
+   "en": "'Close, but the chances overlap (sometimes two calls are slow at once). The exact answer is 1 − 0.99²⁰ ≈ 18%.'",
+   "zh": "'很接近，但機率會重疊（有時候兩個呼叫同時很慢）。正確答案是 1 − 0.99²⁰ ≈ 18%。'"
+  }
+ ]
+}

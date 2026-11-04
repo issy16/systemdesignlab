@@ -1,6 +1,6 @@
 // End-to-end test: plays through every page's "Try this" missions like a learner would,
 // then checks that all missions completed and the console stayed clean.
-// Usage: node tests/missions.js [slug ...]
+// Usage: node tests/missions.js [--lang zh-tw|zh-cn] [slug ...]
 const path = require('path');
 const { chromium } = require('playwright');
 
@@ -69,7 +69,10 @@ const FLOWS = {
 };
 
 (async () => {
-  const only = process.argv.slice(2);
+  const args = process.argv.slice(2);
+  const li = args.indexOf('--lang');
+  const lang = li >= 0 ? args.splice(li, 2)[1] : '';
+  const only = args;
   const browser = await chromium.launch();
   let ok = true;
   for (const [slug, flow] of Object.entries(FLOWS)) {
@@ -78,7 +81,7 @@ const FLOWS = {
     const errors = [];
     page.on('pageerror', e => errors.push(e.message));
     page.on('console', m => m.type() === 'error' && !/fonts\.(googleapis|gstatic)/.test(m.text()) && errors.push(m.text()));
-    await page.goto('file://' + path.join(root, slug, 'index.html'));
+    await page.goto('file://' + path.join(root, lang, slug, 'index.html'));
     for (const [action, arg, wait] of flow) {
       if (action === 'click') await page.click(arg);
       if (action === 'fill') { await page.fill(arg[0], arg[1]); await page.dispatchEvent(arg[0], 'input'); }
@@ -88,7 +91,7 @@ const FLOWS = {
     const done = await page.$$eval('#missions li.done', l => l.length);
     const pass = done === total && !errors.length;
     if (!pass) ok = false;
-    console.log(`${pass ? '✓' : '✕'} ${slug}: ${done}/${total} missions${errors.length ? ' · errors: ' + errors.join(' | ') : ''}`);
+    console.log(`${pass ? '✓' : '✕'} ${lang ? lang + '/' : ''}${slug}: ${done}/${total} missions${errors.length ? ' · errors: ' + errors.join(' | ') : ''}`);
     if (done < total) console.log('    stuck on: ' + (await page.$eval('#missions li.now', l => l.textContent.trim()).catch(() => '?')));
     await page.close();
   }

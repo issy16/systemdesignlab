@@ -1,0 +1,850 @@
+{
+ "page": "database-indexing",
+ "segments": [
+  {
+   "kind": "attr",
+   "en": "width=device-width, initial-scale=1, viewport-fit=cover",
+   "zh": "="
+  },
+  {
+   "kind": "attr",
+   "en": "Run the same query with and without an index and watch how many rows the database has to read.",
+   "zh": "同一條查詢，分別在有索引和沒索引的情況下執行，看資料庫要讀多少列。"
+  },
+  {
+   "kind": "attr",
+   "en": "Sections",
+   "zh": "章節"
+  },
+  {
+   "kind": "attr",
+   "en": "Finished runs",
+   "zh": "已完成的執行"
+  },
+  {
+   "kind": "attr",
+   "en": "Example EXPLAIN ANALYZE output",
+   "zh": "EXPLAIN ANALYZE 輸出範例"
+  },
+  {
+   "kind": "attr",
+   "en": "Pages",
+   "zh": "頁面"
+  },
+  {
+   "kind": "html",
+   "en": "Database Indexing · System Design Lab",
+   "zh": "資料庫索引 · System Design Lab"
+  },
+  {
+   "kind": "html",
+   "en": "system<b>.design.lab</b>",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "Lab",
+   "zh": "實驗室"
+  },
+  {
+   "kind": "html",
+   "en": "Can it use it?",
+   "zh": "用得上嗎？"
+  },
+  {
+   "kind": "html",
+   "en": "The cost",
+   "zh": "代價"
+  },
+  {
+   "kind": "html",
+   "en": "EXPLAIN",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "Recap",
+   "zh": "重點整理"
+  },
+  {
+   "kind": "html",
+   "en": "page 2 · stage 1 · one server",
+   "zh": "第 2 頁 · 階段 1 · 一台伺服器"
+  },
+  {
+   "kind": "html",
+   "en": "Database indexing, query optimization",
+   "zh": "資料庫索引、查詢最佳化"
+  },
+  {
+   "kind": "html",
+   "en": "Same query. Same data. <em>4 seconds vs 0.1 milliseconds.</em>",
+   "zh": "同一條查詢、同一份資料。<em>4 秒 vs 0.1 毫秒。</em>"
+  },
+  {
+   "kind": "html",
+   "en": "<b>Encore</b>Ana's “My tickets” page runs one query: find every order for this email. With 2,000 orders it was instant. Encore now has 5 million orders, and the page takes 4 seconds. Nobody changed the code.",
+   "zh": "<b>Encore</b>Ana 的「我的票券」頁面只跑一條查詢：找出這個 email 的所有訂單。2,000 筆訂單時一下就好。現在 Encore 有 500 萬筆訂單，這個頁面要跑 4 秒。程式碼沒有人改過。"
+  },
+  {
+   "kind": "html",
+   "en": "Open the lab ↓",
+   "zh": "打開實驗室 ↓"
+  },
+  {
+   "kind": "html",
+   "en": "lab · break it, then fix it",
+   "zh": "實驗室 · 先弄壞，再修好"
+  },
+  {
+   "kind": "html",
+   "en": "no index",
+   "zh": "沒有索引"
+  },
+  {
+   "kind": "html",
+   "en": "Find Ana's 3 orders",
+   "zh": "找出 Ana 的 3 筆訂單"
+  },
+  {
+   "kind": "html",
+   "en": "SELECT * FROM orders WHERE email = 'ana@encore.example';",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "Orders in the table",
+   "zh": "資料表中的訂單數"
+  },
+  {
+   "kind": "html",
+   "en": "Index",
+   "zh": "索引"
+  },
+  {
+   "kind": "html",
+   "en": "Run the query",
+   "zh": "執行查詢"
+  },
+  {
+   "kind": "html",
+   "en": "Table",
+   "zh": "資料表"
+  },
+  {
+   "kind": "html",
+   "en": "Index on email",
+   "zh": "email 索引"
+  },
+  {
+   "kind": "html",
+   "en": "Rows read",
+   "zh": "讀取列數"
+  },
+  {
+   "kind": "html",
+   "en": "of 5,000,000",
+   "zh": "共 5,000,000 列"
+  },
+  {
+   "kind": "html",
+   "en": "Matches found",
+   "zh": "找到的符合項"
+  },
+  {
+   "kind": "html",
+   "en": "Ana's orders",
+   "zh": "Ana 的訂單"
+  },
+  {
+   "kind": "html",
+   "en": "Query time",
+   "zh": "查詢時間"
+  },
+  {
+   "kind": "html",
+   "en": "0 ms",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "simulated",
+   "zh": "模擬值"
+  },
+  {
+   "kind": "html",
+   "en": "Press Play (or Step) to run the query.",
+   "zh": "按「播放」（或「單步」）執行查詢。"
+  },
+  {
+   "kind": "html",
+   "en": "Finished runs will be listed here so you can compare them.",
+   "zh": "完成的執行會列在這裡，方便你比較。"
+  },
+  {
+   "kind": "html",
+   "en": "Try this",
+   "zh": "試試看"
+  },
+  {
+   "kind": "html",
+   "en": "Indexing in one line",
+   "zh": "一句話說清楚索引"
+  },
+  {
+   "kind": "html",
+   "en": "Without an index the database must read <b>every row</b> to be sure it found all matches. An index is a sorted lookup structure (usually a B-tree) that jumps straight to the matching rows.",
+   "zh": "沒有索引時，資料庫必須讀<b>每一列</b>，才能確定找到了所有符合的資料。索引（index）是一種排序好的查找結構（通常是 B-tree），能直接跳到符合的那幾列。"
+  },
+  {
+   "kind": "html",
+   "en": "act 2 · query optimization",
+   "zh": "第 2 幕 · 查詢最佳化"
+  },
+  {
+   "kind": "html",
+   "en": "Having an index isn't enough. The query has to be able to use it.",
+   "zh": "光有索引還不夠，查詢本身也要用得上它。"
+  },
+  {
+   "kind": "html",
+   "en": "The index stores emails sorted exactly as written. Pick a query and see whether the database can still use it.",
+   "zh": "索引會把 email 依照原本的寫法排序存好。選一條查詢，看看資料庫還能不能用上索引。"
+  },
+  {
+   "kind": "html",
+   "en": "Plan",
+   "zh": "執行計畫"
+  },
+  {
+   "kind": "html",
+   "en": "Fix",
+   "zh": "修法"
+  },
+  {
+   "kind": "html",
+   "en": "The one difference",
+   "zh": "關鍵差別"
+  },
+  {
+   "kind": "html",
+   "en": "An index helps only when the database can search the column <b>the same way it's sorted</b>. Wrapping the column in a function, or starting a search with a wildcard, sends it back to reading every row.",
+   "zh": "只有當資料庫能用<b>跟排序相同的方式</b>搜尋欄位時，索引才幫得上忙。把欄位包進函式，或用萬用字元開頭搜尋，都會讓它退回去逐列讀取。"
+  },
+  {
+   "kind": "html",
+   "en": "act 3 · the cost",
+   "zh": "第 3 幕 · 代價"
+  },
+  {
+   "kind": "html",
+   "en": "tradeoff",
+   "zh": "取捨"
+  },
+  {
+   "kind": "html",
+   "en": "So why not index every column?",
+   "zh": "那為什麼不幫每個欄位都建索引？"
+  },
+  {
+   "kind": "html",
+   "en": "Every index is an extra sorted copy of some data. Each new order has to be written into the table <i>and</i> into every index.",
+   "zh": "每個索引都是部分資料的一份額外排序副本。每筆新訂單都得寫進資料表，<i>還要</i>寫進每一個索引。"
+  },
+  {
+   "kind": "html",
+   "en": "Indexes on the orders table: <b id=\"nIdxV\">1</b>",
+   "zh": "orders 資料表上的索引數：<b id=\"nIdxV\">1</b>"
+  },
+  {
+   "kind": "html",
+   "en": "Writes per new order",
+   "zh": "每筆新訂單的寫入次數"
+  },
+  {
+   "kind": "html",
+   "en": "Extra disk space",
+   "zh": "額外磁碟空間"
+  },
+  {
+   "kind": "html",
+   "en": "Lookups made fast",
+   "zh": "變快的查找"
+  },
+  {
+   "kind": "html",
+   "en": "Illustrative proportions. Real costs depend on the database, the column types, and the workload.",
+   "zh": "示意比例。實際成本取決於資料庫、欄位型別與工作負載。"
+  },
+  {
+   "kind": "html",
+   "en": "act 4 · the real thing",
+   "zh": "第 4 幕 · 真實世界"
+  },
+  {
+   "kind": "html",
+   "en": "explain",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "Ask the database what it did",
+   "zh": "問資料庫它做了什麼"
+  },
+  {
+   "kind": "html",
+   "en": "<code>EXPLAIN ANALYZE</code> (Postgres) shows the plan a query actually used. This is illustrative output for the lab's query, before and after one <code>CREATE INDEX</code>. <b>Hover or tap a line.</b>",
+   "zh": "<code>EXPLAIN ANALYZE</code>（Postgres）會顯示一條查詢實際使用的執行計畫。下面是實驗室那條查詢在執行一次 <code>CREATE INDEX</code> 前後的示意輸出。<b>把滑鼠移到某一行上，或點一下。</b>"
+  },
+  {
+   "kind": "html",
+   "en": "👆 pick a line",
+   "zh": "👆 選一行"
+  },
+  {
+   "kind": "html",
+   "en": "Each highlighted line tells you something you saw in the lab.",
+   "zh": "每一行反白後，都會告訴你一件在實驗室看過的事。"
+  },
+  {
+   "kind": "html",
+   "en": "recap · keep this",
+   "zh": "重點整理 · 帶走這些"
+  },
+  {
+   "kind": "html",
+   "en": "The whole page on one screen",
+   "zh": "整頁濃縮在一個畫面"
+  },
+  {
+   "kind": "html",
+   "en": "Without",
+   "zh": "沒有索引"
+  },
+  {
+   "kind": "html",
+   "en": "Full scan",
+   "zh": "全表掃描"
+  },
+  {
+   "kind": "html",
+   "en": "The database reads every row. The cost grows with the table, so the same query gets slower every month.",
+   "zh": "資料庫讀取每一列。成本隨資料表成長，所以同一條查詢每個月都更慢。"
+  },
+  {
+   "kind": "html",
+   "en": "With",
+   "zh": "有索引"
+  },
+  {
+   "kind": "html",
+   "en": "A sorted tree on the column. A lookup reads a handful of pages, whether the table has a thousand rows or a billion.",
+   "zh": "在欄位上建一棵排序好的樹。不管資料表有一千列還是十億列，一次查找只要讀少數幾個頁面。"
+  },
+  {
+   "kind": "html",
+   "en": "Check",
+   "zh": "驗證"
+  },
+  {
+   "kind": "html",
+   "en": "Never guess. <code>EXPLAIN ANALYZE</code> tells you whether the index was used and how many rows were read.",
+   "zh": "不要用猜的。<code>EXPLAIN ANALYZE</code> 會告訴你有沒有用到索引、讀了多少列。"
+  },
+  {
+   "kind": "html",
+   "en": "The tradeoff",
+   "zh": "取捨"
+  },
+  {
+   "kind": "html",
+   "en": "Indexes make reads fast and writes slower, and they take space. Index the columns your important queries filter or sort by, not every column.",
+   "zh": "索引讓讀取變快、寫入變慢，還會佔空間。替重要查詢會拿來篩選或排序的欄位建索引，而不是每個欄位都建。"
+  },
+  {
+   "kind": "html",
+   "en": "Check it",
+   "zh": "考考自己"
+  },
+  {
+   "kind": "js",
+   "en": "' ms'",
+   "zh": "' 毫秒'"
+  },
+  {
+   "kind": "js",
+   "en": "'With <b>5,000,000</b> orders and <b>no index</b>, run the query to the end.'",
+   "zh": "'在 <b>5,000,000</b> 筆訂單、<b>沒有索引</b>的情況下，把查詢跑完。'"
+  },
+  {
+   "kind": "js",
+   "en": "'It found Ana\\'s 3 orders early, but it can\\'t stop: there could be more further down.'",
+   "zh": "'它很早就找到 Ana 的 3 筆訂單，但不能停下來：後面可能還有更多。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Switch to <b>Index on email</b> and run it again.'",
+   "zh": "'切換到<b>email 索引</b>，再跑一次。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Compare the rows read in the run list below the lab.'",
+   "zh": "'比較實驗室下方執行紀錄裡讀取的列數。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Now try <b>2,000</b> orders with <b>no index</b>.'",
+   "zh": "'現在試試 <b>2,000</b> 筆訂單、<b>沒有索引</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Still a full scan, but it barely matters. Indexes pay off as tables grow.'",
+   "zh": "'還是全表掃描，但幾乎沒差。資料表越大，索引越划算。'"
+  },
+  {
+   "kind": "js",
+   "en": "'aaron… alex'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'ana@encore… → 3 rows'",
+   "zh": "'ana@encore… → 3 列'"
+  },
+  {
+   "kind": "js",
+   "en": "'andre… anya'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "`${S.depth} levels for ${X.fmt(S.size)} rows. Each level narrows the search about 300×, so even a billion rows needs only about 4 levels.`",
+   "zh": "`${X.fmt(S.size)} 列需要 ${S.depth} 層。每一層大約把搜尋範圍縮小 300 倍，所以就算十億列也只需要大約 4 層。`"
+  },
+  {
+   "kind": "js",
+   "en": "'No index yet. Switch it on to use this.'",
+   "zh": "'還沒有索引。開啟它才能使用。'"
+  },
+  {
+   "kind": "js",
+   "en": "`(each square ≈ ${X.fmt(per)} rows)`",
+   "zh": "`（每個方塊 ≈ ${X.fmt(per)} 列）`"
+  },
+  {
+   "kind": "js",
+   "en": "`plus ${Math.min(S.step, S.depth)} index pages`",
+   "zh": "`另外讀了 ${Math.min(S.step, S.depth)} 個索引頁`"
+  },
+  {
+   "kind": "js",
+   "en": "`of ${X.fmt(S.size)}`",
+   "zh": "`共 ${X.fmt(S.size)} 列`"
+  },
+  {
+   "kind": "js",
+   "en": "`${S.hits} / 3`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'index on email'",
+   "zh": "'email 索引'"
+  },
+  {
+   "kind": "js",
+   "en": "'no index'",
+   "zh": "'沒有索引'"
+  },
+  {
+   "kind": "js",
+   "en": "'Press Play (or Step) to run the query.'",
+   "zh": "'按「播放」（或「單步」）執行查詢。'"
+  },
+  {
+   "kind": "js",
+   "en": "`Reading index level ${S.step} of ${S.depth}: comparing “ana@encore.example” and going left or right.`",
+   "zh": "`讀取索引第 ${S.step} / ${S.depth} 層：比對「ana@encore.example」，決定往左還是往右。`"
+  },
+  {
+   "kind": "js",
+   "en": "`Sequential scan: reading row ${X.fmt(S.rowsRead)} of ${X.fmt(S.size)}. ${S.hits ? `Found ${S.hits} so far, but it has to keep going to be sure.` : ''}`",
+   "zh": "`循序掃描：正在讀第 ${X.fmt(S.rowsRead)} / ${X.fmt(S.size)} 列。${S.hits ? `目前找到 ${S.hits} 筆，但必須繼續讀完才能確定。` : ''}`"
+  },
+  {
+   "kind": "js",
+   "en": "`✓ Done: ${S.depth} index pages, then exactly 3 rows. ${fmtMs(timeMs(S))}.`",
+   "zh": "`✓ 完成：讀了 ${S.depth} 個索引頁，接著剛好 3 列。${fmtMs(timeMs(S))}。`"
+  },
+  {
+   "kind": "js",
+   "en": "`${timeMs(S) > 1000 ? '✕' : '✓'} Done: read all ${X.fmt(S.size)} rows to return 3. ${fmtMs(timeMs(S))}.`",
+   "zh": "`${timeMs(S) > 1000 ? '✕' : '✓'} 完成：為了回傳 3 列，讀完全部 ${X.fmt(S.size)} 列。${fmtMs(timeMs(S))}。`"
+  },
+  {
+   "kind": "js",
+   "en": "`${S.indexed ? 'Index   ' : 'No index'} · ${X.fmt(S.size).padStart(9)} orders · read ${X.fmt(S.rows || S.rowsRead).padStart(9)} rows · ${fmtMs(timeMs(S))}`",
+   "zh": "`${S.indexed ? '有索引  ' : '沒有索引'} · ${X.fmt(S.size).padStart(9)} 筆訂單 · 讀了 ${X.fmt(S.rows || S.rowsRead).padStart(9)} 列 · ${fmtMs(timeMs(S))}`"
+  },
+  {
+   "kind": "js",
+   "en": "'No index'",
+   "zh": "'沒有索引'"
+  },
+  {
+   "kind": "js",
+   "en": "'Index on email'",
+   "zh": "'email 索引'"
+  },
+  {
+   "kind": "js",
+   "en": "'= exact'",
+   "zh": "'= 精確比對'"
+  },
+  {
+   "kind": "js",
+   "en": "\"WHERE email = 'ana@encore.example'\"",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'The column is compared directly, so the database walks the sorted index straight to the match.'",
+   "zh": "'直接比對欄位，所以資料庫可以沿著排序好的索引直接走到符合的地方。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Nothing to fix.'",
+   "zh": "'不需要修。'"
+  },
+  {
+   "kind": "js",
+   "en": "'LOWER(email)'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "\"WHERE LOWER(email) = 'ana@encore.example'\"",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'The index is sorted by <code>email</code>, not by <code>LOWER(email)</code>. To compare, the database has to compute LOWER() for every row.'",
+   "zh": "'索引是依 <code>email</code> 排序的，不是依 <code>LOWER(email)</code>。為了比較，資料庫必須對每一列計算 LOWER()。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Store emails lowercased when they\\'re saved, or create an index on the expression: <code>CREATE INDEX ON orders (LOWER(email))</code>.'",
+   "zh": "'儲存 email 時就先轉成小寫，或建立運算式索引：<code>CREATE INDEX ON orders (LOWER(email))</code>。'"
+  },
+  {
+   "kind": "js",
+   "en": "\"LIKE '%@gmail.com'\"",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "\"WHERE email LIKE '%@gmail.com'\"",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'A leading wildcard means “ends with”. A sorted list can\\'t help you find everything that <i>ends</i> with something, just as a phone book can\\'t find all surnames ending in “-son”.'",
+   "zh": "'開頭的萬用字元代表「結尾是」。排序好的清單沒辦法幫你找出所有<i>結尾</i>是某個字的資料，就像電話簿沒辦法找出所有名字以「明」結尾的人。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Search on a column that starts with what you know (e.g. store the domain separately), or use a full-text or trigram index.'",
+   "zh": "'改搜尋開頭已知的欄位（例如把網域另外存一欄），或使用全文索引、trigram 索引。'"
+  },
+  {
+   "kind": "js",
+   "en": "\"LIKE 'ana%'\"",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "\"WHERE email LIKE 'ana%'\"",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'“Starts with” works with sorted order: jump to “ana” and read forward until the prefix stops matching.'",
+   "zh": "'「開頭是」可以利用排序：跳到「ana」，往後讀到前綴不再符合為止。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Works with a B-tree index. In Postgres this needs the C collation or a <code>text_pattern_ops</code> index.'",
+   "zh": "'B-tree 索引可以處理。在 Postgres 中需要 C 定序（collation）或 <code>text_pattern_ops</code> 索引。'"
+  },
+  {
+   "kind": "js",
+   "en": "'SELECT * FROM orders '",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"pill ok\">✓ Index scan</span>'",
+   "zh": "'<span class=\"pill ok\">✓ 索引掃描</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"pill bad\">✕ Full scan</span>'",
+   "zh": "'<span class=\"pill bad\">✕ 全表掃描</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "' cols'",
+   "zh": "' 欄'"
+  },
+  {
+   "kind": "js",
+   "en": "'No indexes: inserts are as cheap as possible, but every lookup is a full scan.'",
+   "zh": "'沒有索引：寫入成本最低，但每次查找都是全表掃描。'"
+  },
+  {
+   "kind": "js",
+   "en": "`${n} index${n > 1 ? 'es' : ''}: each new order costs ${1 + n} writes. A reasonable price for fast lookups on the columns you actually search by.`",
+   "zh": "`${n} 個索引：每筆新訂單要寫 ${1 + n} 次。用來換取你真正會搜尋的欄位快速查找，這個代價很合理。`"
+  },
+  {
+   "kind": "js",
+   "en": "`${n} indexes: every ticket sale now does ${1 + n} writes. During an on-sale rush, that slows down the exact thing you're trying to sell. Drop indexes no query uses.`",
+   "zh": "`${n} 個索引：現在每賣一張票都要寫 ${1 + n} 次。開賣湧入時，這會拖慢你最想賣的東西。把沒有查詢用到的索引刪掉。`"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\">-- before: no index</span>'",
+   "zh": "'<span class=\"c\">-- 之前：沒有索引</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">Seq Scan</span> on orders  (actual time=0.4..3912.5 rows=3)'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  Filter: (email = <span class=\"s\">\\'ana@encore.example\\'</span>)'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  <span class=\"key\">Rows Removed by Filter</span>: 4999997'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Execution Time: <span class=\"s\">3912.6 ms</span>'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">CREATE INDEX</span> orders_email_idx ON orders (email);'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\">-- after</span>'",
+   "zh": "'<span class=\"c\">-- 之後</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">Index Scan</span> using orders_email_idx on orders'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  <span class=\"key\">Index Cond</span>: (email = <span class=\"s\">\\'ana@encore.example\\'</span>)'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Execution Time: <span class=\"s\">0.08 ms</span>'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Seq Scan'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Sequential scan: read the table from top to bottom. This is the lab with the index switched off.'",
+   "zh": "'循序掃描（Seq Scan）：從頭到尾讀整張資料表。這就是實驗室裡把索引關掉的情況。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Filter'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Each row is read first and checked second. A filter throws rows away <i>after</i> the work of reading them.'",
+   "zh": "'每一列都先讀出來再檢查。篩選（Filter）是在讀完<i>之後</i>才把資料丟掉。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Rows Removed by Filter'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'The giveaway. Almost 5 million rows read and thrown away to return 3. A big number here on a hot query means it needs an index.'",
+   "zh": "'破綻就在這裡：為了回傳 3 列，讀了將近 500 萬列再丟掉。熱門查詢這裡的數字很大，就代表它需要索引。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Execution Time'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Illustrative, not a benchmark. The point is the shape: this number grows with the table.'",
+   "zh": "'示意值，不是效能基準。重點是趨勢：這個數字會隨資料表成長。'"
+  },
+  {
+   "kind": "js",
+   "en": "'CREATE INDEX'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Builds the sorted tree once. From then on the database keeps it up to date on every insert, update and delete (act 3).'",
+   "zh": "'一次建好排序樹。之後每次新增、更新、刪除，資料庫都會維護它（第 3 幕）。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Index Scan'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'The planner chose the index: walk the tree, then fetch only the matching rows.'",
+   "zh": "'查詢規劃器選擇了索引：沿著樹走，然後只抓符合的列。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Index Cond'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'The condition is being answered by the index itself, not checked row by row. Compare it with “Filter” above.'",
+   "zh": "'條件是由索引本身回答的，而不是逐列檢查。跟上面的「Filter」比較看看。'"
+  },
+  {
+   "kind": "js",
+   "en": "'After'",
+   "zh": "'之後'"
+  },
+  {
+   "kind": "js",
+   "en": "'Stays about the same at 5 thousand or 5 billion rows, because the tree only gets slightly deeper.'",
+   "zh": "'不管是 5 千列還是 50 億列都差不多，因為樹只會稍微變深一點。'"
+  },
+  {
+   "kind": "js",
+   "en": "'“Search orders by email” was fast in development and is slow in production. The code is identical. What\\'s the most likely cause?'",
+   "zh": "'「用 email 搜尋訂單」在開發環境很快，在正式環境很慢，程式碼完全一樣。最可能的原因是什麼？'"
+  },
+  {
+   "kind": "js",
+   "en": "'The production server has a slower CPU'",
+   "zh": "'正式環境的伺服器 CPU 比較慢'"
+  },
+  {
+   "kind": "js",
+   "en": "'Possible, but it wouldn\\'t explain going from instant to seconds. A full scan that grows with the data does.'",
+   "zh": "'有可能，但無法解釋從瞬間變成好幾秒。會隨資料量成長的全表掃描才解釋得了。'"
+  },
+  {
+   "kind": "js",
+   "en": "'There\\'s no index on email, and production has far more rows'",
+   "zh": "'email 沒有索引，而正式環境的資料列多太多了'"
+  },
+  {
+   "kind": "js",
+   "en": "'A full scan is cheap on 2,000 rows and expensive on 5 million. Dev data hides the problem.'",
+   "zh": "'全表掃描在 2,000 列時很便宜，在 500 萬列時很昂貴。開發環境的資料把問題藏起來了。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The query needs SELECT email instead of SELECT *'",
+   "zh": "'查詢要改成 SELECT email 而不是 SELECT *'"
+  },
+  {
+   "kind": "js",
+   "en": "'Selecting fewer columns helps a little, but the database still has to read every row to find the matches.'",
+   "zh": "'少選幾個欄位有一點幫助，但資料庫還是得讀每一列才能找到符合的資料。'"
+  },
+  {
+   "kind": "js",
+   "en": "'There\\'s an index on email, but EXPLAIN still shows a Seq Scan for <code>WHERE LOWER(email) = ?</code>. Why?'",
+   "zh": "'email 有索引，但 EXPLAIN 對 <code>WHERE LOWER(email) = ?</code> 還是顯示 Seq Scan。為什麼？'"
+  },
+  {
+   "kind": "js",
+   "en": "'The index is broken and needs rebuilding'",
+   "zh": "'索引壞了，需要重建'"
+  },
+  {
+   "kind": "js",
+   "en": "'The index is fine. It just isn\\'t sorted by the value the query compares.'",
+   "zh": "'索引沒問題，只是它不是依照查詢比對的值排序的。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The index is sorted by email, not by LOWER(email)'",
+   "zh": "'索引是依 email 排序，不是依 LOWER(email)'"
+  },
+  {
+   "kind": "js",
+   "en": "'Wrapping the column in a function hides it from the index. Index the expression, or store emails lowercased.'",
+   "zh": "'把欄位包進函式，索引就看不到它了。替運算式建索引，或把 email 存成小寫。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Postgres never uses indexes for text columns'",
+   "zh": "'Postgres 從來不會對文字欄位使用索引'"
+  },
+  {
+   "kind": "js",
+   "en": "'It does, all the time. The exact-match query in the lab used one.'",
+   "zh": "'會的，而且隨時都在用。實驗室裡的精確比對查詢就用了。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Ben wants to add an index to all 12 columns of the orders table “to be safe”. What happens?'",
+   "zh": "'Ben 想「保險起見」替 orders 資料表的 12 個欄位全部建索引。會發生什麼事？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Every query gets faster and nothing else changes'",
+   "zh": "'每條查詢都變快，其他什麼都沒變'"
+  },
+  {
+   "kind": "js",
+   "en": "'Reads that use them get faster, but each insert now updates 12 extra structures.'",
+   "zh": "'用得上索引的讀取會變快，但現在每次新增都要多更新 12 個結構。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Ticket sales (inserts) get slower and the table takes much more disk space'",
+   "zh": "'賣票（新增）變慢，而且資料表佔用更多磁碟空間'"
+  },
+  {
+   "kind": "js",
+   "en": "'Indexes cost writes and storage. Add them for real query patterns, and remove ones nothing uses.'",
+   "zh": "'索引會增加寫入與儲存成本。依真實的查詢模式建立索引，並刪掉沒人用的。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The database will refuse more than one index per table'",
+   "zh": "'資料庫不允許一張資料表有超過一個索引'"
+  },
+  {
+   "kind": "js",
+   "en": "'It will happily let you create them. That\\'s why this mistake is common.'",
+   "zh": "'它會很樂意讓你建。這正是這個錯誤很常見的原因。'"
+  }
+ ]
+}

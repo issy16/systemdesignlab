@@ -1,0 +1,710 @@
+{
+ "page": "load-balancing-scaling",
+ "segments": [
+  {
+   "kind": "attr",
+   "en": "width=device-width, initial-scale=1, viewport-fit=cover",
+   "zh": "="
+  },
+  {
+   "kind": "attr",
+   "en": "Scale up, scale out, kill a server, and compare load balancing algorithms under a traffic spike.",
+   "zh": "垂直擴展、水平擴展、關掉一台伺服器，並在流量尖峰下比較不同的負載平衡演算法。"
+  },
+  {
+   "kind": "attr",
+   "en": "Sections",
+   "zh": "章節"
+  },
+  {
+   "kind": "attr",
+   "en": "Servers",
+   "zh": "伺服器"
+  },
+  {
+   "kind": "attr",
+   "en": "Example nginx load balancer config",
+   "zh": "nginx 負載平衡器設定範例"
+  },
+  {
+   "kind": "attr",
+   "en": "Pages",
+   "zh": "頁面"
+  },
+  {
+   "kind": "html",
+   "en": "Load Balancing and Scaling · System Design Lab",
+   "zh": "負載平衡與擴展 · System Design Lab"
+  },
+  {
+   "kind": "html",
+   "en": "system<b>.design.lab</b>",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "Lab",
+   "zh": "實驗室"
+  },
+  {
+   "kind": "html",
+   "en": "The config",
+   "zh": "設定檔"
+  },
+  {
+   "kind": "html",
+   "en": "Recap",
+   "zh": "重點整理"
+  },
+  {
+   "kind": "html",
+   "en": "page 6 · stage 2 · more traffic",
+   "zh": "第 6 頁 · 階段 2 · 更多流量"
+  },
+  {
+   "kind": "html",
+   "en": "Load balancing, horizontal scaling, vertical scaling",
+   "zh": "負載平衡、水平擴展、垂直擴展"
+  },
+  {
+   "kind": "html",
+   "en": "Buy a bigger server, or buy more servers? <em>Then decide who gets each request.</em>",
+   "zh": "買一台更大的伺服器，還是買更多台？<em>然後決定每個請求交給誰。</em>"
+  },
+  {
+   "kind": "html",
+   "en": "<b>Encore</b>One server ran Encore just fine, until the reunion tour went on sale. Dee has two options: scale <b>up</b> (a bigger machine) or scale <b>out</b> (more machines behind a load balancer). Try both, then pull the plug on one.",
+   "zh": "<b>Encore</b>一台伺服器撐 Encore 撐得好好的，直到重聚巡演開賣。Dee 有兩個選擇：<b>向上</b>擴展（換一台更大的機器），或<b>向外</b>擴展（在負載平衡器後面放更多台）。兩種都試試，然後拔掉其中一台的插頭。"
+  },
+  {
+   "kind": "html",
+   "en": "Open the lab ↓",
+   "zh": "打開實驗室 ↓"
+  },
+  {
+   "kind": "html",
+   "en": "lab · break it, then fix it",
+   "zh": "實驗室 · 先弄壞，再修好"
+  },
+  {
+   "kind": "html",
+   "en": "1 server",
+   "zh": "1 台伺服器"
+  },
+  {
+   "kind": "html",
+   "en": "The on-sale spike",
+   "zh": "開賣尖峰"
+  },
+  {
+   "kind": "html",
+   "en": "9 in 10 requests are quick page views. 1 in 10 is a checkout that needs about 8× the work. Each server works through its own line, one request at a time. Capacities are simulated, not benchmarks.",
+   "zh": "10 個請求中有 9 個是快速的頁面瀏覽，1 個是需要大約 8 倍工作量的結帳。每台伺服器依序處理自己的隊伍，一次一個請求。容量是模擬值，不是效能基準。"
+  },
+  {
+   "kind": "html",
+   "en": "Traffic: <b id=\"rateV\">30</b> requests/second",
+   "zh": "流量：每秒 <b id=\"rateV\">30</b> 個請求"
+  },
+  {
+   "kind": "html",
+   "en": "Normal day",
+   "zh": "平常日"
+  },
+  {
+   "kind": "html",
+   "en": "On-sale spike",
+   "zh": "開賣尖峰"
+  },
+  {
+   "kind": "html",
+   "en": "Change the servers",
+   "zh": "調整伺服器"
+  },
+  {
+   "kind": "html",
+   "en": "⬆ Bigger machine (scale up)",
+   "zh": "⬆ 換更大的機器（向上擴展）"
+  },
+  {
+   "kind": "html",
+   "en": "＋ Add a server (scale out)",
+   "zh": "＋ 加一台伺服器（向外擴展）"
+  },
+  {
+   "kind": "html",
+   "en": "✕ Kill a server",
+   "zh": "✕ 關掉一台伺服器"
+  },
+  {
+   "kind": "html",
+   "en": "Load balancer sends each request to",
+   "zh": "負載平衡器把每個請求送到"
+  },
+  {
+   "kind": "html",
+   "en": "Simulation",
+   "zh": "模擬"
+  },
+  {
+   "kind": "html",
+   "en": "Served",
+   "zh": "已服務"
+  },
+  {
+   "kind": "html",
+   "en": "requests finished",
+   "zh": "完成的請求"
+  },
+  {
+   "kind": "html",
+   "en": "P95 latency",
+   "zh": "P95 延遲"
+  },
+  {
+   "kind": "html",
+   "en": "0 ms",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "slowest 1 in 20",
+   "zh": "最慢的 1/20"
+  },
+  {
+   "kind": "html",
+   "en": "Errors",
+   "zh": "錯誤"
+  },
+  {
+   "kind": "html",
+   "en": "503s in the last 3 s",
+   "zh": "最近 3 秒的 503"
+  },
+  {
+   "kind": "html",
+   "en": "Capacity",
+   "zh": "容量"
+  },
+  {
+   "kind": "html",
+   "en": "all servers, roughly",
+   "zh": "所有伺服器合計，概略值"
+  },
+  {
+   "kind": "html",
+   "en": "Press Play to start the traffic.",
+   "zh": "按「播放」開始送出流量。"
+  },
+  {
+   "kind": "html",
+   "en": "Try this",
+   "zh": "試試看"
+  },
+  {
+   "kind": "html",
+   "en": "Scale up (vertical)",
+   "zh": "向上擴展（垂直）"
+  },
+  {
+   "kind": "html",
+   "en": "One bigger machine. No code changes and nothing to coordinate. But there's a largest machine you can buy, upgrading usually means downtime, and when it dies, everything dies with it.",
+   "zh": "一台更大的機器。不用改程式，也不用協調。但能買到的機器有上限，升級通常意味著停機，而且它一掛，所有東西跟著掛。"
+  },
+  {
+   "kind": "html",
+   "en": "Scale out (horizontal)",
+   "zh": "向外擴展（水平）"
+  },
+  {
+   "kind": "html",
+   "en": "More machines behind a <b>load balancer</b>. Grows almost without limit and survives losing a machine. But the app must not keep important state in one server's memory, since the next request may land elsewhere.",
+   "zh": "在<b>負載平衡器（load balancer）</b>後面放更多台機器。幾乎可以無限成長，也撐得過壞掉一台。但 App 不能把重要狀態存在某一台伺服器的記憶體裡，因為下一個請求可能會落到別台。"
+  },
+  {
+   "kind": "html",
+   "en": "The one difference",
+   "zh": "關鍵差別"
+  },
+  {
+   "kind": "html",
+   "en": "Scaling <b>up</b> makes one server stronger. Scaling <b>out</b> adds servers and needs a load balancer to split the traffic. How it splits matters: <b>least connections</b> notices a server stuck on slow requests, while <b>round robin</b> keeps sending it more.",
+   "zh": "<b>向上</b>擴展讓一台伺服器變強。<b>向外</b>擴展增加伺服器數量，需要負載平衡器來分配流量。怎麼分配很重要：<b>最少連線</b>會注意到卡在慢請求上的伺服器，<b>輪詢</b>則會繼續塞更多給它。"
+  },
+  {
+   "kind": "html",
+   "en": "act 2 · the real thing",
+   "zh": "第 2 幕 · 真實世界"
+  },
+  {
+   "kind": "html",
+   "en": "nginx",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "A load balancer is a few lines of config",
+   "zh": "負載平衡器只是幾行設定"
+  },
+  {
+   "kind": "html",
+   "en": "This is nginx, one of the most common load balancers. Cloud load balancers (AWS ALB, Cloudflare, GCP) have the same settings in a web console. <b>Hover or tap a line.</b>",
+   "zh": "這是 nginx，最常見的負載平衡器之一。雲端負載平衡器（AWS ALB、Cloudflare、GCP）在網頁主控台上也有同樣的設定。<b>把滑鼠移到某一行上，或點一下。</b>"
+  },
+  {
+   "kind": "html",
+   "en": "👆 pick a line",
+   "zh": "👆 選一行"
+  },
+  {
+   "kind": "html",
+   "en": "Each highlighted line maps to a control in the lab.",
+   "zh": "每一行反白後，都會對應到實驗室裡的一個控制項。"
+  },
+  {
+   "kind": "html",
+   "en": "recap · keep this",
+   "zh": "重點整理 · 帶走這些"
+  },
+  {
+   "kind": "html",
+   "en": "The whole page on one screen",
+   "zh": "整頁濃縮在一個畫面"
+  },
+  {
+   "kind": "html",
+   "en": "Stronger",
+   "zh": "更強"
+  },
+  {
+   "kind": "html",
+   "en": "Vertical scaling",
+   "zh": "垂直擴展"
+  },
+  {
+   "kind": "html",
+   "en": "A bigger machine. Easiest first step, with a hard ceiling and a single point of failure.",
+   "zh": "一台更大的機器。最簡單的第一步，但有硬性上限，也是單點故障。"
+  },
+  {
+   "kind": "html",
+   "en": "More",
+   "zh": "更多"
+  },
+  {
+   "kind": "html",
+   "en": "Horizontal scaling",
+   "zh": "水平擴展"
+  },
+  {
+   "kind": "html",
+   "en": "More machines. Survives failures and keeps growing, as long as servers are interchangeable (stateless).",
+   "zh": "更多台機器。撐得過故障，也能持續成長，前提是伺服器彼此可以互換（無狀態）。"
+  },
+  {
+   "kind": "html",
+   "en": "Traffic cop",
+   "zh": "交通指揮"
+  },
+  {
+   "kind": "html",
+   "en": "Load balancer",
+   "zh": "負載平衡器"
+  },
+  {
+   "kind": "html",
+   "en": "Splits requests across servers, skips dead ones, and picks a strategy: round robin, least connections, and others.",
+   "zh": "把請求分配到各台伺服器、跳過掛掉的伺服器，並選擇一種策略：輪詢、最少連線等等。"
+  },
+  {
+   "kind": "html",
+   "en": "The tradeoff",
+   "zh": "取捨"
+  },
+  {
+   "kind": "html",
+   "en": "Scaling up is simple until it isn't. Scaling out costs some design work (shared sessions, a shared database) but removes the ceiling and the single point of failure. Most teams start up and move out.",
+   "zh": "向上擴展很簡單，直到它不再簡單。向外擴展需要一些設計工作（共用工作階段、共用資料庫），但能去掉天花板和單點故障。大多數團隊會先向上，再向外。"
+  },
+  {
+   "kind": "html",
+   "en": "Check it",
+   "zh": "考考自己"
+  },
+  {
+   "kind": "js",
+   "en": "'Press <b>Play</b> on a normal day (30 requests/s, 1 medium server).'",
+   "zh": "'在平常日（每秒 30 個請求、1 台 medium 伺服器）按<b>播放</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Plenty of headroom. Every request is served quickly.'",
+   "zh": "'餘裕很多，每個請求都很快就被處理。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Hit <b>On-sale spike</b> (150/s).'",
+   "zh": "'按下<b>開賣尖峰</b>（每秒 150 個）。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The server\\'s line fills up. Requests wait, then get 503 errors.'",
+   "zh": "'伺服器的隊伍滿了。請求先是等待，接著收到 503 錯誤。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Scale <b>up</b>: click “Bigger machine” until one server keeps up.'",
+   "zh": "'<b>向上</b>擴展：一直按「換更大的機器」，直到一台伺服器撐得住。'"
+  },
+  {
+   "kind": "js",
+   "en": "'It works, but there\\'s no bigger machine after x-large.'",
+   "zh": "'有效，但 x-large 之後就沒有更大的機器了。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Now <b>kill</b> that server.'",
+   "zh": "'現在把那台伺服器<b>關掉</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'One machine means one point of failure. Everything is down.'",
+   "zh": "'只有一台機器，就是單點故障。整個服務都掛了。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Scale <b>out</b> instead: add medium servers until the spike is handled.'",
+   "zh": "'改成<b>向外</b>擴展：一直加 medium 伺服器，直到撐住尖峰。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The load balancer spreads the work. Each medium server handles about 70 requests/s.'",
+   "zh": "'負載平衡器把工作分散開來。每台 medium 伺服器大約能處理每秒 70 個請求。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Add one more, then <b>kill one</b> server.'",
+   "zh": "'再加一台，然後<b>關掉其中一台</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The load balancer stops sending to it. Only the requests already in its line fail, and the site stays up.'",
+   "zh": "'負載平衡器不再把請求送給它。只有已經在它隊伍裡的請求會失敗，網站依然正常。'"
+  },
+  {
+   "kind": "js",
+   "en": "'With the spike running, compare <b>Round robin</b> and <b>Least connections</b>.'",
+   "zh": "'尖峰持續時，比較<b>輪詢</b>和<b>最少連線</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Look at the P95 and at each server\\'s line. Round robin keeps feeding a server that got stuck with checkouts.'",
+   "zh": "'看 P95 和每台伺服器的隊伍。輪詢會持續餵給一台卡在結帳請求上的伺服器。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Down'",
+   "zh": "'已停機'"
+  },
+  {
+   "kind": "js",
+   "en": "'Overloaded'",
+   "zh": "'超載'"
+  },
+  {
+   "kind": "js",
+   "en": "'Busy'",
+   "zh": "'忙碌'"
+  },
+  {
+   "kind": "js",
+   "en": "'OK'",
+   "zh": "'正常'"
+  },
+  {
+   "kind": "js",
+   "en": "`<div class=\"nm\"><span>app-${sv.id}</span><span class=\"pill ${state[1]}\">${state[0]}</span></div>\n      <div class=\"mono\">${SIZES[sv.size].name} · ~${reqCap(cap)} req/s</div>\n      <div class=\"bar ${state[1] === 'bad' ? 'risk' : ''}\"><i style=\"width:${util * 100}%\"></i></div>\n      <div class=\"mono\">line: ${sv.alive ? lineLen : '–'}</div>`",
+   "zh": "`<div class=\"nm\"><span>app-${sv.id}</span><span class=\"pill ${state[1]}\">${state[0]}</span></div>\n      <div class=\"mono\">${SIZES[sv.size].name} · 約 ${reqCap(cap)} 請求/秒</div>\n      <div class=\"bar ${state[1] === 'bad' ? 'risk' : ''}\"><i style=\"width:${util * 100}%\"></i></div>\n      <div class=\"mono\">隊伍：${sv.alive ? lineLen : '–'}</div>`"
+  },
+  {
+   "kind": "js",
+   "en": "`${m.alive} of ${S.servers.length} server${S.servers.length > 1 ? 's' : ''} up`",
+   "zh": "`${S.servers.length} 台中有 ${m.alive} 台運作中`"
+  },
+  {
+   "kind": "js",
+   "en": "' ms'",
+   "zh": "' 毫秒'"
+  },
+  {
+   "kind": "js",
+   "en": "'⬆ Already the largest machine'",
+   "zh": "'⬆ 已經是最大的機器'"
+  },
+  {
+   "kind": "js",
+   "en": "'⬆ Bigger machine (scale up)'",
+   "zh": "'⬆ 換更大的機器（向上擴展）'"
+  },
+  {
+   "kind": "js",
+   "en": "'Press Play to start the traffic.'",
+   "zh": "'按「播放」開始送出流量。'"
+  },
+  {
+   "kind": "js",
+   "en": "'✕ Total outage: no servers are left. Every request fails.'",
+   "zh": "'✕ 全面停擺：一台伺服器都不剩，每個請求都失敗。'"
+  },
+  {
+   "kind": "js",
+   "en": "`✕ Overloaded: ${S.rate} requests/s against roughly ${m.cap}/s of capacity. ${m.err} requests got a 503 in the last 3 s.`",
+   "zh": "`✕ 超載：每秒 ${S.rate} 個請求，容量卻只有約每秒 ${m.cap} 個。最近 3 秒有 ${m.err} 個請求收到 503。`"
+  },
+  {
+   "kind": "js",
+   "en": "`⚠ Keeping up, but lines are forming. P95 is ${X.fmt(m.p95)} ms.`",
+   "zh": "`⚠ 撐得住，但隊伍開始形成。P95 為 ${X.fmt(m.p95)} 毫秒。`"
+  },
+  {
+   "kind": "js",
+   "en": "`✓ Healthy: ${m.alive} server${m.alive > 1 ? 's' : ''}, P95 ${X.fmt(m.p95)} ms.`",
+   "zh": "`✓ 健康：${m.alive} 台伺服器，P95 ${X.fmt(m.p95)} 毫秒。`"
+  },
+  {
+   "kind": "js",
+   "en": "`t = ${(S.t / 1000).toFixed(1)} s`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Round robin'",
+   "zh": "'輪詢（Round robin）'"
+  },
+  {
+   "kind": "js",
+   "en": "'Least connections'",
+   "zh": "'最少連線（Least connections）'"
+  },
+  {
+   "kind": "js",
+   "en": "'Random'",
+   "zh": "'隨機'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">upstream</span> encore_app {'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'    <span class=\"key\">least_conn</span>;'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'    <span class=\"key\">server</span> app1.internal:3000;'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'    <span class=\"key\">server</span> app2.internal:3000;'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'    <span class=\"key\">server</span> app3.internal:3000 max_fails=3 fail_timeout=10s;'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">server</span> {'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'    <span class=\"key\">listen</span> 443 ssl;'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'    <span class=\"key\">location</span> / {'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'        <span class=\"key\">proxy_pass</span> http://encore_app;'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'        <span class=\"key\">proxy_next_upstream</span> error timeout;'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'The pool of servers'",
+   "zh": "'伺服器群組'"
+  },
+  {
+   "kind": "js",
+   "en": "'A named group of interchangeable app servers. Scaling out means adding a line to it (or letting autoscaling do it for you).'",
+   "zh": "'一組具名、可互換的應用伺服器。向外擴展就是在這裡多加一行（或交給自動擴展幫你做）。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Balancing algorithm'",
+   "zh": "'平衡演算法'"
+  },
+  {
+   "kind": "js",
+   "en": "'Leave this line out and nginx uses <b>round robin</b>. <code>least_conn</code> sends each request to the server with the fewest active requests. That\\'s the lab\\'s “Least connections”.'",
+   "zh": "'拿掉這一行，nginx 就會使用<b>輪詢</b>。<code>least_conn</code> 會把每個請求送給目前進行中請求最少的伺服器，也就是實驗室裡的「最少連線」。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Servers'",
+   "zh": "'伺服器'"
+  },
+  {
+   "kind": "js",
+   "en": "'Each line is one app server, like the boxes in the lab. They must be interchangeable: same code, no important state kept in local memory.'",
+   "zh": "'每一行是一台應用伺服器，就像實驗室裡的方框。它們必須可以互換：同樣的程式碼，不在本機記憶體裡保存重要狀態。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Skip dead servers'",
+   "zh": "'跳過掛掉的伺服器'"
+  },
+  {
+   "kind": "js",
+   "en": "'After 3 failures, nginx stops sending traffic to this server for 10 s. That\\'s why killing one server only cost the requests already waiting in its line.'",
+   "zh": "'失敗 3 次後，nginx 會在 10 秒內停止把流量送給這台伺服器。這就是為什麼關掉一台伺服器時，只損失了已經在它隊伍裡等的請求。'"
+  },
+  {
+   "kind": "js",
+   "en": "'One front door'",
+   "zh": "'唯一的大門'"
+  },
+  {
+   "kind": "js",
+   "en": "'Fans connect to the load balancer, never to an app server directly. That\\'s what lets you add and remove servers without anyone noticing.'",
+   "zh": "'歌迷連線到負載平衡器，從來不會直接連到應用伺服器。這讓你可以增減伺服器而沒有人察覺。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Forward'",
+   "zh": "'轉送'"
+  },
+  {
+   "kind": "js",
+   "en": "'Pass each request to a server picked from the upstream group.'",
+   "zh": "'把每個請求轉給從 upstream 群組中挑出的一台伺服器。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Try another'",
+   "zh": "'換一台試試'"
+  },
+  {
+   "kind": "js",
+   "en": "'If the chosen server errors or times out, retry the request on a different one. Only safe for requests that can be repeated (see Idempotency, page 10).'",
+   "zh": "'如果選中的伺服器出錯或逾時，就把請求改送到另一台重試。只對可以重複執行的請求才安全（見第 10 頁〈冪等性〉）。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Encore runs on the largest machine the cloud provider sells, and it\\'s at 95% CPU during on-sales. What now?'",
+   "zh": "'Encore 已經跑在雲端供應商賣的最大機器上，開賣時 CPU 還是到 95%。現在怎麼辦？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Upgrade to a bigger machine'",
+   "zh": "'升級成更大的機器'"
+  },
+  {
+   "kind": "js",
+   "en": "'There isn\\'t one. That\\'s the ceiling of vertical scaling.'",
+   "zh": "'沒有更大的了。這就是垂直擴展的天花板。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Scale out: run several servers behind a load balancer'",
+   "zh": "'向外擴展：在負載平衡器後面跑好幾台伺服器'"
+  },
+  {
+   "kind": "js",
+   "en": "'Horizontal scaling has no single-machine ceiling, and it removes the single point of failure.'",
+   "zh": "'水平擴展沒有單一機器的天花板，也去掉了單點故障。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Restart the server more often'",
+   "zh": "'更常重開伺服器'"
+  },
+  {
+   "kind": "js",
+   "en": "'Restarting doesn\\'t add capacity. It just causes short outages.'",
+   "zh": "'重開不會增加容量，只會造成短暫停機。'"
+  },
+  {
+   "kind": "js",
+   "en": "'After scaling out to 3 servers, fans get logged out at random. Why?'",
+   "zh": "'向外擴展到 3 台伺服器之後，歌迷會隨機被登出。為什麼？'"
+  },
+  {
+   "kind": "js",
+   "en": "'The load balancer is broken'",
+   "zh": "'負載平衡器壞了'"
+  },
+  {
+   "kind": "js",
+   "en": "'It\\'s doing its job: spreading requests across servers.'",
+   "zh": "'它正在做它該做的事：把請求分散到各台伺服器。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Sessions are stored in one server\\'s memory, so the next request lands on a server that doesn\\'t know the fan'",
+   "zh": "'工作階段存在某一台伺服器的記憶體裡，所以下一個請求落到一台不認得這位歌迷的伺服器'"
+  },
+  {
+   "kind": "js",
+   "en": "'Horizontal scaling needs stateless servers. Move sessions to a shared store (Redis, the database, or signed cookies).'",
+   "zh": "'水平擴展需要無狀態的伺服器。把工作階段移到共用的儲存空間（Redis、資料庫或簽章過的 cookie）。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Three servers is an unlucky number'",
+   "zh": "'3 台伺服器是不吉利的數字'"
+  },
+  {
+   "kind": "js",
+   "en": "'Any number above one has the same problem while state lives in local memory.'",
+   "zh": "'只要狀態存在本機記憶體裡，任何超過一台的數量都有同樣的問題。'"
+  },
+  {
+   "kind": "js",
+   "en": "'One server keeps getting stuck on slow checkout requests while the others sit idle. Which balancing setting helps most?'",
+   "zh": "'有一台伺服器一直卡在慢速的結帳請求上，其他台卻閒著。哪一種平衡設定最有幫助？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Round robin hands out requests in turn, no matter how busy each server is.'",
+   "zh": "'輪詢會依序分配請求，不管每台伺服器有多忙。'"
+  },
+  {
+   "kind": "js",
+   "en": "'It sends new requests to the server with the fewest active ones, so a server stuck on slow work gets fewer new requests.'",
+   "zh": "'它會把新請求送給進行中請求最少的伺服器，所以卡在慢工作上的伺服器會收到比較少的新請求。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Sending every request to the first server'",
+   "zh": "'把每個請求都送給第一台伺服器'"
+  },
+  {
+   "kind": "js",
+   "en": "'That turns your three servers back into one.'",
+   "zh": "'這等於把你的三台伺服器又變回一台。'"
+  }
+ ]
+}

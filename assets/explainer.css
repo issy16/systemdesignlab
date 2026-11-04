@@ -352,3 +352,10 @@ a.topic:hover{background:var(--accent-3)}
 h1,h2,.mode{font-family:var(--mono);font-weight:600;letter-spacing:-.01em}
 h1{font-size:clamp(28px,4.4vw,42px);line-height:1.15}
 h2{font-size:clamp(20px,3vw,26px);line-height:1.25}
+
+/* Language switcher + Chinese font stacks */
+.acts.langs{margin-left:0}
+.acts.langs a[aria-current="true"]{color:var(--accent-ink);border-color:var(--accent);background:var(--accent-3)}
+:root:lang(zh-Hant){--body:"IBM Plex Sans","Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;--mono:"IBM Plex Mono","Noto Sans TC","PingFang TC",monospace;--label:"Silkscreen","Noto Sans TC","PingFang TC",monospace}
+:root:lang(zh-Hans){--body:"IBM Plex Sans","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;--mono:"IBM Plex Mono","Noto Sans SC","PingFang SC",monospace;--label:"Silkscreen","Noto Sans SC","PingFang SC",monospace}
+:root:lang(zh) p,:root:lang(zh) li{line-height:1.75}

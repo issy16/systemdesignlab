@@ -29,6 +29,7 @@ An interactive site that teaches system design by letting learners see a problem
 | Stack | "Keep the existing stack" plus TypeScript, lint and type checks | **Static HTML, CSS and JS with no build step**, plus shared `assets/explainer.css` and `assets/explainer.js` | The existing CI/CD page had no stack. This keeps it simple, and the theme still lives in one place. |
 | Tests | Unit tests, end-to-end tests, lint, types | **Browser smoke test + mission walkthrough** on every push (`tests/`) | Matches a build-free stack. Unit tests for the simulation functions are a follow-up (see Known gaps). |
 | Hosting | Unknown | **GitHub Pages** from `main`, repo `issy16/systemdesignlab` | Free, static, and deploys on push. |
+| Languages | English only | **English, 繁體中文 (`/zh-tw/`), 简体中文 (`/zh-cn/`)**, generated from the English page plus a translation file | One copy of the simulation code. Simplified is converted from Traditional with OpenCC (Taiwan → mainland vocabulary). |
 
 ## Baseline (audit results)
 
@@ -82,6 +83,7 @@ The random generator state lives inside the simulation state (`s.r`), so a given
 - [ ] Uses tokens and components from `assets/explainer.css`. No copied styles and no hard-coded colors.
 - [ ] The explanation has been checked for technical accuracy by a person.
 - [ ] The page's `status` in `X.CATALOG` is set to `built`, and `node tests/gen-docs.js` has been run.
+- [ ] `i18n/<slug>.json` is fully translated, and `python3 tools/i18n.py build --check` passes.
 
 ## Milestones
 
@@ -98,3 +100,5 @@ The random generator state lives inside the simulation state (`s.r`), so a given
 - The CI/CD page still uses its own inline CSS, has no pager, and its quiz is 5 myth/fact questions instead of 3 scenario questions.
 - Simulation functions live inside each page's script, so they're covered by browser tests but not by unit tests. Moving them to `topic/sim.js` files would allow unit tests without a build step.
 - Accuracy review of pages 1–8 by a person hasn't happened yet.
+- The Chinese translations were written by Claude and haven't been reviewed by a native speaker. Simplified is machine-converted from Traditional, plus fix-ups for terms OpenCC misses.
+- A few labels stay in English on purpose: machine sizes (medium, large, x-large), code, and HTTP status text.

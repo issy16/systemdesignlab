@@ -4,6 +4,15 @@
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const X = (window.X = { reduce });
 
+  /* ---------- UI strings (overridden by assets/i18n.<lang>.js on translated pages) ---------- */
+  X.LANG = document.documentElement.dataset.lang || 'en';
+  X.T = {
+    play: '▶ Play', pause: '❚❚ Pause', step: 'Step', reset: '↺ Reset',
+    run: 'running…', ok: '✓ passed', fail: '✕ failed', wait: '⏸ waiting',
+    right: '✓ Right.', wrong: '✕ Not quite.', nailed: ' · nailed it', retry: ' · re-read the recap, then retry the lab',
+    prev: '← Previous', next: 'Next →', page: n => `page ${n}`, all: 'All topics', roadmap: 'Roadmap',
+  };
+
   /* ---------- DOM ---------- */
   X.$ = (s, r = document) => r.querySelector(s);
   X.$$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -44,17 +53,17 @@
   X.player = (root, o) => {
     const wrap = X.el('div', 'player');
     const mk = (t, cls) => { const b = X.el('button', 'btn sm ' + (cls || ''), t); b.type = 'button'; return b; };
-    const play = mk('▶ Play', 'primary'), step = mk('Step'), reset = mk('↺ Reset');
+    const play = mk(X.T.play, 'primary'), step = mk(X.T.step), reset = mk(X.T.reset);
     play.setAttribute('aria-pressed', 'false');
     const clock = X.el('span', 'clock', '');
     let timer = null;
     const set = on => {
       if (on && !timer) {
         timer = setInterval(() => o.step(), o.ms || 100);
-        play.textContent = '❚❚ Pause'; play.setAttribute('aria-pressed', 'true');
+        play.textContent = X.T.pause; play.setAttribute('aria-pressed', 'true');
       } else if (!on && timer) {
         clearInterval(timer); timer = null;
-        play.textContent = '▶ Play'; play.setAttribute('aria-pressed', 'false');
+        play.textContent = X.T.play; play.setAttribute('aria-pressed', 'false');
       }
     };
     play.onclick = () => set(!timer);
@@ -66,13 +75,12 @@
   };
 
   /* ---------- pipeline chips with a text state ---------- */
-  const ST = { run: 'running…', ok: '✓ passed', fail: '✕ failed', wait: '⏸ waiting', '': '' };
   X.chip = (chip, state, text) => {
     chip.classList.remove('run', 'ok', 'fail', 'wait');
     if (state) chip.classList.add(state);
     let st = chip.querySelector('.st');
     if (!st) { st = X.el('span', 'st'); chip.append(st); }
-    st.textContent = text != null ? text : ST[state || ''];
+    st.textContent = text != null ? text : state ? X.T[state] : '';
   };
 
   /* ---------- segmented control: X.seg(el, ['a','b'], onChange, initial) ---------- */
@@ -138,10 +146,10 @@
           box.querySelectorAll('button').forEach(x => (x.disabled = true));
           b.classList.add(ok ? 'right' : 'wrong');
           if (!ok) box.querySelectorAll('button').forEach((x, i) => opts[i][1] && x.classList.add('right'));
-          why.innerHTML = `<b>${ok ? '✓ Right.' : '✕ Not quite.'}</b> ${w}`;
+          why.innerHTML = `<b>${ok ? X.T.right : X.T.wrong}</b> ${w}`;
           why.hidden = false;
           answered++; if (ok) right++;
-          if (scoreEl) scoreEl.textContent = `· ${right}/${answered}` + (answered === Q.length ? (right === Q.length ? ' · nailed it' : ' · re-read the recap, then retry the lab') : '');
+          if (scoreEl) scoreEl.textContent = `· ${right}/${answered}` + (answered === Q.length ? (right === Q.length ? X.T.nailed : X.T.retry) : '');
         };
         box.append(b);
       });
@@ -298,11 +306,35 @@
     const live = X.CATALOG.filter(p => p.status !== 'planned');
     const i = live.findIndex(p => p.slug === slug);
     const link = (p, cls, label) => p
-      ? `<a class="${cls}" href="../${p.slug}/"><small>${label} · page ${p.n}</small>${p.title}</a>`
+      ? `<a class="${cls}" href="../${p.slug}/"><small>${label} · ${X.T.page(p.n)}</small>${p.title}</a>`
       : '';
     root.innerHTML =
-      link(live[i - 1], 'pv', '← Previous') +
-      `<a href="../"><small>All topics</small>Roadmap</a>` +
-      link(live[i + 1], 'nx', 'Next →');
+      link(live[i - 1], 'pv', X.T.prev) +
+      `<a href="../"><small>${X.T.all}</small>${X.T.roadmap}</a>` +
+      link(live[i + 1], 'nx', X.T.next);
   };
+
+  /* ---------- language switcher: EN / 繁 / 简 in the top bar ---------- */
+  X.langSwitch = () => {
+    const bar = document.querySelector('.topbar-inner');
+    if (!bar || bar.querySelector('.langs')) return;
+    const parts = location.pathname.split('/').filter(Boolean);
+    if (parts[parts.length - 1] === 'index.html') parts.pop();
+    const last = parts[parts.length - 1] || '';
+    const slug = X.CATALOG.some(p => p.slug === last) ? last : '';
+    const depth = (X.LANG === 'en' ? 0 : 1) + (slug ? 1 : 0);
+    const up = '../'.repeat(depth);
+    const nav = X.el('nav', 'acts langs');
+    nav.setAttribute('aria-label', 'Language');
+    [['en', 'EN', 'English'], ['zh-tw', '繁', '繁體中文'], ['zh-cn', '简', '简体中文']].forEach(([code, label, name]) => {
+      const a = X.el('a', '', label);
+      a.href = up + (code === 'en' ? '' : code + '/') + (slug ? slug + '/' : '');
+      a.lang = code === 'en' ? 'en' : code === 'zh-tw' ? 'zh-Hant' : 'zh-Hans';
+      a.title = name;
+      if (code === X.LANG) a.setAttribute('aria-current', 'true');
+      nav.append(a);
+    });
+    bar.append(nav);
+  };
+  X.langSwitch();
 })();

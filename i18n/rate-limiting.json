@@ -1,0 +1,740 @@
+{
+ "page": "rate-limiting",
+ "segments": [
+  {
+   "kind": "attr",
+   "en": "width=device-width, initial-scale=1, viewport-fit=cover",
+   "zh": "="
+  },
+  {
+   "kind": "attr",
+   "en": "Send bursts of requests through a token bucket, fight off a scraper bot, and see why limits belong to each user.",
+   "zh": "讓突發請求通過令牌桶，擋下搶票機器人，並了解為什麼限額應該屬於每一位使用者。"
+  },
+  {
+   "kind": "attr",
+   "en": "Sections",
+   "zh": "章節"
+  },
+  {
+   "kind": "attr",
+   "en": "Ana's request log",
+   "zh": "Ana 的請求紀錄"
+  },
+  {
+   "kind": "attr",
+   "en": "Example 429 response and token bucket code",
+   "zh": "429 回應與令牌桶程式碼範例"
+  },
+  {
+   "kind": "attr",
+   "en": "Pages",
+   "zh": "頁面"
+  },
+  {
+   "kind": "html",
+   "en": "Rate Limiting · System Design Lab",
+   "zh": "限流 · System Design Lab"
+  },
+  {
+   "kind": "html",
+   "en": "system<b>.design.lab</b>",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "Lab",
+   "zh": "實驗室"
+  },
+  {
+   "kind": "html",
+   "en": "The response",
+   "zh": "回應內容"
+  },
+  {
+   "kind": "html",
+   "en": "Recap",
+   "zh": "重點整理"
+  },
+  {
+   "kind": "html",
+   "en": "page 7 · stage 2 · more traffic",
+   "zh": "第 7 頁 · 階段 2 · 更多流量"
+  },
+  {
+   "kind": "html",
+   "en": "Rate limiting, token bucket",
+   "zh": "限流、令牌桶"
+  },
+  {
+   "kind": "html",
+   "en": "One bot shouldn't be able <em>to take the site down for everyone.</em>",
+   "zh": "一個機器人，不該能<em>讓所有人都上不了網站。</em>"
+  },
+  {
+   "kind": "html",
+   "en": "<b>Encore</b>A scalper's bot hits the seat map 150 times a second, looking for cheap seats to resell. The server handles about 50 requests a second. Ana, a real fan, just wants to check out. Your job: slow the bot down without slowing Ana down.",
+   "zh": "<b>Encore</b>黃牛的機器人每秒打座位圖 150 次，想找便宜的座位轉賣。伺服器每秒大約只能處理 50 個請求。Ana 是真正的歌迷，只想順利結帳。你的任務：讓機器人慢下來，但不拖慢 Ana。"
+  },
+  {
+   "kind": "html",
+   "en": "Open the lab ↓",
+   "zh": "打開實驗室 ↓"
+  },
+  {
+   "kind": "html",
+   "en": "lab · break it, then fix it",
+   "zh": "實驗室 · 先弄壞，再修好"
+  },
+  {
+   "kind": "html",
+   "en": "no limit",
+   "zh": "沒有限流"
+  },
+  {
+   "kind": "html",
+   "en": "The token bucket",
+   "zh": "令牌桶（token bucket）"
+  },
+  {
+   "kind": "html",
+   "en": "Each bucket holds up to <b>B</b> tokens and refills at <b>R</b> tokens per second. Every request spends one token. No token means the request is rejected right away with <code>429 Too Many Requests</code>, so the server never has to do that work. Numbers are simulated.",
+   "zh": "每個桶子最多裝 <b>B</b> 個令牌，每秒補充 <b>R</b> 個。每個請求花掉一個令牌。沒有令牌，請求就會立刻被 <code>429 Too Many Requests</code> 拒絕，伺服器完全不用做那份工作。數字是模擬的。"
+  },
+  {
+   "kind": "html",
+   "en": "Rate limiter",
+   "zh": "限流器"
+  },
+  {
+   "kind": "html",
+   "en": "Bucket size B (burst): <b id=\"capV\">10</b> tokens",
+   "zh": "桶子大小 B（突發量）：<b id=\"capV\">10</b> 個令牌"
+  },
+  {
+   "kind": "html",
+   "en": "Refill rate R: <b id=\"refillV\">5</b> tokens/second",
+   "zh": "補充速率 R：每秒 <b id=\"refillV\">5</b> 個令牌"
+  },
+  {
+   "kind": "html",
+   "en": "Traffic",
+   "zh": "流量"
+  },
+  {
+   "kind": "html",
+   "en": "🤖 Bot: off",
+   "zh": "🤖 機器人：關"
+  },
+  {
+   "kind": "html",
+   "en": "Ana: 15 quick clicks",
+   "zh": "Ana：連點 15 下"
+  },
+  {
+   "kind": "html",
+   "en": "Simulation",
+   "zh": "模擬"
+  },
+  {
+   "kind": "html",
+   "en": "Ana's bucket",
+   "zh": "Ana 的桶子"
+  },
+  {
+   "kind": "html",
+   "en": "Bot's bucket",
+   "zh": "機器人的桶子"
+  },
+  {
+   "kind": "html",
+   "en": "Ana's requests",
+   "zh": "Ana 的請求"
+  },
+  {
+   "kind": "html",
+   "en": "succeeded, last 5 s",
+   "zh": "成功率，最近 5 秒"
+  },
+  {
+   "kind": "html",
+   "en": "Bot's requests",
+   "zh": "機器人的請求"
+  },
+  {
+   "kind": "html",
+   "en": "Server load",
+   "zh": "伺服器負載"
+  },
+  {
+   "kind": "html",
+   "en": "~50 requests/s capacity",
+   "zh": "容量約每秒 50 個請求"
+  },
+  {
+   "kind": "html",
+   "en": "Ana's request log",
+   "zh": "Ana 的請求紀錄"
+  },
+  {
+   "kind": "html",
+   "en": "Ana loads a page about once a second.",
+   "zh": "Ana 大約每秒載入一次頁面。"
+  },
+  {
+   "kind": "html",
+   "en": "Press Play to start.",
+   "zh": "按「播放」開始。"
+  },
+  {
+   "kind": "html",
+   "en": "Try this",
+   "zh": "試試看"
+  },
+  {
+   "kind": "html",
+   "en": "The one difference",
+   "zh": "關鍵差別"
+  },
+  {
+   "kind": "html",
+   "en": "A <b>single shared limit</b> protects the server but punishes everyone for the bot's behavior. A <b>limit per user</b> (per account, API key or IP) protects the server <i>and</i> keeps the bot's behavior the bot's problem.",
+   "zh": "<b>單一共用限額</b>能保護伺服器，卻讓所有人一起為機器人的行為受罰。<b>每位使用者各自的限額</b>（依帳號、API 金鑰或 IP）既能保護伺服器，<i>又</i>能讓機器人的行為只影響機器人自己。"
+  },
+  {
+   "kind": "html",
+   "en": "Rate limiting in one line",
+   "zh": "一句話說清楚限流"
+  },
+  {
+   "kind": "html",
+   "en": "Cap how many requests each client can make in a time window, and reject the extra ones cheaply with a 429 before they cost real work. The bucket size allows short bursts; the refill rate sets the long-run limit.",
+   "zh": "限制每個客戶端在一段時間內能發出的請求數，並在多出來的請求耗費真正的工作之前，用 429 便宜地拒絕它們。桶子大小允許短暫的突發；補充速率決定長期的上限。"
+  },
+  {
+   "kind": "html",
+   "en": "act 2 · the real thing",
+   "zh": "第 2 幕 · 真實世界"
+  },
+  {
+   "kind": "html",
+   "en": "http 429",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "What the bot actually receives, and the code behind it",
+   "zh": "機器人實際收到什麼，以及背後的程式碼"
+  },
+  {
+   "kind": "html",
+   "en": "<b>Hover or tap a line.</b>",
+   "zh": "<b>把滑鼠移到某一行上，或點一下。</b>"
+  },
+  {
+   "kind": "html",
+   "en": "👆 pick a line",
+   "zh": "👆 選一行"
+  },
+  {
+   "kind": "html",
+   "en": "Each highlighted line maps to the lab.",
+   "zh": "每一行反白後，都會對應到實驗室。"
+  },
+  {
+   "kind": "html",
+   "en": "recap · keep this",
+   "zh": "重點整理 · 帶走這些"
+  },
+  {
+   "kind": "html",
+   "en": "The whole page on one screen",
+   "zh": "整頁濃縮在一個畫面"
+  },
+  {
+   "kind": "html",
+   "en": "What",
+   "zh": "是什麼"
+  },
+  {
+   "kind": "html",
+   "en": "Rate limit",
+   "zh": "限流"
+  },
+  {
+   "kind": "html",
+   "en": "A cap on requests per client per time window. Extra requests get a fast 429 instead of using up server capacity.",
+   "zh": "限制每個客戶端在每段時間內的請求數。多出來的請求會很快拿到 429，而不是耗掉伺服器容量。"
+  },
+  {
+   "kind": "html",
+   "en": "How",
+   "zh": "怎麼做"
+  },
+  {
+   "kind": "html",
+   "en": "Token bucket",
+   "zh": "令牌桶"
+  },
+  {
+   "kind": "html",
+   "en": "Bucket size = how big a burst is allowed. Refill rate = the sustained limit. Simple, cheap, and the most common algorithm.",
+   "zh": "桶子大小＝允許多大的突發。補充速率＝持續的上限。簡單、便宜，也是最常見的演算法。"
+  },
+  {
+   "kind": "html",
+   "en": "Who",
+   "zh": "針對誰"
+  },
+  {
+   "kind": "html",
+   "en": "Per client",
+   "zh": "每個客戶端各自計算"
+  },
+  {
+   "kind": "html",
+   "en": "Key the bucket by user, API key or IP so one heavy client can't use up everyone's allowance.",
+   "zh": "依使用者、API 金鑰或 IP 建立桶子，這樣一個重度客戶端就不能用光所有人的額度。"
+  },
+  {
+   "kind": "html",
+   "en": "The tradeoff",
+   "zh": "取捨"
+  },
+  {
+   "kind": "html",
+   "en": "Limits that are too tight block real fans at exactly the busiest moment, and limits that are too loose don't protect anything. Allow realistic bursts, limit per client, and tell clients when to come back (<code>Retry-After</code>).",
+   "zh": "限額太緊，會在最忙的那一刻擋掉真正的歌迷；限額太鬆，什麼都保護不了。允許合理的突發、依客戶端限流，並告訴客戶端什麼時候可以再來（<code>Retry-After</code>）。"
+  },
+  {
+   "kind": "html",
+   "en": "Check it",
+   "zh": "考考自己"
+  },
+  {
+   "kind": "js",
+   "en": "'Press <b>Play</b> with no rate limit and the bot off.'",
+   "zh": "'在沒有限流、機器人關閉的情況下按<b>播放</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Ana loads a page about once a second. Everything works.'",
+   "zh": "'Ana 大約每秒載入一次頁面。一切正常。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Turn the <b>bot on</b>.'",
+   "zh": "'把<b>機器人打開</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'150 requests/s against a server that handles 50. The line fills up and Ana starts getting 503s.'",
+   "zh": "'每秒 150 個請求，伺服器卻只能處理 50 個。隊伍塞滿，Ana 開始收到 503。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Switch to <b>One shared bucket</b>.'",
+   "zh": "'切換到<b>一個共用的桶子</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The server is safe now, but the bot spends the shared tokens, so Ana gets 429s too.'",
+   "zh": "'伺服器現在安全了，但機器人花光了共用的令牌，所以 Ana 也收到 429。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Switch to <b>A bucket per user</b>.'",
+   "zh": "'切換到<b>每位使用者一個桶子</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Now the bot only empties its own bucket. Ana keeps getting 200s.'",
+   "zh": "'現在機器人只會掏空自己的桶子。Ana 持續收到 200。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Click <b>Ana: 15 quick clicks</b>.'",
+   "zh": "'點<b>Ana：連點 15 下</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The first 10 pass (that\\'s the bucket size, the allowed burst). The rest wait for the refill.'",
+   "zh": "'前 10 下會通過（這就是桶子大小，也就是允許的突發量）。其餘的要等令牌補充。'"
+  },
+  {
+   "kind": "js",
+   "en": "`${Math.floor(tokens)} of ${S.cap} tokens${label ? ' · ' + label : ''}`",
+   "zh": "`${S.cap} 個令牌中剩 ${Math.floor(tokens)} 個${label ? ' · ' + label : ''}`"
+  },
+  {
+   "kind": "js",
+   "en": "'no limit'",
+   "zh": "'沒有限流'"
+  },
+  {
+   "kind": "js",
+   "en": "'one shared bucket'",
+   "zh": "'一個共用的桶子'"
+  },
+  {
+   "kind": "js",
+   "en": "'bucket per user'",
+   "zh": "'每位使用者一個桶子'"
+  },
+  {
+   "kind": "js",
+   "en": "'🤖 Bot: on (150/s)'",
+   "zh": "'🤖 機器人：開（每秒 150 次）'"
+  },
+  {
+   "kind": "js",
+   "en": "'🤖 Bot: off'",
+   "zh": "'🤖 機器人：關'"
+  },
+  {
+   "kind": "js",
+   "en": "'No limiter'",
+   "zh": "'沒有限流器'"
+  },
+  {
+   "kind": "js",
+   "en": "'Every request goes straight to the server.'",
+   "zh": "'每個請求都直接送到伺服器。'"
+  },
+  {
+   "kind": "js",
+   "en": "'One bucket for everyone'",
+   "zh": "'所有人共用一個桶子'"
+  },
+  {
+   "kind": "js",
+   "en": "'shared by Ana and the bot'",
+   "zh": "'Ana 和機器人共用'"
+  },
+  {
+   "kind": "js",
+   "en": "'Ana\\'s bucket'",
+   "zh": "'Ana 的桶子'"
+  },
+  {
+   "kind": "js",
+   "en": "'Bot\\'s bucket'",
+   "zh": "'機器人的桶子'"
+  },
+  {
+   "kind": "js",
+   "en": "`${m.ana.ok} ok · ${m.ana.r429} × 429 · ${m.ana.r503} × 503`",
+   "zh": "`${m.ana.ok} 成功 · ${m.ana.r429} × 429 · ${m.ana.r503} × 503`"
+  },
+  {
+   "kind": "js",
+   "en": "'succeeded, last 5 s'",
+   "zh": "'成功率，最近 5 秒'"
+  },
+  {
+   "kind": "js",
+   "en": "`${m.bot.ok} ok · ${m.bot.r429} × 429 · ${m.bot.r503} × 503`",
+   "zh": "`${m.bot.ok} 成功 · ${m.bot.r429} × 429 · ${m.bot.r503} × 503`"
+  },
+  {
+   "kind": "js",
+   "en": "`${ts}  GET /seats → 200 OK`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "`${ts}  GET /seats → 429 Too Many Requests (retry in ${Math.max(0.1, l.wait).toFixed(1)} s)`",
+   "zh": "`${ts}  GET /seats → 429 Too Many Requests（${Math.max(0.1, l.wait).toFixed(1)} 秒後重試）`"
+  },
+  {
+   "kind": "js",
+   "en": "`${ts}  GET /seats → 503 Service Unavailable (server overloaded)`",
+   "zh": "`${ts}  GET /seats → 503 Service Unavailable（伺服器超載）`"
+  },
+  {
+   "kind": "js",
+   "en": "'Press Play to start.'",
+   "zh": "'按「播放」開始。'"
+  },
+  {
+   "kind": "js",
+   "en": "'✕ The server is overloaded. The bot\\'s requests fill the line, so Ana\\'s requests fail with 503 too.'",
+   "zh": "'✕ 伺服器超載。機器人的請求塞滿了隊伍，所以 Ana 的請求也以 503 失敗。'"
+  },
+  {
+   "kind": "js",
+   "en": "'✕ The server is safe, but Ana is blocked. Ana shares one bucket with the bot, which spends almost every token.'",
+   "zh": "'✕ 伺服器安全了，但 Ana 被擋住。Ana 和機器人共用一個桶子，而機器人幾乎花光了每一個令牌。'"
+  },
+  {
+   "kind": "js",
+   "en": "'⚠ That burst went past Ana\\'s own limit. The extra clicks just wait for the refill, and the bot can\\'t affect Ana.'",
+   "zh": "'⚠ 剛才那波連點超過了 Ana 自己的限額。多出來的點擊只要等令牌補充，機器人影響不了 Ana。'"
+  },
+  {
+   "kind": "js",
+   "en": "`✓ The bot gets 429s from its own bucket (about ${S.refill} requests/s get through). Ana is unaffected, and the server load stays low.`",
+   "zh": "`✓ 機器人從自己的桶子收到 429（每秒大約只有 ${S.refill} 個請求能通過）。Ana 不受影響，伺服器負載也維持在低檔。`"
+  },
+  {
+   "kind": "js",
+   "en": "'✓ Everything is getting through.'",
+   "zh": "'✓ 全部都順利通過。'"
+  },
+  {
+   "kind": "js",
+   "en": "`t = ${(S.t / 1000).toFixed(1)} s`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'No limit'",
+   "zh": "'沒有限流'"
+  },
+  {
+   "kind": "js",
+   "en": "'One shared bucket'",
+   "zh": "'一個共用的桶子'"
+  },
+  {
+   "kind": "js",
+   "en": "'A bucket per user'",
+   "zh": "'每位使用者一個桶子'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">HTTP/1.1 429 Too Many Requests</span>'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">Retry-After</span>: <span class=\"s\">2</span>'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">RateLimit-Limit</span>: <span class=\"s\">10</span>'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">RateLimit-Remaining</span>: <span class=\"s\">0</span>'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\">// token bucket, one per user</span>'",
+   "zh": "'<span class=\"c\">// 令牌桶，每位使用者一個</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">function</span> allow(userId, now) {'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  <span class=\"key\">const</span> b = buckets.get(userId) ?? { tokens: B, last: now };'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  b.tokens = Math.min(B, b.tokens + (now - b.last) * R);'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  b.last = now;'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  buckets.set(userId, b);'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  <span class=\"key\">if</span> (b.tokens &lt; 1) <span class=\"key\">return false</span>;  <span class=\"c\">// → 429</span>'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  b.tokens -= 1;'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  <span class=\"key\">return true</span>;'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'The standard status code for “you\\'re sending too many requests”. It costs the server almost nothing to send, which is the whole point.'",
+   "zh": "'代表「你送出太多請求了」的標準狀態碼。伺服器送出它幾乎不花成本，這正是重點。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Retry-After'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Tells the client how many seconds to wait. Well-behaved clients wait. That\\'s the “retry in … s” in Ana\\'s log.'",
+   "zh": "'告訴客戶端要等幾秒。守規矩的客戶端會等。這就是 Ana 紀錄裡的「… 秒後重試」。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Limit headers'",
+   "zh": "'限額標頭'"
+  },
+  {
+   "kind": "js",
+   "en": "'Lets clients see their allowance before they hit it. These names come from an IETF draft standard. Many APIs use <code>X-RateLimit-*</code> instead.'",
+   "zh": "'讓客戶端在碰到上限前就知道自己的額度。這些名稱來自 IETF 的標準草案，很多 API 則使用 <code>X-RateLimit-*</code>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'One bucket per user'",
+   "zh": "'每位使用者一個桶子'"
+  },
+  {
+   "kind": "js",
+   "en": "'The bucket is looked up by <code>userId</code>. Use one key for everyone and you get the shared bucket from the lab. Real systems store buckets in Redis so every server shares them.'",
+   "zh": "'桶子是用 <code>userId</code> 查出來的。所有人共用同一個鍵，就是實驗室裡的共用桶子。真實系統會把桶子存在 Redis 裡，讓每台伺服器都共用。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Refill'",
+   "zh": "'補充'"
+  },
+  {
+   "kind": "js",
+   "en": "'Instead of a timer, refill lazily: add R tokens per second that passed since the last request, never more than B.'",
+   "zh": "'不用計時器，而是延遲補充：依照距離上一個請求過了幾秒，補上 R 個令牌，最多不超過 B。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Reject'",
+   "zh": "'拒絕'"
+  },
+  {
+   "kind": "js",
+   "en": "'Out of tokens: refuse now, before any expensive work happens.'",
+   "zh": "'令牌用完了：在任何昂貴的工作開始之前就先拒絕。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Spend'",
+   "zh": "'花費'"
+  },
+  {
+   "kind": "js",
+   "en": "'One request, one token. Expensive endpoints can cost more than one.'",
+   "zh": "'一個請求，一個令牌。昂貴的端點可以花不只一個。'"
+  },
+  {
+   "kind": "js",
+   "en": "'A bucket holds 10 tokens and refills at 1 per second. A full-bucket fan clicks 10 times instantly, then once a second. What happens?'",
+   "zh": "'一個桶子裝 10 個令牌，每秒補充 1 個。桶子滿的歌迷瞬間點了 10 下，之後每秒點一下。會發生什麼事？'"
+  },
+  {
+   "kind": "js",
+   "en": "'All 10 quick clicks pass, and then the 1-per-second clicks keep passing'",
+   "zh": "'10 下快速點擊全部通過，之後每秒一下的點擊也持續通過'"
+  },
+  {
+   "kind": "js",
+   "en": "'The bucket size allows the burst. After that the refill exactly matches 1 click per second.'",
+   "zh": "'桶子大小允許了這次突發。之後補充速率剛好等於每秒點一下。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Only the first click passes'",
+   "zh": "'只有第一下通過'"
+  },
+  {
+   "kind": "js",
+   "en": "'That would be a bucket size of 1. A bigger bucket exists to allow bursts.'",
+   "zh": "'那是桶子大小為 1 的情況。桶子做大就是為了允許突發。'"
+  },
+  {
+   "kind": "js",
+   "en": "'All of them get 429'",
+   "zh": "'全部都收到 429'"
+  },
+  {
+   "kind": "js",
+   "en": "'The bucket starts full, so the burst is allowed.'",
+   "zh": "'桶子一開始是滿的，所以突發是被允許的。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Encore\\'s API has one global limit of 1,000 requests/s. A single partner\\'s buggy script uses all of it. What\\'s the fix?'",
+   "zh": "'Encore 的 API 有一個每秒 1,000 個請求的全域限額。某個合作夥伴有 bug 的腳本把它全部用光了。怎麼修？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Raise the global limit to 10,000'",
+   "zh": "'把全域限額提高到 10,000'"
+  },
+  {
+   "kind": "js",
+   "en": "'The script would just use more. The problem is that one client can use everyone\\'s allowance.'",
+   "zh": "'腳本只會用得更多。問題在於一個客戶端可以用光所有人的額度。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Give each client (API key) its own limit'",
+   "zh": "'給每個客戶端（API 金鑰）各自的限額'"
+  },
+  {
+   "kind": "js",
+   "en": "'Per-client buckets mean the buggy script hits its own limit while other partners carry on.'",
+   "zh": "'每個客戶端各自一個桶子，有 bug 的腳本就只會撞上自己的上限，其他合作夥伴照常運作。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Remove the limit and add more servers'",
+   "zh": "'拿掉限額，加更多伺服器'"
+  },
+  {
+   "kind": "js",
+   "en": "'Then the buggy script just costs you more servers.'",
+   "zh": "'那樣有 bug 的腳本只會讓你花更多錢買伺服器。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Your app receives <code>429</code> with <code>Retry-After: 5</code> from a payment provider. What should it do?'",
+   "zh": "'你的 App 從金流服務收到 <code>429</code> 加上 <code>Retry-After: 5</code>。它該怎麼做？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Retry immediately in a loop until it works'",
+   "zh": "'在迴圈裡立刻重試，直到成功'"
+  },
+  {
+   "kind": "js",
+   "en": "'That makes things worse for everyone, and some providers will block you.'",
+   "zh": "'這會讓所有人的情況更糟，有些服務商還會封鎖你。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Wait about 5 seconds, then retry'",
+   "zh": "'等大約 5 秒，再重試'"
+  },
+  {
+   "kind": "js",
+   "en": "'Respect Retry-After. For repeated failures, wait longer each time (exponential backoff, page 9).'",
+   "zh": "'遵守 Retry-After。連續失敗時，每次等更久（指數退避，第 9 頁）。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Treat it as a permanent failure and give up'",
+   "zh": "'當成永久失敗，直接放棄'"
+  },
+  {
+   "kind": "js",
+   "en": "'429 is temporary by definition. You\\'re just being asked to slow down.'",
+   "zh": "'429 本來就是暫時性的，只是要求你放慢速度。'"
+  }
+ ]
+}

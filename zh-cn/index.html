@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-Hans-CN" data-lang="zh-cn" data-slug="">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="弄坏一个模拟的演唱会售票 App，再亲手修好它，借此学会系统设计。交互页面涵盖 111 个正式环境工程概念。">
+<title>System Design Lab 系统设计实验室</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/explainer.css">
+</head>
+<body>
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="./">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="章节"><a href="#roadmap">学习地图</a><a href="#how">运作方式</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>系统设计实验室</span><span class="hot" id="progress"></span></div>
+  <h1>学系统设计，就从<em>故意把东西弄坏</em>开始。</h1>
+  <p class="lede">每一页都是 <b>Encore</b> 的小型模拟。Encore 是一个虚构的演唱会售票 App，会从一台服务器一路成长为正式上线的系统。你负责灌流量、引发故障、套用解法，亲眼看到它为什么有效。</p>
+  <div class="scenario"><b>认识团队</b>Ana 负责后端，Ben 负责金流，Cai 负责前端，Dee 负责让一切持续运作。每一页都会把他们丢进一个新问题。</div>
+  <div class="row"><a class="btn primary" href="latency-throughput/" style="text-decoration:none">从第 1 页开始 →</a><a class="btn" href="#roadmap" style="text-decoration:none">看所有主题 ↓</a></div>
+</section>
+
+<section class="panel" id="how">
+  <div class="panel-label"><span>每一页怎么进行</span><span class="hot">5 个步骤</span></div>
+  <div class="cards">
+    <div class="card"><div class="sub">1 · 情境</div><div class="t">问题</div><p>一两句话描述 Encore 成长途中遇到的状况。</p></div>
+    <div class="card"><div class="sub">2–3 · 实验室</div><div class="t">弄坏它，再修好它</div><p>附带引导任务的模拟。先引发故障，再套用概念并比较差异。</p></div>
+    <div class="card"><div class="sub">4–5 · 解说、检验</div><div class="t">说出名字，考考自己</div><p>真实的设置档或代码，逐行对照。最后是三题情境题。</p></div>
+  </div>
+  <p class="muted" style="font-size:14px;margin:8px 0 0">所有示范都在你的浏览器里运行。数字是模拟的，用来呈现问题的样貌，不是真实系统的性能基准。</p>
+</section>
+
+<section class="panel" id="roadmap">
+  <div class="panel-label"><span>学习地图</span><span class="hot" id="count"></span></div>
+  <h2>所有主题</h2>
+  <div class="ctl" style="max-width:420px">
+    <label for="find">搜索概念</label>
+    <input class="input" id="find" type="search" placeholder="例如：幂等性、P99、CORS" autocomplete="off">
+  </div>
+  <p class="status" id="findTxt" style="margin-top:10px" role="status"></p>
+  <div id="stages"></div>
+</section>
+</main>
+
+<script src="../assets/explainer.js"></script>
+<script src="../assets/i18n.zh-cn.js"></script>
+<script>
+(() => {
+const { $, el, esc } = X;
+const built = X.CATALOG.filter(p => p.status !== 'planned').length;
+$('#progress').textContent = `已上线 ${built} / ${X.CATALOG.length} 页`;
+$('#count').textContent = `${X.CATALOG.length} 页 · ${X.CONCEPTS.length - 1} 个概念`;
+function draw(q) {
+  const box = $('#stages'); box.innerHTML = '';
+  const query = q.trim().toLowerCase();
+  let shown = 0;
+  X.STAGES.forEach(st => {
+    const pages = X.CATALOG.filter(p => p.stage === st.n).filter(p => !query || p.title.toLowerCase().includes(query) || p.ids.some(id => X.CONCEPTS[id].toLowerCase().includes(query)));
+    if (!pages.length) return;
+    const h = el('div', 'stage-h', `<h3 style="margin:0">阶段 ${st.n} · ${esc(st.name)}</h3><span class="muted" style="font-size:13px">${pages.length} 页</span>`);
+    const grid = el('div', 'topics');
+    pages.forEach(p => {
+      shown++;
+      const live = p.status !== 'planned';
+      const card = el(live ? 'a' : 'div', 'topic' + (live ? '' : ' soon'));
+      if (live) card.href = p.slug + '/';
+      const badge = p.status === 'built' ? '<span class="pill ok">已上线</span>' : p.status === 'partial' ? '<span class="pill wait">部分完成</span>' : '<span class="pill">即将推出</span>';
+      card.innerHTML = `<div class="n"><span>第 ${p.n} 页</span>${badge}</div><div class="t">${esc(p.title)}</div><div class="c">${p.ids.map(id => esc(X.CONCEPTS[id])).join(' · ')}</div>`;
+      grid.append(card);
+    });
+    box.append(h, grid);
+  });
+  $('#findTxt').hidden = !query;
+  $('#findTxt').textContent = shown ? `有 ${shown} 页符合「${q.trim()}」。` : `没有符合「${q.trim()}」的结果。`;
+}
+$('#find').addEventListener('input', e => draw(e.target.value));
+draw('');
+})();
+</script>
+</body>
+</html>

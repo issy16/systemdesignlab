@@ -1,0 +1,900 @@
+{
+ "page": "message-queues",
+ "segments": [
+  {
+   "kind": "attr",
+   "en": "width=device-width, initial-scale=1, viewport-fit=cover",
+   "zh": "="
+  },
+  {
+   "kind": "attr",
+   "en": "Move slow work onto a queue, watch it back up, add workers, apply backpressure, and catch poison messages in a dead letter queue.",
+   "zh": "把慢工作移到佇列上，看它塞車、加開工作者、套用背壓，並用死信佇列接住毒藥訊息。"
+  },
+  {
+   "kind": "attr",
+   "en": "Sections",
+   "zh": "章節"
+  },
+  {
+   "kind": "attr",
+   "en": "Example queue code and config",
+   "zh": "佇列程式碼與設定範例"
+  },
+  {
+   "kind": "attr",
+   "en": "Pages",
+   "zh": "頁面"
+  },
+  {
+   "kind": "html",
+   "en": "Message Queues · System Design Lab",
+   "zh": "訊息佇列 · System Design Lab"
+  },
+  {
+   "kind": "html",
+   "en": "system<b>.design.lab</b>",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "Why a queue",
+   "zh": "為什麼要佇列"
+  },
+  {
+   "kind": "html",
+   "en": "Queue lab",
+   "zh": "佇列實驗室"
+  },
+  {
+   "kind": "html",
+   "en": "The code",
+   "zh": "程式碼"
+  },
+  {
+   "kind": "html",
+   "en": "Recap",
+   "zh": "重點整理"
+  },
+  {
+   "kind": "html",
+   "en": "page 8 · stage 2 · more traffic",
+   "zh": "第 8 頁 · 階段 2 · 更多流量"
+  },
+  {
+   "kind": "html",
+   "en": "Message queues, dead letter queues, backpressure",
+   "zh": "訊息佇列、死信佇列、背壓"
+  },
+  {
+   "kind": "html",
+   "en": "The fan doesn't need to wait <em>for the email to be sent.</em>",
+   "zh": "歌迷不需要等<em>email 寄出去。</em>"
+  },
+  {
+   "kind": "html",
+   "en": "<b>Encore</b>Checkout does three things: charge the card, send the ticket email, then tell the fan “done”. Today the email provider is having a slow day, and every checkout waits for it. Some fans give up and click “Buy” again.",
+   "zh": "<b>Encore</b>結帳要做三件事：刷卡、寄出票券 email，然後告訴歌迷「完成」。今天 email 服務商特別慢，每次結帳都在等它。有些歌迷等不下去，又按了一次「購買」。"
+  },
+  {
+   "kind": "html",
+   "en": "Start ↓",
+   "zh": "開始 ↓"
+  },
+  {
+   "kind": "html",
+   "en": "act 1 · do it now, or do it later",
+   "zh": "第 1 幕 · 現在做，還是晚點做"
+  },
+  {
+   "kind": "html",
+   "en": "inside checkout",
+   "zh": "在結帳流程內"
+  },
+  {
+   "kind": "html",
+   "en": "Buy a ticket",
+   "zh": "買一張票"
+  },
+  {
+   "kind": "html",
+   "en": "Email provider response time: <b id=\"provV\">300 ms</b>",
+   "zh": "Email 服務商回應時間：<b id=\"provV\">300 ms</b>"
+  },
+  {
+   "kind": "html",
+   "en": "Normal day",
+   "zh": "平常日"
+  },
+  {
+   "kind": "html",
+   "en": "Slow day",
+   "zh": "很慢的一天"
+  },
+  {
+   "kind": "html",
+   "en": "The email is sent",
+   "zh": "Email 何時寄出"
+  },
+  {
+   "kind": "html",
+   "en": "&nbsp;",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "Press “Buy a ticket”.",
+   "zh": "按「買一張票」。"
+  },
+  {
+   "kind": "html",
+   "en": "Message queue in one line",
+   "zh": "一句話說清楚訊息佇列"
+  },
+  {
+   "kind": "html",
+   "en": "Instead of doing slow work while someone waits, the app puts a small note (a <b>message</b>) on a <b>queue</b> and answers right away. Separate <b>workers</b> take messages off the queue and do the work at their own pace.",
+   "zh": "與其在有人等待時做慢工作，App 會把一張小紙條（一則<b>訊息</b>）放到<b>佇列（queue）</b>上，然後馬上回應。另外的<b>工作者（worker）</b>會從佇列取出訊息，依自己的步調處理。"
+  },
+  {
+   "kind": "html",
+   "en": "lab · break it, then fix it",
+   "zh": "實驗室 · 先弄壞，再修好"
+  },
+  {
+   "kind": "html",
+   "en": "queue",
+   "zh": "佇列"
+  },
+  {
+   "kind": "html",
+   "en": "The email queue on a busy day",
+   "zh": "忙碌日的 email 佇列"
+  },
+  {
+   "kind": "html",
+   "en": "Each order adds one message to the queue. Each worker sends about <b>4 emails a second</b>. This small broker (the queue server) can hold <b>200 messages</b> in memory. All numbers are simulated.",
+   "zh": "每筆訂單會在佇列中加入一則訊息。每個工作者每秒大約寄出 <b>4 封 email</b>。這台小型 broker（佇列伺服器）的記憶體可以容納 <b>200 則訊息</b>。所有數字都是模擬的。"
+  },
+  {
+   "kind": "html",
+   "en": "Orders: <b id=\"rateV\">4</b> per second",
+   "zh": "訂單：每秒 <b id=\"rateV\">4</b> 筆"
+  },
+  {
+   "kind": "html",
+   "en": "On-sale",
+   "zh": "開賣"
+  },
+  {
+   "kind": "html",
+   "en": "Workers: <b id=\"workersV\">3</b> (≈",
+   "zh": "工作者：<b id=\"workersV\">3</b> 個（≈"
+  },
+  {
+   "kind": "html",
+   "en": "emails/s)",
+   "zh": "封 email/秒）"
+  },
+  {
+   "kind": "html",
+   "en": "When the queue is full",
+   "zh": "佇列滿了的時候"
+  },
+  {
+   "kind": "html",
+   "en": "A message that keeps failing",
+   "zh": "一直失敗的訊息"
+  },
+  {
+   "kind": "html",
+   "en": "＋ Add a broken message",
+   "zh": "＋ 加入一則壞掉的訊息"
+  },
+  {
+   "kind": "html",
+   "en": "Simulation",
+   "zh": "模擬"
+  },
+  {
+   "kind": "html",
+   "en": "Queue",
+   "zh": "佇列"
+  },
+  {
+   "kind": "html",
+   "en": "Workers",
+   "zh": "工作者"
+  },
+  {
+   "kind": "html",
+   "en": "Dead letter queue",
+   "zh": "死信佇列"
+  },
+  {
+   "kind": "html",
+   "en": "Empty.",
+   "zh": "空的。"
+  },
+  {
+   "kind": "html",
+   "en": "Waiting",
+   "zh": "等待中"
+  },
+  {
+   "kind": "html",
+   "en": "messages in queue",
+   "zh": "佇列中的訊息"
+  },
+  {
+   "kind": "html",
+   "en": "Email delay",
+   "zh": "Email 延遲"
+  },
+  {
+   "kind": "html",
+   "en": "age of the oldest message",
+   "zh": "最舊訊息的年齡"
+  },
+  {
+   "kind": "html",
+   "en": "Sent",
+   "zh": "已寄出"
+  },
+  {
+   "kind": "html",
+   "en": "emails delivered",
+   "zh": "已送達的 email"
+  },
+  {
+   "kind": "html",
+   "en": "Lost",
+   "zh": "遺失"
+  },
+  {
+   "kind": "html",
+   "en": "in broker crashes",
+   "zh": "broker 當機時"
+  },
+  {
+   "kind": "html",
+   "en": "Press Play to start taking orders.",
+   "zh": "按「播放」開始接訂單。"
+  },
+  {
+   "kind": "html",
+   "en": "Try this",
+   "zh": "試試看"
+  },
+  {
+   "kind": "html",
+   "en": "Backpressure",
+   "zh": "背壓（Backpressure）"
+  },
+  {
+   "kind": "html",
+   "en": "When the consumer can't keep up, the system tells the producer to <b>slow down</b> (refuse, wait or retry later) instead of buffering forever. A queue with no limit just turns “slow” into “out of memory”.",
+   "zh": "當消費者跟不上時，系統會叫生產者<b>放慢速度</b>（拒絕、等待或稍後重試），而不是無止盡地緩衝。沒有上限的佇列，只會把「慢」變成「記憶體不足」。"
+  },
+  {
+   "kind": "html",
+   "en": "A message that fails again and again (a <b>poison message</b>) is moved aside after a few tries, so it stops blocking workers. A person or a tool looks at the dead letter queue later.",
+   "zh": "一再失敗的訊息（<b>毒藥訊息</b>，poison message）在試過幾次後會被移到一旁，不再卡住工作者。之後由人或工具來檢查死信佇列。"
+  },
+  {
+   "kind": "html",
+   "en": "The one difference",
+   "zh": "關鍵差別"
+  },
+  {
+   "kind": "html",
+   "en": "Without a queue, <b>the fan waits for the slowest step</b>. With a queue, the fan waits only for the steps that matter right now, and the rest catch up. The queue absorbs spikes, but only if its size is limited and its failures go somewhere.",
+   "zh": "沒有佇列時，<b>歌迷要等最慢的那一步</b>。有了佇列，歌迷只要等此刻真正重要的步驟，其他的稍後補上。佇列能吸收尖峰，但前提是它的大小有上限，而且失敗的訊息有地方去。"
+  },
+  {
+   "kind": "html",
+   "en": "act 3 · the real thing",
+   "zh": "第 3 幕 · 真實世界"
+  },
+  {
+   "kind": "html",
+   "en": "code + config",
+   "zh": "程式碼＋設定"
+  },
+  {
+   "kind": "html",
+   "en": "Producer, worker, and two settings",
+   "zh": "生產者、工作者，以及兩個設定"
+  },
+  {
+   "kind": "html",
+   "en": "The syntax is generic. BullMQ, Celery, Sidekiq, SQS and RabbitMQ all follow the same pattern. <b>Hover or tap a line.</b>",
+   "zh": "語法是通用的。BullMQ、Celery、Sidekiq、SQS 和 RabbitMQ 都遵循同樣的模式。<b>把滑鼠移到某一行上，或點一下。</b>"
+  },
+  {
+   "kind": "html",
+   "en": "👆 pick a line",
+   "zh": "👆 選一行"
+  },
+  {
+   "kind": "html",
+   "en": "Each highlighted line maps to a control in the labs.",
+   "zh": "每一行反白後，都會對應到實驗室裡的一個控制項。"
+  },
+  {
+   "kind": "html",
+   "en": "recap · keep this",
+   "zh": "重點整理 · 帶走這些"
+  },
+  {
+   "kind": "html",
+   "en": "The whole page on one screen",
+   "zh": "整頁濃縮在一個畫面"
+  },
+  {
+   "kind": "html",
+   "en": "Decouple",
+   "zh": "解耦"
+  },
+  {
+   "kind": "html",
+   "en": "Message queue",
+   "zh": "訊息佇列"
+  },
+  {
+   "kind": "html",
+   "en": "Producers drop messages, workers process them later. Fast responses, and spikes get absorbed instead of passed on.",
+   "zh": "生產者丟出訊息，工作者稍後處理。回應快速，尖峰被吸收而不是被往下傳。"
+  },
+  {
+   "kind": "html",
+   "en": "Slow down",
+   "zh": "放慢"
+  },
+  {
+   "kind": "html",
+   "en": "Limit the queue and push back on producers when it's full. Bounded is better than out of memory.",
+   "zh": "限制佇列大小，滿了就把壓力推回給生產者。有上限，好過記憶體不足。"
+  },
+  {
+   "kind": "html",
+   "en": "Set aside",
+   "zh": "擱置"
+  },
+  {
+   "kind": "html",
+   "en": "After N failed tries, move the message aside so one bad message can't keep a worker busy forever.",
+   "zh": "失敗 N 次後把訊息移開，這樣一則壞訊息就不會永遠佔住一個工作者。"
+  },
+  {
+   "kind": "html",
+   "en": "The tradeoff",
+   "zh": "取捨"
+  },
+  {
+   "kind": "html",
+   "en": "A queue makes work <b>eventually</b> happen instead of happening <b>now</b>. That's perfect for emails, PDFs and analytics, but the fan's seat must still be reserved during checkout. Watch the queue's length and age: they're your early warning.",
+   "zh": "佇列讓工作<b>最終</b>會完成，而不是<b>現在</b>完成。這非常適合 email、PDF 和分析資料，但歌迷的座位仍然必須在結帳時保留。盯著佇列的長度和年齡：它們是你的早期警訊。"
+  },
+  {
+   "kind": "html",
+   "en": "Check it",
+   "zh": "考考自己"
+  },
+  {
+   "kind": "js",
+   "en": "'Charge card'",
+   "zh": "'刷卡'"
+  },
+  {
+   "kind": "js",
+   "en": "'Add to queue'",
+   "zh": "'加入佇列'"
+  },
+  {
+   "kind": "js",
+   "en": "'Tell the fan'",
+   "zh": "'告訴歌迷'"
+  },
+  {
+   "kind": "js",
+   "en": "'Send email'",
+   "zh": "'寄出 email'"
+  },
+  {
+   "kind": "js",
+   "en": "`${label}<small>${ms ? X.fmt(ms) + ' ms' : ''}</small>`",
+   "zh": "`${label}<small>${ms ? X.fmt(ms) + ' 毫秒' : ''}</small>`"
+  },
+  {
+   "kind": "js",
+   "en": "'Worker: send email<small>later</small>'",
+   "zh": "'工作者：寄出 email<small>稍後</small>'"
+  },
+  {
+   "kind": "js",
+   "en": "' ms'",
+   "zh": "' 毫秒'"
+  },
+  {
+   "kind": "js",
+   "en": "'via queue'",
+   "zh": "'透過佇列'"
+  },
+  {
+   "kind": "js",
+   "en": "'inside checkout'",
+   "zh": "'在結帳流程內'"
+  },
+  {
+   "kind": "js",
+   "en": "'Inside checkout'",
+   "zh": "'在結帳流程內'"
+  },
+  {
+   "kind": "js",
+   "en": "'Later, via a queue'",
+   "zh": "'稍後，透過佇列'"
+  },
+  {
+   "kind": "js",
+   "en": "'✕ timed out'",
+   "zh": "'✕ 逾時'"
+  },
+  {
+   "kind": "js",
+   "en": "'✓ done'",
+   "zh": "'✓ 完成'"
+  },
+  {
+   "kind": "js",
+   "en": "`✕ The fan waited over ${TIMEOUT / 1000} s and got a timeout, even though <b>the card was already charged</b>. Many will click “Buy” again. (That's how double charges happen: see Idempotency, page 10.)`",
+   "zh": "`✕ 歌迷等了超過 ${TIMEOUT / 1000} 秒，最後收到逾時，但<b>卡片其實已經刷過了</b>。很多人會再按一次「購買」。（重複扣款就是這樣發生的：見第 10 頁〈冪等性〉。）`"
+  },
+  {
+   "kind": "js",
+   "en": "'⏸ queued'",
+   "zh": "'⏸ 已排入'"
+  },
+  {
+   "kind": "js",
+   "en": "`✓ The fan sees “done” after <b>${X.fmt(total)} ms</b>, no matter how slow the email provider is. A worker sends the email a moment later${PROV[+$('#prov').value] > 2000 ? ' (it takes a while today, and that\\'s fine)' : ''}.`",
+   "zh": "`✓ 不管 email 服務商多慢，歌迷都在 <b>${X.fmt(total)} 毫秒</b>後看到「完成」。工作者會在片刻之後寄出 email${PROV[+$('#prov').value] > 2000 ? '（今天要等一下，但沒關係）' : ''}。`"
+  },
+  {
+   "kind": "js",
+   "en": "'✓ sent'",
+   "zh": "'✓ 已寄出'"
+  },
+  {
+   "kind": "js",
+   "en": "`${total > 1500 ? '⚠' : '✓'} The fan waited <b>${X.fmt(total)} ms</b>: ${X.fmt(CHARGE)} for the card plus ${X.fmt(total - CHARGE)} for an email they didn't need yet.`",
+   "zh": "`${total > 1500 ? '⚠' : '✓'} 歌迷等了 <b>${X.fmt(total)} 毫秒</b>：刷卡 ${X.fmt(CHARGE)} 毫秒，再加上 ${X.fmt(total - CHARGE)} 毫秒等一封他們現在還不需要的 email。`"
+  },
+  {
+   "kind": "js",
+   "en": "'Press <b>Play</b> on a normal day: 4 orders/s, 3 workers.'",
+   "zh": "'在平常日按<b>播放</b>：每秒 4 筆訂單、3 個工作者。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Workers send emails faster than orders arrive. The queue stays near empty.'",
+   "zh": "'工作者寄信的速度比訂單進來得快，佇列幾乎是空的。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Hit <b>On-sale</b> (30 orders/s) and watch the queue grow.'",
+   "zh": "'按下<b>開賣</b>（每秒 30 筆訂單），看佇列變長。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Checkout is still fast for fans. The cost shows up as email delay, which grows every second.'",
+   "zh": "'對歌迷來說結帳還是很快。代價顯現在 email 延遲上，而且每秒都在增加。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Keep it running with the queue <b>Unbounded</b>.'",
+   "zh": "'讓佇列維持<b>無上限</b>，繼續跑。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The broker fills up, runs out of memory, and every waiting message is lost.'",
+   "zh": "'broker 被塞滿、記憶體用光，所有等待中的訊息全部遺失。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Switch “When the queue is full” to <b>Push back at 100</b>.'",
+   "zh": "'把「佇列滿了的時候」切換成<b>滿 100 就推回</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The queue stops growing. New messages get “busy, try later” instead of crashing everything.'",
+   "zh": "'佇列不再變長。新訊息會收到「忙碌中，請稍後再試」，而不是讓一切當機。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Add <b>workers</b> until the queue drains.'",
+   "zh": "'加開<b>工作者</b>，直到佇列消化完。'"
+  },
+  {
+   "kind": "js",
+   "en": "'30 orders/s needs at least 8 workers at 4 emails/s each. 10 clears the backlog faster.'",
+   "zh": "'每秒 30 筆訂單、每個工作者每秒寄 4 封，至少需要 8 個工作者。開到 10 個能更快清掉積壓。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Click <b>Add a broken message</b> while it\\'s set to retry forever.'",
+   "zh": "'在設定為無限重試時，按<b>加入一則壞掉的訊息</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'It fails, goes back in the queue, fails again… and keeps a worker busy every time.'",
+   "zh": "'它失敗、回到佇列、又失敗……每次都佔住一個工作者。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Switch to <b>Dead letter queue after 3 tries</b>.'",
+   "zh": "'切換到<b>重試 3 次後移到死信佇列</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The broken message is moved aside, and the workers get back to real emails.'",
+   "zh": "'壞掉的訊息被移到一旁，工作者回去寄真正的 email。'"
+  },
+  {
+   "kind": "js",
+   "en": "'bounded queue'",
+   "zh": "'有上限的佇列'"
+  },
+  {
+   "kind": "js",
+   "en": "'unbounded queue'",
+   "zh": "'無上限的佇列'"
+  },
+  {
+   "kind": "js",
+   "en": "`+${S.q.length - 120} more`",
+   "zh": "`另外還有 ${S.q.length - 120} 則`"
+  },
+  {
+   "kind": "js",
+   "en": "'Queue: broker restarting…'",
+   "zh": "'佇列：broker 重新啟動中…'"
+  },
+  {
+   "kind": "js",
+   "en": "`Queue: ${S.q.length} message${S.q.length === 1 ? '' : 's'}${S.bounded ? ` (limit ${LIMIT})` : ''}`",
+   "zh": "`佇列：${S.q.length} 則訊息${S.bounded ? `（上限 ${LIMIT}）` : ''}`"
+  },
+  {
+   "kind": "js",
+   "en": "'Broker crashed: out of memory. Restarting with an empty queue.'",
+   "zh": "'broker 當機：記憶體不足。正以空佇列重新啟動。'"
+  },
+  {
+   "kind": "js",
+   "en": "`Broker memory: ${Math.round(memPct * 100)}% (holds ${MEM} messages)${m.pushed ? ` · ${m.pushed} new messages pushed back in the last 3 s` : ''}`",
+   "zh": "`broker 記憶體：${Math.round(memPct * 100)}%（可容納 ${MEM} 則訊息）${m.pushed ? ` · 最近 3 秒推回了 ${m.pushed} 則新訊息` : ''}`"
+  },
+  {
+   "kind": "js",
+   "en": "`${S.w.filter(w => w.job && w.busy > S.t).length} of ${S.workers} busy${poisonBusy ? ` · ${poisonBusy} stuck on a broken message` : ''}`",
+   "zh": "`${S.workers} 個中有 ${S.w.filter(w => w.job && w.busy > S.t).length} 個忙碌${poisonBusy ? ` · ${poisonBusy} 個卡在壞掉的訊息上` : ''}`"
+  },
+  {
+   "kind": "js",
+   "en": "`${S.dlq.length} message${S.dlq.length > 1 ? 's' : ''} set aside after ${MAX_TRIES} failed tries: “invalid recipient address”. Fix and replay later.`",
+   "zh": "`${S.dlq.length} 則訊息在失敗 ${MAX_TRIES} 次後被擱置：「收件人地址無效」。修好後再重新投遞。`"
+  },
+  {
+   "kind": "js",
+   "en": "'Empty. Broken messages land here after 3 tries.'",
+   "zh": "'空的。壞掉的訊息在 3 次嘗試後會落到這裡。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Off: broken messages are retried forever.'",
+   "zh": "'關閉：壞掉的訊息會被無限重試。'"
+  },
+  {
+   "kind": "js",
+   "en": "`${S.crashes} broker crash${S.crashes > 1 ? 'es' : ''}`",
+   "zh": "`broker 當機 ${S.crashes} 次`"
+  },
+  {
+   "kind": "js",
+   "en": "'in broker crashes'",
+   "zh": "'broker 當機時'"
+  },
+  {
+   "kind": "js",
+   "en": "'Press Play to start taking orders.'",
+   "zh": "'按「播放」開始接訂單。'"
+  },
+  {
+   "kind": "js",
+   "en": "`✕ The broker ran out of memory and crashed. ${X.fmt(S.lost)} ticket emails are gone for good.`",
+   "zh": "`✕ broker 記憶體用光而當機。${X.fmt(S.lost)} 封票券 email 永遠消失了。`"
+  },
+  {
+   "kind": "js",
+   "en": "`✕ A broken message has failed ${S.poisonTries} times and keeps coming back, using up a worker every time.`",
+   "zh": "`✕ 一則壞掉的訊息已經失敗 ${S.poisonTries} 次，還一直回來，每次都用掉一個工作者。`"
+  },
+  {
+   "kind": "js",
+   "en": "`⚠ Backpressure: the queue is full, so new messages are refused (“try again later”). Memory is safe. Add workers to catch up.`",
+   "zh": "`⚠ 背壓：佇列滿了，所以新訊息被拒絕（「請稍後再試」）。記憶體是安全的。加開工作者才能追上進度。`"
+  },
+  {
+   "kind": "js",
+   "en": "`⚠ Orders arrive faster than workers can send (${S.rate}/s in, ~${S.workers * PER_WORKER}/s out). Emails are ${m.age.toFixed(0)} s behind and the delay keeps growing.`",
+   "zh": "`⚠ 訂單進來的速度比工作者寄信的速度快（每秒進 ${S.rate}、出約 ${S.workers * PER_WORKER}）。Email 落後 ${m.age.toFixed(0)} 秒，而且延遲還在增加。`"
+  },
+  {
+   "kind": "js",
+   "en": "`✓ Keeping up: emails go out about ${Math.max(0.3, m.age).toFixed(1)} s after the order.`",
+   "zh": "`✓ 跟得上：email 大約在下單後 ${Math.max(0.3, m.age).toFixed(1)} 秒寄出。`"
+  },
+  {
+   "kind": "js",
+   "en": "`t = ${(S.t / 1000).toFixed(1)} s`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Unbounded'",
+   "zh": "'無上限'"
+  },
+  {
+   "kind": "js",
+   "en": "'Push back at 100'",
+   "zh": "'滿 100 就推回'"
+  },
+  {
+   "kind": "js",
+   "en": "'Retry forever'",
+   "zh": "'無限重試'"
+  },
+  {
+   "kind": "js",
+   "en": "'Dead letter queue after 3 tries'",
+   "zh": "'重試 3 次後移到死信佇列'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\">// checkout: do what matters now, queue the rest</span>'",
+   "zh": "'<span class=\"c\">// 結帳：現在只做重要的，其他排進佇列</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">await</span> payments.charge(order);'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">await</span> queue.send(<span class=\"s\">\"send-ticket-email\"</span>, { orderId: order.id });'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">return</span> res.json({ ok: <span class=\"s\">true</span> });'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\">// worker: a separate process. Run as many copies as you need.</span>'",
+   "zh": "'<span class=\"c\">// 工作者：獨立的行程。需要幾份就跑幾份。</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'queue.process(<span class=\"s\">\"send-ticket-email\"</span>, <span class=\"key\">async</span> (job) =&gt; {'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  <span class=\"key\">await</span> email.sendTicket(job.data.orderId);  <span class=\"c\">// throws → retried</span>'",
+   "zh": "'  <span class=\"key\">await</span> email.sendTicket(job.data.orderId);  <span class=\"c\">// 拋出錯誤 → 重試</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\">// SQS redrive policy: after 3 receives, move it to the DLQ</span>'",
+   "zh": "'<span class=\"c\">// SQS 重新投遞政策：接收 3 次後移到 DLQ</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'{ <span class=\"key\">\"deadLetterTargetArn\"</span>: <span class=\"s\">\"arn:aws:sqs:…:emails-dlq\"</span>,'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  <span class=\"key\">\"maxReceiveCount\"</span>: <span class=\"s\">3</span> }'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\">// RabbitMQ queue limit: refuse new messages when full</span>'",
+   "zh": "'<span class=\"c\">// RabbitMQ 佇列上限：滿了就拒絕新訊息</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'{ <span class=\"key\">\"x-max-length\"</span>: <span class=\"s\">100</span>, <span class=\"key\">\"x-overflow\"</span>: <span class=\"s\">\"reject-publish\"</span> }'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Do the critical part now'",
+   "zh": "'現在就做關鍵的部分'"
+  },
+  {
+   "kind": "js",
+   "en": "'Charging the card (and reserving the seat) must succeed before the fan hears “done”. That stays in the request.'",
+   "zh": "'刷卡（以及保留座位）必須在歌迷聽到「完成」之前成功。這部分留在請求裡。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Produce a message'",
+   "zh": "'產生訊息'"
+  },
+  {
+   "kind": "js",
+   "en": "'A tiny note with just an id. Adding it takes milliseconds, so the fan isn\\'t waiting on the email provider. This is the “Add to queue” step in act 1.'",
+   "zh": "'一張只有 id 的小紙條。加入佇列只要幾毫秒，所以歌迷不用等 email 服務商。這就是第 1 幕的「加入佇列」步驟。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Answer fast'",
+   "zh": "'快速回應'"
+  },
+  {
+   "kind": "js",
+   "en": "'The checkout response no longer depends on how slow the email provider is today.'",
+   "zh": "'結帳的回應時間不再取決於今天 email 服務商有多慢。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Consume'",
+   "zh": "'消費'"
+  },
+  {
+   "kind": "js",
+   "en": "'Workers pull messages and do the slow work. More copies means more throughput. That\\'s the Workers slider.'",
+   "zh": "'工作者拉取訊息並處理慢工作。份數越多，吞吐量越高。這就是「工作者」滑桿。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Retries'",
+   "zh": "'重試'"
+  },
+  {
+   "kind": "js",
+   "en": "'If sending throws, the queue gives the message back for another try. Great for temporary failures, and a trap for permanent ones (the broken message).'",
+   "zh": "'寄送時拋出錯誤，佇列就會把訊息還回去再試一次。對暫時性的失敗很好用，對永久性的失敗則是陷阱（那則壞掉的訊息）。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Dead letter queue'",
+   "zh": "'死信佇列'"
+  },
+  {
+   "kind": "js",
+   "en": "'After <code>maxReceiveCount</code> failed tries, the message moves to a separate queue for a human or a tool to inspect and replay.'",
+   "zh": "'失敗 <code>maxReceiveCount</code> 次後，訊息會移到另一個佇列，讓人或工具檢查並重新投遞。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Backpressure'",
+   "zh": "'背壓'"
+  },
+  {
+   "kind": "js",
+   "en": "'Cap the queue and refuse new messages when it\\'s full, so producers learn to slow down or retry later. No more “out of memory”.'",
+   "zh": "'替佇列設上限，滿了就拒絕新訊息，讓生產者學會放慢或稍後重試。不再「記憶體不足」。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Ticket emails go through a queue. The email provider is down for 10 minutes. What do fans experience?'",
+   "zh": "'票券 email 走佇列。Email 服務商掛了 10 分鐘。歌迷會遇到什麼？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Checkout fails for 10 minutes'",
+   "zh": "'結帳失敗 10 分鐘'"
+  },
+  {
+   "kind": "js",
+   "en": "'Checkout only adds a message to the queue. It doesn\\'t need the email provider.'",
+   "zh": "'結帳只是在佇列中加一則訊息，它不需要 email 服務商。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Checkout works, and the emails arrive late once the provider is back'",
+   "zh": "'結帳正常，等服務商恢復後 email 才晚點寄到'"
+  },
+  {
+   "kind": "js",
+   "en": "'Messages wait in the queue and workers retry. The outage turns into a delay instead of failed purchases.'",
+   "zh": "'訊息在佇列裡等待，工作者會重試。故障變成延遲，而不是購買失敗。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The emails are lost'",
+   "zh": "'Email 遺失了'"
+  },
+  {
+   "kind": "js",
+   "en": "'Messages stay in the queue until they\\'re processed. That\\'s the point of a durable queue.'",
+   "zh": "'訊息會留在佇列中，直到被處理。這就是持久化佇列的意義。'"
+  },
+  {
+   "kind": "js",
+   "en": "'One message has a malformed address. It fails, goes back to the queue, and fails again, thousands of times. What fixes it?'",
+   "zh": "'有一則訊息的地址格式錯誤。它失敗、回到佇列、再失敗，重複了上千次。怎麼修？'"
+  },
+  {
+   "kind": "js",
+   "en": "'More workers'",
+   "zh": "'更多工作者'"
+  },
+  {
+   "kind": "js",
+   "en": "'More workers just fail the same message more often.'",
+   "zh": "'更多工作者只會更頻繁地讓同一則訊息失敗。'"
+  },
+  {
+   "kind": "js",
+   "en": "'A max retry count, then move it to a dead letter queue'",
+   "zh": "'設定最大重試次數，然後把它移到死信佇列'"
+  },
+  {
+   "kind": "js",
+   "en": "'Set it aside after a few tries, alert someone, and fix or replay it later.'",
+   "zh": "'試幾次後把它擱置、通知某人，之後修好或重新投遞。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Delete the queue and start over'",
+   "zh": "'刪掉佇列重來'"
+  },
+  {
+   "kind": "js",
+   "en": "'You\\'d lose every good message along with the bad one.'",
+   "zh": "'你會連同壞訊息把所有好訊息一起丟掉。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The queue length has grown steadily all day and never comes back down. What does that tell you?'",
+   "zh": "'佇列長度一整天穩定成長，從來沒有降下來。這代表什麼？'"
+  },
+  {
+   "kind": "js",
+   "en": "'The queue is doing its job, so nothing is wrong'",
+   "zh": "'佇列在做它該做的事，所以沒有問題'"
+  },
+  {
+   "kind": "js",
+   "en": "'A queue should absorb short spikes. Growth that never ends means the backlog will never be processed.'",
+   "zh": "'佇列應該吸收短暫的尖峰。永不停止的成長，代表積壓永遠處理不完。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Consumers are slower than producers. Add workers, speed up the work, or apply backpressure.'",
+   "zh": "'消費者比生產者慢。加開工作者、加快處理速度，或套用背壓。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Queue length and the age of the oldest message are the two numbers to alert on.'",
+   "zh": "'佇列長度和最舊訊息的年齡，是兩個該設告警的數字。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The broker needs more disk space'",
+   "zh": "'broker 需要更多磁碟空間'"
+  },
+  {
+   "kind": "js",
+   "en": "'More space only delays the problem. The rates in and out don\\'t match.'",
+   "zh": "'更多空間只會延後問題。進出的速率根本對不上。'"
+  }
+ ]
+}

@@ -1,0 +1,1120 @@
+{
+ "page": "ci-cd",
+ "segments": [
+  {
+   "kind": "attr",
+   "en": "width=device-width, initial-scale=1, viewport-fit=cover",
+   "zh": "="
+  },
+  {
+   "kind": "attr",
+   "en": "An interactive explainer that makes CI/CD click: feel the pain, hire a robot, extend the pipeline, read the file.",
+   "zh": "一個讓 CI/CD 真正搞懂的互動解說：先感受痛苦、請一個機器人、延長流水線，最後讀懂設定檔。"
+  },
+  {
+   "kind": "html",
+   "en": "CI/CD, Finally Clicks",
+   "zh": "CI/CD，終於搞懂了"
+  },
+  {
+   "kind": "attr",
+   "en": "Acts",
+   "zh": "章節"
+  },
+  {
+   "kind": "attr",
+   "en": "Example workflow file",
+   "zh": "工作流程檔案範例"
+  },
+  {
+   "kind": "html",
+   "en": "system<b>.design.lab</b>",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "0 · Pain",
+   "zh": "0 · 痛點"
+  },
+  {
+   "kind": "html",
+   "en": "1 · CI",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "2 · CD",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "3 · The file",
+   "zh": "3 · 設定檔"
+  },
+  {
+   "kind": "html",
+   "en": "Recap",
+   "zh": "重點整理"
+  },
+  {
+   "kind": "html",
+   "en": "ci-cd.explained",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "● ready",
+   "zh": "● 準備好了"
+  },
+  {
+   "kind": "html",
+   "en": "You've heard “CI/CD” a hundred times. <em>Let's make it click.</em>",
+   "zh": "「CI/CD」你聽過一百遍了。<em>這次讓它真正搞懂。</em>"
+  },
+  {
+   "kind": "html",
+   "en": "Definitions don't stick. Pain does. In about 5 minutes you'll run a team the old way, watch it fall apart, then fix it one robot at a time.",
+   "zh": "定義記不住，痛才記得住。大約 5 分鐘，你會用老方法帶一個團隊、看它崩潰，然後一次請一個機器人把它修好。"
+  },
+  {
+   "kind": "html",
+   "en": "<b>Act 0</b>Ship the old way and feel why it hurts",
+   "zh": "<b>第 0 幕</b>用老方法出貨，感受為什麼痛"
+  },
+  {
+   "kind": "html",
+   "en": "<b>Act 1 · CI</b>Hire a robot that checks every change",
+   "zh": "<b>第 1 幕 · CI</b>請一個機器人檢查每一次變更"
+  },
+  {
+   "kind": "html",
+   "en": "<b>Act 2 · CD</b>Let the robot pack and ship it too",
+   "zh": "<b>第 2 幕 · CD</b>讓機器人也負責打包和出貨"
+  },
+  {
+   "kind": "html",
+   "en": "<b>Act 3</b>Read the real file. It's shorter than you think.",
+   "zh": "<b>第 3 幕</b>讀真正的設定檔。比你想的短。"
+  },
+  {
+   "kind": "html",
+   "en": "Start ↓",
+   "zh": "開始 ↓"
+  },
+  {
+   "kind": "html",
+   "en": "act 0 · life without ci/cd",
+   "zh": "第 0 幕 · 沒有 CI/CD 的日子"
+  },
+  {
+   "kind": "html",
+   "en": "week 0 / 3",
+   "zh": "第 0 / 3 週"
+  },
+  {
+   "kind": "html",
+   "en": "The old way: everyone codes alone, then merges at the end",
+   "zh": "老方法：每個人各自寫程式，最後才合併"
+  },
+  {
+   "kind": "html",
+   "en": "Four devs each work on their own branch for three weeks. <code>main</code> stays untouched until <b>merge day</b>. Nobody runs the full test suite until then because it's slow and manual.",
+   "zh": "四位開發者各自在自己的分支上工作三週。<code>main</code> 一直沒人動，直到<b>合併日</b>。在那之前沒有人跑完整的測試，因為又慢又要手動。"
+  },
+  {
+   "kind": "html",
+   "en": "Work one week →",
+   "zh": "工作一週 →"
+  },
+  {
+   "kind": "html",
+   "en": "It's merge day 😬",
+   "zh": "合併日到了 😬"
+  },
+  {
+   "kind": "html",
+   "en": "Merging…",
+   "zh": "合併中…"
+  },
+  {
+   "kind": "html",
+   "en": "🐞 Tests finally run: <b>checkout total is wrong</b>. Introduced by Ben… three weeks ago. Ben: “I honestly don't remember writing that.”",
+   "zh": "🐞 測試終於跑了：<b>結帳總金額算錯</b>。是 Ben……三週前寫的。Ben：「我真的不記得我寫過那段。」"
+  },
+  {
+   "kind": "html",
+   "en": "Bug sat unnoticed",
+   "zh": "Bug 沒被發現的時間"
+  },
+  {
+   "kind": "html",
+   "en": "21 days",
+   "zh": "21 天"
+  },
+  {
+   "kind": "html",
+   "en": "Merge conflicts",
+   "zh": "合併衝突"
+  },
+  {
+   "kind": "html",
+   "en": "Time to untangle",
+   "zh": "解開衝突的時間"
+  },
+  {
+   "kind": "html",
+   "en": "~3 days",
+   "zh": "約 3 天"
+  },
+  {
+   "kind": "html",
+   "en": "Finally fixed. Now deploy it, by hand, from the wiki checklist.",
+   "zh": "終於修好了。現在照著 wiki 上的清單，手動部署。"
+  },
+  {
+   "kind": "html",
+   "en": "Click each step in order.",
+   "zh": "依序點擊每個步驟。"
+  },
+  {
+   "kind": "html",
+   "en": "<b>Notice the pattern:</b> every problem came from two things. Changes were <b>checked late</b> (merge day), and shipping was <b>done by hand</b> (the checklist). CI fixes the first. CD fixes the second.",
+   "zh": "<b>注意這個模式：</b>每個問題都來自兩件事。變更<b>太晚才檢查</b>（合併日），出貨<b>靠人工</b>（那張清單）。CI 解決第一件，CD 解決第二件。"
+  },
+  {
+   "kind": "html",
+   "en": "Hire a robot → Act 1",
+   "zh": "請一個機器人 → 第 1 幕"
+  },
+  {
+   "kind": "html",
+   "en": "act 1 · continuous integration",
+   "zh": "第 1 幕 · 持續整合"
+  },
+  {
+   "kind": "html",
+   "en": "ci",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "CI: merge small changes often, and a robot checks every one",
+   "zh": "CI：經常合併小變更，機器人檢查每一次"
+  },
+  {
+   "kind": "html",
+   "en": "Same team, new rule: push <b>small</b> changes to <code>main</code> <b>several times a day</b>. Every push wakes up a robot (a server somewhere) that merges it, builds it, and runs the tests within minutes. Try both buttons.",
+   "zh": "同一個團隊，新規則：<b>一天好幾次</b>把<b>小</b>變更推上 <code>main</code>。每次推送都會叫醒一個機器人（某處的一台伺服器），在幾分鐘內幫你合併、建置、跑測試。兩個按鈕都試試看。"
+  },
+  {
+   "kind": "html",
+   "en": "Push a small change",
+   "zh": "推送一個小變更"
+  },
+  {
+   "kind": "html",
+   "en": "Push a change with a bug",
+   "zh": "推送一個有 bug 的變更"
+  },
+  {
+   "kind": "html",
+   "en": "Fix it (5 min) &amp; push again",
+   "zh": "修好它（5 分鐘）並重新推送"
+  },
+  {
+   "kind": "html",
+   "en": "🤖 push",
+   "zh": "🤖 推送"
+  },
+  {
+   "kind": "html",
+   "en": "waiting…",
+   "zh": "等待中…"
+  },
+  {
+   "kind": "html",
+   "en": "Merge",
+   "zh": "合併"
+  },
+  {
+   "kind": "html",
+   "en": "into main",
+   "zh": "進 main"
+  },
+  {
+   "kind": "html",
+   "en": "Build",
+   "zh": "建置"
+  },
+  {
+   "kind": "html",
+   "en": "compile it",
+   "zh": "編譯"
+  },
+  {
+   "kind": "html",
+   "en": "Test",
+   "zh": "測試"
+  },
+  {
+   "kind": "html",
+   "en": "run all tests",
+   "zh": "跑所有測試"
+  },
+  {
+   "kind": "html",
+   "en": "main",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "Each green push adds a square to <code>main</code>. A red one is stopped before it lands.",
+   "zh": "每次綠燈的推送都會在 <code>main</code> 上加一個方塊。紅燈的會在進去之前被擋下來。"
+  },
+  {
+   "kind": "html",
+   "en": "Why “often”? Drag it.",
+   "zh": "為什麼要「經常」？拖拉看看。"
+  },
+  {
+   "kind": "html",
+   "en": "Team merges into main every: <b id=\"freqLabel\">1 day</b>",
+   "zh": "團隊合併進 main 的頻率：每 <b id=\"freqLabel\">1 天</b>"
+  },
+  {
+   "kind": "html",
+   "en": "1 hour",
+   "zh": "1 小時"
+  },
+  {
+   "kind": "html",
+   "en": "1 day",
+   "zh": "1 天"
+  },
+  {
+   "kind": "html",
+   "en": "3 days",
+   "zh": "3 天"
+  },
+  {
+   "kind": "html",
+   "en": "1 week",
+   "zh": "1 週"
+  },
+  {
+   "kind": "html",
+   "en": "3 weeks",
+   "zh": "3 週"
+  },
+  {
+   "kind": "html",
+   "en": "Lines changed / merge",
+   "zh": "每次合併改動的行數"
+  },
+  {
+   "kind": "html",
+   "en": "Chance of conflict",
+   "zh": "衝突機率"
+  },
+  {
+   "kind": "html",
+   "en": "Bug found after",
+   "zh": "Bug 被發現的時間"
+  },
+  {
+   "kind": "html",
+   "en": "Illustrative numbers, but the shape is real: the longer you wait to merge, the bigger and riskier each merge gets.",
+   "zh": "示意數字，但趨勢是真的：越久才合併，每次合併就越大、越危險。"
+  },
+  {
+   "kind": "html",
+   "en": "CI in one line",
+   "zh": "一句話說清楚 CI"
+  },
+  {
+   "kind": "html",
+   "en": "Merge small changes into main often, and a robot builds and tests each one so problems show up in minutes, not on merge day.",
+   "zh": "經常把小變更合併進 main，由機器人建置並測試每一次，讓問題在幾分鐘內浮現，而不是等到合併日。"
+  },
+  {
+   "kind": "html",
+   "en": "The “I” means <b>integration</b>: combining everyone's code. It's “continuous” because it happens all the time instead of once at the end.",
+   "zh": "「I」指的是<b>整合（integration）</b>：把所有人的程式碼結合起來。說它「持續」，是因為它隨時都在發生，而不是最後才做一次。"
+  },
+  {
+   "kind": "html",
+   "en": "act 2 · continuous delivery / deployment",
+   "zh": "第 2 幕 · 持續交付 / 持續部署"
+  },
+  {
+   "kind": "html",
+   "en": "cd",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "CD: same robot, longer pipeline",
+   "zh": "CD：同一個機器人，更長的流水線"
+  },
+  {
+   "kind": "html",
+   "en": "CI stopped at “tests pass.” CD keeps going: the robot <b>packages</b> the app, puts it on a <b>staging</b> server (a private copy of the real site), and then it goes to <b>production</b>, the site real users see. The one question left: does a human press a button first?",
+   "zh": "CI 停在「測試通過」。CD 會繼續往下：機器人把 App <b>打包</b>，放到 <b>staging</b> 伺服器（真實網站的私人副本），然後送上 <b>production</b>，也就是真正使用者看到的網站。剩下唯一的問題：要不要先由人按一個按鈕？"
+  },
+  {
+   "kind": "html",
+   "en": "A human approves each release",
+   "zh": "每次發布都由人核准"
+  },
+  {
+   "kind": "html",
+   "en": "Continuous Delivery",
+   "zh": "持續交付（Continuous Delivery）"
+  },
+  {
+   "kind": "html",
+   "en": "Every passing change is ready to ship. A person decides <i>when</i>.",
+   "zh": "每個通過的變更都隨時可以出貨，由人決定<i>什麼時候</i>。"
+  },
+  {
+   "kind": "html",
+   "en": "Package",
+   "zh": "打包"
+  },
+  {
+   "kind": "html",
+   "en": "zip it up",
+   "zh": "壓縮起來"
+  },
+  {
+   "kind": "html",
+   "en": "Staging",
+   "zh": "Staging"
+  },
+  {
+   "kind": "html",
+   "en": "private copy",
+   "zh": "私人副本"
+  },
+  {
+   "kind": "html",
+   "en": "🔘 Human",
+   "zh": "🔘 人工"
+  },
+  {
+   "kind": "html",
+   "en": "approves",
+   "zh": "核准"
+  },
+  {
+   "kind": "html",
+   "en": "Production",
+   "zh": "Production"
+  },
+  {
+   "kind": "html",
+   "en": "real users",
+   "zh": "真實使用者"
+  },
+  {
+   "kind": "html",
+   "en": "Push a change",
+   "zh": "推送一個變更"
+  },
+  {
+   "kind": "html",
+   "en": "Release to users ▶",
+   "zh": "發布給使用者 ▶"
+  },
+  {
+   "kind": "html",
+   "en": "Latest commit",
+   "zh": "最新提交"
+  },
+  {
+   "kind": "html",
+   "en": "Staging (ready to ship)",
+   "zh": "Staging（隨時可出貨）"
+  },
+  {
+   "kind": "html",
+   "en": "Production (users see)",
+   "zh": "Production（使用者看到的）"
+  },
+  {
+   "kind": "html",
+   "en": "Push a few changes with the switch on, then turn it off and push again.",
+   "zh": "開關打開時推送幾次變更，然後關掉開關，再推送。"
+  },
+  {
+   "kind": "html",
+   "en": "The two CDs, settled",
+   "zh": "兩種 CD，一次說清楚"
+  },
+  {
+   "kind": "html",
+   "en": "Continuous <b>Delivery</b>: every passing change is ready to ship, and a human presses the button. Continuous <b>Deployment</b>: there's no button, and passing changes go straight to users.",
+   "zh": "持續<b>交付（Delivery）</b>：每個通過的變更都隨時可以出貨，由人按下按鈕。持續<b>部署（Deployment）</b>：沒有按鈕，通過的變更直接送到使用者面前。"
+  },
+  {
+   "kind": "html",
+   "en": "Both need CI underneath. CD without good tests just ships bugs faster.",
+   "zh": "兩者底下都需要 CI。沒有好的測試，CD 只是更快地把 bug 送出去。"
+  },
+  {
+   "kind": "html",
+   "en": "act 3 · the actual file",
+   "zh": "第 3 幕 · 真正的設定檔"
+  },
+  {
+   "kind": "html",
+   "en": ".yml",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "The robot reads a short to-do list",
+   "zh": "機器人讀的是一張短短的待辦清單"
+  },
+  {
+   "kind": "html",
+   "en": "This is a real GitHub Actions file for everything you just watched. It lives in the repo at <code>.github/workflows/ship.yml</code>. <b>Hover or tap a line</b> to see which stage it is.",
+   "zh": "這是一個真實的 GitHub Actions 檔案，涵蓋你剛剛看到的一切。它放在 repo 的 <code>.github/workflows/ship.yml</code>。<b>把滑鼠移到某一行上，或點一下</b>，看看它是哪個階段。"
+  },
+  {
+   "kind": "html",
+   "en": "Trigger",
+   "zh": "觸發"
+  },
+  {
+   "kind": "html",
+   "en": "Robot",
+   "zh": "機器人"
+  },
+  {
+   "kind": "html",
+   "en": "Checkout",
+   "zh": "取出程式碼"
+  },
+  {
+   "kind": "html",
+   "en": "Gate",
+   "zh": "關卡"
+  },
+  {
+   "kind": "html",
+   "en": "Prod",
+   "zh": "Prod"
+  },
+  {
+   "kind": "html",
+   "en": "👆 pick a line",
+   "zh": "👆 選一行"
+  },
+  {
+   "kind": "html",
+   "en": "Each highlighted line maps to one stage of the pipeline above.",
+   "zh": "每一行反白後，都會對應到上面流水線的一個階段。"
+  },
+  {
+   "kind": "html",
+   "en": "<b>The big reveal:</b> a pipeline is just <b>a trigger</b> (“when someone pushes”) + <b>a list of commands</b> (the same ones you'd type yourself) + <b>a borrowed computer</b> to run them on. GitHub Actions, GitLab CI, Jenkins and CircleCI are all the same idea, just different robots reading different file formats.",
+   "zh": "<b>真相大白：</b>流水線不過就是<b>一個觸發條件</b>（「有人推送時」）＋<b>一串指令</b>（就是你自己會打的那些）＋<b>一台借來的電腦</b>來執行它們。GitHub Actions、GitLab CI、Jenkins、CircleCI 都是同一個概念，只是不同的機器人，讀不同格式的檔案。"
+  },
+  {
+   "kind": "html",
+   "en": "recap · keep this",
+   "zh": "重點整理 · 帶走這些"
+  },
+  {
+   "kind": "html",
+   "en": "The whole thing on one screen",
+   "zh": "整件事濃縮在一個畫面"
+  },
+  {
+   "kind": "html",
+   "en": "Continuous Integration",
+   "zh": "持續整合（Continuous Integration）"
+  },
+  {
+   "kind": "html",
+   "en": "CI",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "Merge small changes often. A robot builds and tests every one. Bugs show up in minutes, while they're still cheap to fix.",
+   "zh": "經常合併小變更。機器人建置並測試每一次。Bug 在幾分鐘內浮現，那時修起來還很便宜。"
+  },
+  {
+   "kind": "html",
+   "en": "CD (with button)",
+   "zh": "CD（有按鈕）"
+  },
+  {
+   "kind": "html",
+   "en": "The robot also packages and stages every passing change, so it's always ready to ship. A human picks when.",
+   "zh": "機器人還會打包並部署每一個通過的變更到 staging，所以隨時可以出貨。由人決定什麼時候。"
+  },
+  {
+   "kind": "html",
+   "en": "Continuous Deployment",
+   "zh": "持續部署（Continuous Deployment）"
+  },
+  {
+   "kind": "html",
+   "en": "CD (no button)",
+   "zh": "CD（沒有按鈕）"
+  },
+  {
+   "kind": "html",
+   "en": "Same pipeline, no button. Every change that passes goes straight to users.",
+   "zh": "同樣的流水線，沒有按鈕。每個通過的變更都直接送到使用者面前。"
+  },
+  {
+   "kind": "html",
+   "en": "Why any of it exists",
+   "zh": "為什麼需要這一切"
+  },
+  {
+   "kind": "html",
+   "en": "A problem found minutes after you write it takes minutes to fix. Found three weeks later, it takes days. CI/CD makes “minutes later” the default.",
+   "zh": "寫完幾分鐘就發現的問題，幾分鐘就能修好。三週後才發現，就要花好幾天。CI/CD 讓「幾分鐘後」變成預設。"
+  },
+  {
+   "kind": "html",
+   "en": "Myth or fact?",
+   "zh": "迷思還是事實？"
+  },
+  {
+   "kind": "html",
+   "en": "<b>P.S.</b> Next time you see a ✅ or ❌ next to a commit on GitHub, that's the robot from Act 1 reporting back. A “Deploy” job after it is Act 2.",
+   "zh": "<b>附註：</b>下次你在 GitHub 的提交旁邊看到 ✅ 或 ❌，那就是第 1 幕的機器人在回報。後面接著的「Deploy」工作就是第 2 幕。"
+  },
+  {
+   "kind": "js",
+   "en": "'(prefers-reduced-motion: reduce)'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Ana'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Ben'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Cai'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Dee'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "`week ${week} / 3`",
+   "zh": "`第 ${week} / 3 週`"
+  },
+  {
+   "kind": "js",
+   "en": "'3 weeks done'",
+   "zh": "'3 週結束了'"
+  },
+  {
+   "kind": "js",
+   "en": "'cart.js: Ana and Cai both rewrote calculateTotal()'",
+   "zh": "'cart.js：Ana 和 Cai 都改寫了 calculateTotal()'"
+  },
+  {
+   "kind": "js",
+   "en": "'styles.css: 4 overlapping edits to .header'",
+   "zh": "'styles.css：對 .header 有 4 處重疊的修改'"
+  },
+  {
+   "kind": "js",
+   "en": "'api/users.js: Ben renamed a function Dee still calls'",
+   "zh": "'api/users.js：Ben 改了一個 Dee 還在呼叫的函式名稱'"
+  },
+  {
+   "kind": "js",
+   "en": "'package.json: two different versions of the date library'",
+   "zh": "'package.json：兩個不同版本的日期函式庫'"
+  },
+  {
+   "kind": "js",
+   "en": "'checkout.js: Ana and Ben edited the same 40 lines'",
+   "zh": "'checkout.js：Ana 和 Ben 改了同樣的 40 行'"
+  },
+  {
+   "kind": "js",
+   "en": "'config.json: three different API URLs'",
+   "zh": "'config.json：三個不同的 API 網址'"
+  },
+  {
+   "kind": "js",
+   "en": "'auth.js: Dee deleted a file Cai changed'",
+   "zh": "'auth.js：Dee 刪掉了一個 Cai 改過的檔案'"
+  },
+  {
+   "kind": "js",
+   "en": "'utils/date.js: duplicated helper, slightly different'",
+   "zh": "'utils/date.js：重複的輔助函式，而且稍有不同'"
+  },
+  {
+   "kind": "js",
+   "en": "'README.md: 3 versions of the setup steps'",
+   "zh": "'README.md：3 個版本的安裝步驟'"
+  },
+  {
+   "kind": "js",
+   "en": "`CONFLICT ${c}`",
+   "zh": "`衝突 ${c}`"
+  },
+  {
+   "kind": "js",
+   "en": "'SSH into the production server'",
+   "zh": "'SSH 登入正式伺服器'"
+  },
+  {
+   "kind": "js",
+   "en": "'git pull the new code'",
+   "zh": "'git pull 新的程式碼'"
+  },
+  {
+   "kind": "js",
+   "en": "'npm install on the server'",
+   "zh": "'在伺服器上 npm install'"
+  },
+  {
+   "kind": "js",
+   "en": "'Copy the config file (.env) into place'",
+   "zh": "'把設定檔（.env）複製到位'"
+  },
+  {
+   "kind": "js",
+   "en": "'Restart the server'",
+   "zh": "'重新啟動伺服器'"
+  },
+  {
+   "kind": "js",
+   "en": "'Click around to check it works'",
+   "zh": "'到處點點看，確認它能用'"
+  },
+  {
+   "kind": "js",
+   "en": "`<span class=\"box\"></span><span>${s}</span>`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "`${s}<br><small style=\"color:var(--bad)\">Copied the <b>staging</b> config by mistake. Site is down. It's Friday, 6:47pm.</small>`",
+   "zh": "`${s}<br><small style=\"color:var(--bad)\">不小心複製成 <b>staging</b> 的設定檔。網站掛了。現在是星期五晚上 6:47。</small>`"
+  },
+  {
+   "kind": "js",
+   "en": "'fixed a typo on the login page'",
+   "zh": "'修正登入頁的錯字'"
+  },
+  {
+   "kind": "js",
+   "en": "'added a \"sort by price\" option'",
+   "zh": "'新增「依價格排序」選項'"
+  },
+  {
+   "kind": "js",
+   "en": "'made the button a little bigger'",
+   "zh": "'把按鈕稍微放大'"
+  },
+  {
+   "kind": "js",
+   "en": "'added a test for the cart'",
+   "zh": "'替購物車加了一個測試'"
+  },
+  {
+   "kind": "js",
+   "en": "'updated the footer links'",
+   "zh": "'更新頁尾連結'"
+  },
+  {
+   "kind": "js",
+   "en": "`${dev.n} · ${buggy ? 'cart edit' : goodMsgs[pushN % goodMsgs.length].split(' ').slice(0, 2).join(' ')}`",
+   "zh": "`${dev.n} · ${buggy ? '修改購物車' : goodMsgs[pushN % goodMsgs.length]}`"
+  },
+  {
+   "kind": "js",
+   "en": "`<p class=\"muted\">🤖 ${dev.n} pushed. The robot wakes up…</p>`",
+   "zh": "`<p class=\"muted\">🤖 ${dev.n} 推送了。機器人醒來了…</p>`"
+  },
+  {
+   "kind": "js",
+   "en": "`<ul class=\"events\"><li>❌ <b>Test failed: checkout total is wrong.</b> Caught <b>${t} seconds</b> after ${dev.n} pushed. ${dev.n} still has the file open and gets a ping right away. <code>main</code> stays clean.</li></ul>`",
+   "zh": "`<ul class=\"events\"><li>❌ <b>測試失敗：結帳總金額算錯。</b>在 ${dev.n} 推送後 <b>${t} 秒</b>就抓到了。${dev.n} 的檔案都還開著，馬上就收到通知。<code>main</code> 保持乾淨。</li></ul>`"
+  },
+  {
+   "kind": "js",
+   "en": "`<ul class=\"events\"><li class=\"ok\">✅ All green in ${t}s. ${dev.n}'s change is now in <code>main</code>, so everyone else builds on top of it right away. No merge day.</li></ul>`",
+   "zh": "`<ul class=\"events\"><li class=\"ok\">✅ ${t} 秒內全部綠燈。${dev.n} 的變更現在已經進了 <code>main</code>，其他人可以馬上在它上面繼續開發。沒有合併日。</li></ul>`"
+  },
+  {
+   "kind": "js",
+   "en": "' <br>Total cost of that bug: <b>about 5 minutes</b>. Compare: 3 days in Act 0.'",
+   "zh": "' <br>這個 bug 的總成本：<b>大約 5 分鐘</b>。對照：第 0 幕花了 3 天。'"
+  },
+  {
+   "kind": "js",
+   "en": "'1 hour'",
+   "zh": "'1 小時'"
+  },
+  {
+   "kind": "js",
+   "en": "'1 day'",
+   "zh": "'1 天'"
+  },
+  {
+   "kind": "js",
+   "en": "'3 days'",
+   "zh": "'3 天'"
+  },
+  {
+   "kind": "js",
+   "en": "'1 week'",
+   "zh": "'1 週'"
+  },
+  {
+   "kind": "js",
+   "en": "'3 weeks'",
+   "zh": "'3 週'"
+  },
+  {
+   "kind": "js",
+   "en": "'Continuous Delivery'",
+   "zh": "'持續交付（Continuous Delivery）'"
+  },
+  {
+   "kind": "js",
+   "en": "'Continuous Deployment'",
+   "zh": "'持續部署（Continuous Deployment）'"
+  },
+  {
+   "kind": "js",
+   "en": "'Every passing change is ready to ship. A person decides <i>when</i>.'",
+   "zh": "'每個通過的變更都隨時可以出貨，由人決定<i>什麼時候</i>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'No button. Every change that passes the pipeline goes straight to users.'",
+   "zh": "'沒有按鈕。每個通過流水線的變更都直接送到使用者面前。'"
+  },
+  {
+   "kind": "js",
+   "en": "`<p class=\"muted\">🤖 v${v.commit} pushed. CI first, then the CD stages…</p>`",
+   "zh": "`<p class=\"muted\">🤖 v${v.commit} 推送了。先跑 CI，再跑 CD 的階段…</p>`"
+  },
+  {
+   "kind": "js",
+   "en": "`Release v${v.staging} to users ▶`",
+   "zh": "`把 v${v.staging} 發布給使用者 ▶`"
+  },
+  {
+   "kind": "js",
+   "en": "`<ul class=\"events\"><li class=\"warn\">⏸ v${v.staging} passed everything and is <b>sitting on staging, ready to ship</b>. Users are still on v${v.prod}${behind > 1 ? ` (${behind} versions behind, which is fine; you choose when)` : ''}. Push more, or press Release.</li></ul>`",
+   "zh": "`<ul class=\"events\"><li class=\"warn\">⏸ v${v.staging} 全部通過，正<b>在 staging 待命、隨時可以出貨</b>。使用者還在用 v${v.prod}${behind > 1 ? `（落後 ${behind} 個版本，沒關係，由你決定什麼時候）` : ''}。繼續推送，或按下發布。</li></ul>`"
+  },
+  {
+   "kind": "js",
+   "en": "`<ul class=\"events\"><li class=\"ok\">🚀 v${v.prod} is live for users. No button, no checklist, no Friday-night SSH. It was pushed a few seconds ago.</li></ul>`",
+   "zh": "`<ul class=\"events\"><li class=\"ok\">🚀 v${v.prod} 已經上線給使用者。沒有按鈕、沒有清單、沒有星期五晚上的 SSH。它幾秒前才推送。</li></ul>`"
+  },
+  {
+   "kind": "js",
+   "en": "`<ul class=\"events\"><li class=\"ok\">🚀 A human pressed one button and v${v.prod} is live. The robot did every actual step, exactly the same way every time.</li></ul>`",
+   "zh": "`<ul class=\"events\"><li class=\"ok\">🚀 有人按了一個按鈕，v${v.prod} 就上線了。每一個實際的步驟都是機器人做的，而且每次做法都完全一樣。</li></ul>`"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">name</span>: ship-it'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">on</span>:'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  <span class=\"key\">push</span>:'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'    <span class=\"key\">branches</span>: [main]'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">jobs</span>:'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  <span class=\"key\">ci</span>:'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'    <span class=\"key\">runs-on</span>: <span class=\"s\">ubuntu-latest</span>'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'    <span class=\"key\">steps</span>:'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'      - <span class=\"key\">uses</span>: <span class=\"s\">actions/checkout@v4</span>'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'      - <span class=\"key\">run</span>: <span class=\"s\">npm ci &amp;&amp; npm run build</span>'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'      - <span class=\"key\">run</span>: <span class=\"s\">npm test</span>'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'      - <span class=\"key\">uses</span>: <span class=\"s\">actions/upload-artifact@v4</span>'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'        <span class=\"key\">with</span>: { name: app, path: dist }'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  <span class=\"key\">deploy-staging</span>:'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'    <span class=\"key\">needs</span>: ci'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'      - <span class=\"key\">run</span>: <span class=\"s\">./deploy.sh staging</span>'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'  <span class=\"key\">deploy-prod</span>:'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'    <span class=\"key\">needs</span>: deploy-staging'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'    <span class=\"key\">environment</span>: <span class=\"s\">production</span>  <span class=\"c\"># requires approval</span>'",
+   "zh": "'    <span class=\"key\">environment</span>: <span class=\"s\">production</span>  <span class=\"c\"># 需要核准</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'      - <span class=\"key\">run</span>: <span class=\"s\">./deploy.sh production</span>'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Trigger: “when”'",
+   "zh": "'觸發：「什麼時候」'"
+  },
+  {
+   "kind": "js",
+   "en": "'Run this whenever someone pushes to <code>main</code>. This is the “continuous” part: nobody starts the robot, the push does.'",
+   "zh": "'每當有人推送到 <code>main</code> 就執行。這就是「持續」的部分：不是人去啟動機器人，是推送啟動的。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Robot: “where”'",
+   "zh": "'機器人：「在哪裡」'"
+  },
+  {
+   "kind": "js",
+   "en": "'Borrow a fresh Linux machine from GitHub for a few minutes. That machine is the robot. It starts clean every time, so “works on my machine” can\\'t sneak in.'",
+   "zh": "'向 GitHub 借一台全新的 Linux 機器用幾分鐘。那台機器就是機器人。它每次都從乾淨的狀態開始，所以「在我電腦上可以跑」混不進來。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Checkout'",
+   "zh": "'取出程式碼（Checkout）'"
+  },
+  {
+   "kind": "js",
+   "en": "'Download the latest code, including the change that was just merged. This is the <b>integration</b> in CI.'",
+   "zh": "'下載最新的程式碼，包括剛合併的變更。這就是 CI 裡的<b>整合</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Build'",
+   "zh": "'建置'"
+  },
+  {
+   "kind": "js",
+   "en": "'The exact commands you\\'d type yourself. If the code doesn\\'t even compile, stop here.'",
+   "zh": "'就是你自己會打的那些指令。如果程式碼連編譯都過不了，就停在這裡。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Test'",
+   "zh": "'測試'"
+  },
+  {
+   "kind": "js",
+   "en": "'Run every automated test. This one line is why CI is useful. No tests means the robot has nothing to check.'",
+   "zh": "'跑每一個自動化測試。CI 有用全靠這一行。沒有測試，機器人就沒有東西可以檢查。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Package'",
+   "zh": "'打包'"
+  },
+  {
+   "kind": "js",
+   "en": "'Save the built app as a file (an “artifact”). Every later stage ships <i>this exact file</i>, not a rebuild.'",
+   "zh": "'把建置好的 App 存成一個檔案（「artifact」）。之後的每個階段出貨的都是<i>這個檔案</i>，而不是重新建置。'"
+  },
+  {
+   "kind": "js",
+   "en": "'needs: “in order”'",
+   "zh": "'needs：「依序」'"
+  },
+  {
+   "kind": "js",
+   "en": "'Only start if the previous job passed. One red stage stops everything after it. That\\'s what makes it a pipeline.'",
+   "zh": "'只有前一個工作通過才會開始。只要一個階段亮紅燈，後面的全部停止。這就是它被稱為流水線的原因。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Deploy to staging'",
+   "zh": "'部署到 staging'"
+  },
+  {
+   "kind": "js",
+   "en": "'Put it on a private copy of the real site. From here on it\\'s CD: the change is <b>ready to ship</b>.'",
+   "zh": "'放到真實網站的私人副本上。從這裡開始就是 CD：變更已經<b>隨時可以出貨</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The human button'",
+   "zh": "'人工按鈕'"
+  },
+  {
+   "kind": "js",
+   "en": "'In GitHub settings, the <code>production</code> environment can require a reviewer. <b>Keep this line and you have Continuous Delivery. Delete it and you have Continuous Deployment.</b> One line is the whole difference.'",
+   "zh": "'在 GitHub 設定中，<code>production</code> 環境可以要求審核者。<b>保留這一行，就是持續交付；刪掉它，就是持續部署。</b>整個差別就在這一行。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Deploy to production'",
+   "zh": "'部署到 production'"
+  },
+  {
+   "kind": "js",
+   "en": "'Ship to real users. The robot runs the same script every time, so there\\'s no wiki checklist and no forgotten config file.'",
+   "zh": "'送到真實使用者面前。機器人每次都跑同一個腳本，所以沒有 wiki 清單，也不會忘記設定檔。'"
+  },
+  {
+   "kind": "js",
+   "en": "'CI/CD is a tool, like Jenkins or GitHub Actions.'",
+   "zh": "'CI/CD 是一種工具，就像 Jenkins 或 GitHub Actions。'"
+  },
+  {
+   "kind": "js",
+   "en": "'It\\'s a <b>practice</b>: merge often, check automatically, ship automatically. Jenkins and GitHub Actions are just robots that carry it out.'",
+   "zh": "'它是一種<b>做法</b>：經常合併、自動檢查、自動出貨。Jenkins 和 GitHub Actions 只是執行它的機器人。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Without automated tests, CI can\\'t do much.'",
+   "zh": "'沒有自動化測試，CI 能做的事很有限。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The robot can only check what you\\'ve written checks for. With no tests, “green” only means it compiled.'",
+   "zh": "'機器人只能檢查你寫了檢查的東西。沒有測試，「綠燈」只代表它編譯過了。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Continuous Delivery means every commit goes to production automatically.'",
+   "zh": "'持續交付的意思是每個提交都自動送上正式環境。'"
+  },
+  {
+   "kind": "js",
+   "en": "'That\\'s <b>Deployment</b>. Delivery means every commit <i>could</i> go out, and a human presses the button.'",
+   "zh": "'那是<b>部署（Deployment）</b>。交付（Delivery）的意思是每個提交都<i>可以</i>出去，由人按下按鈕。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The “integration” in CI means merging everyone\\'s code into main often, ideally at least daily.'",
+   "zh": "'CI 裡的「整合」，是指經常把所有人的程式碼合併進 main，最好至少每天一次。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Long-lived branches that merge once a month aren\\'t CI, even if a robot runs tests on them.'",
+   "zh": "'一個月才合併一次的長壽分支不算 CI，即使有機器人在上面跑測試。'"
+  },
+  {
+   "kind": "js",
+   "en": "'CD only makes sense for big companies.'",
+   "zh": "'CD 只有大公司才用得上。'"
+  },
+  {
+   "kind": "js",
+   "en": "'A solo project on GitHub Pages or Vercel is usually continuously deployed: push to main and it\\'s live a minute later, and setting that up costs nothing.'",
+   "zh": "'放在 GitHub Pages 或 Vercel 上的個人專案，通常就是持續部署：推送到 main，一分鐘後就上線了，而且設定起來不用花一毛錢。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Myth'",
+   "zh": "'迷思'"
+  },
+  {
+   "kind": "js",
+   "en": "'Fact'",
+   "zh": "'事實'"
+  },
+  {
+   "kind": "js",
+   "en": "`<b>${ok ? '✓ Right' : '✕ Not quite'}: it's a ${fact ? 'fact' : 'myth'}.</b> ${why}`",
+   "zh": "`<b>${ok ? '✓ 答對了' : '✕ 不太對'}：這是${fact ? '事實' : '迷思'}。</b> ${why}`"
+  },
+  {
+   "kind": "js",
+   "en": "`· ${right}/${answered}`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "' (you\\'ll never have to google it again)'",
+   "zh": "'（你再也不用 Google 它了）'"
+  },
+  {
+   "kind": "js",
+   "en": "' (re-read the recap cards and you\\'re set)'",
+   "zh": "'（重讀一次重點卡片，你就沒問題了）'"
+  }
+ ]
+}
