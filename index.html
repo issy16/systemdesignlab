@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Learn system design by breaking a simulated concert ticket app and fixing it. Interactive pages covering 111 production engineering concepts.">
+<title>System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/explainer.css">
+</head>
+<body>
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="./">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="Sections"><a href="#roadmap">Roadmap</a><a href="#how">How it works</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>system design lab</span><span class="hot" id="progress"></span></div>
+  <h1>Learn system design by <em>breaking things on purpose.</em></h1>
+  <p class="lede">Every page is a small simulation of <b>Encore</b>, a fictional concert ticket app, as it grows from one server into a production system. You push traffic, cause the failure, apply the fix, and see why it works.</p>
+  <div class="scenario"><b>Meet the team</b>Ana builds the backend, Ben handles payments, Cai builds the frontend, and Dee keeps it all running. Each page drops them into a new problem.</div>
+  <div class="row"><a class="btn primary" href="latency-throughput/" style="text-decoration:none">Start with page 1 →</a><a class="btn" href="#roadmap" style="text-decoration:none">See all topics ↓</a></div>
+</section>
+
+<section class="panel" id="how">
+  <div class="panel-label"><span>how every page works</span><span class="hot">5 steps</span></div>
+  <div class="cards">
+    <div class="card"><div class="sub">1 · Scenario</div><div class="t">The problem</div><p>A short situation from Encore's growth, in a sentence or two.</p></div>
+    <div class="card"><div class="sub">2–3 · Lab</div><div class="t">Break it, fix it</div><p>A simulation with guided missions. Cause the failure, then apply the concept and compare.</p></div>
+    <div class="card"><div class="sub">4–5 · Explain, check</div><div class="t">Name it, test it</div><p>The real config or code, mapped line by line. Then three scenario questions.</p></div>
+  </div>
+  <p class="muted" style="font-size:14px;margin:8px 0 0">All demos run in your browser. Numbers are simulated to show the shape of each problem, not to benchmark real systems.</p>
+</section>
+
+<section class="panel" id="roadmap">
+  <div class="panel-label"><span>roadmap</span><span class="hot" id="count"></span></div>
+  <h2>Every topic</h2>
+  <div class="ctl" style="max-width:420px">
+    <label for="find">Find a concept</label>
+    <input class="input" id="find" type="search" placeholder="e.g. idempotency, P99, CORS" autocomplete="off">
+  </div>
+  <p class="status" id="findTxt" style="margin-top:10px" role="status"></p>
+  <div id="stages"></div>
+</section>
+</main>
+
+<script src="assets/explainer.js"></script>
+<script>
+(() => {
+const { $, el, esc } = X;
+const built = X.CATALOG.filter(p => p.status !== 'planned').length;
+$('#progress').textContent = `${built} of ${X.CATALOG.length} pages live`;
+$('#count').textContent = `${X.CATALOG.length} pages · ${X.CONCEPTS.length - 1} concepts`;
+function draw(q) {
+  const box = $('#stages'); box.innerHTML = '';
+  const query = q.trim().toLowerCase();
+  let shown = 0;
+  X.STAGES.forEach(st => {
+    const pages = X.CATALOG.filter(p => p.stage === st.n).filter(p => !query || p.title.toLowerCase().includes(query) || p.ids.some(id => X.CONCEPTS[id].toLowerCase().includes(query)));
+    if (!pages.length) return;
+    const h = el('div', 'stage-h', `<h3 style="margin:0">Stage ${st.n} · ${esc(st.name)}</h3><span class="muted" style="font-size:13px">${pages.length} page${pages.length > 1 ? 's' : ''}</span>`);
+    const grid = el('div', 'topics');
+    pages.forEach(p => {
+      shown++;
+      const live = p.status !== 'planned';
+      const card = el(live ? 'a' : 'div', 'topic' + (live ? '' : ' soon'));
+      if (live) card.href = p.slug + '/';
+      const badge = p.status === 'built' ? '<span class="pill ok">live</span>' : p.status === 'partial' ? '<span class="pill wait">partial</span>' : '<span class="pill">coming soon</span>';
+      card.innerHTML = `<div class="n"><span>page ${p.n}</span>${badge}</div><div class="t">${esc(p.title)}</div><div class="c">${p.ids.map(id => esc(X.CONCEPTS[id])).join(' · ')}</div>`;
+      grid.append(card);
+    });
+    box.append(h, grid);
+  });
+  $('#findTxt').hidden = !query;
+  $('#findTxt').textContent = shown ? `${shown} page${shown > 1 ? 's' : ''} match “${q.trim()}”.` : `Nothing matches “${q.trim()}”.`;
+}
+$('#find').addEventListener('input', e => draw(e.target.value));
+draw('');
+})();
+</script>
+</body>
+</html>

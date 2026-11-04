@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="An interactive explainer that makes CI/CD click: feel the pain, hire a robot, extend the pipeline, read the file.">
+<title>CI/CD, Finally Clicks</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#e3e8ef; --panel:#f3f6fa; --panel-2:#e8edf4; --line:#a3adbd; --grid:#d2dae5;
+  --ink:#202736; --muted:#576074;
+  --accent:#2f6fe0; --accent-ink:#1d55b8; --accent-2:#92b4ef; --accent-3:#d5e3fb;
+  --card:#ffffff; --code:#1e2433;
+  --ok:#1f8a5b; --ok-bg:#d6f0e3; --bad:#c63a2f; --bad-bg:#f8dcd8; --wait:#a86b00; --wait-bg:#f8ebc9;
+  --label:"Silkscreen","Courier New",monospace;
+  --body:"IBM Plex Sans",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#151a23; --panel:#1d2330; --panel-2:#252d3b; --line:#45506a; --grid:#1b212c; --ink:#e8edf5; --muted:#9ea8bb; --accent:#5a92f5; --accent-ink:#8db6ff; --accent-2:#2c4c86; --accent-3:#1c2e50; --card:#232a37; --code:#0f131a; --ok:#4cc28a; --ok-bg:#173a2a; --bad:#ff7b6e; --bad-bg:#44201d; --wait:#e6b04a; --wait-bg:#3d3015; color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#151a23; --panel:#1d2330; --panel-2:#252d3b; --line:#45506a; --grid:#1b212c; --ink:#e8edf5; --muted:#9ea8bb; --accent:#5a92f5; --accent-ink:#8db6ff; --accent-2:#2c4c86; --accent-3:#1c2e50; --card:#232a37; --code:#0f131a; --ok:#4cc28a; --ok-bg:#173a2a; --bad:#ff7b6e; --bad-bg:#44201d; --wait:#e6b04a; --wait-bg:#3d3015; color-scheme:dark}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:64px}
+body{margin:0;background-color:var(--bg);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:32px 32px;color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.6;padding-bottom:64px}
+a{color:var(--accent-ink);text-decoration:underline dotted;text-underline-offset:3px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+code,.mono{font-family:var(--mono);font-size:.92em}
+
+/* top bar */
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--panel)}
+.topbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--panel);border-bottom:1.5px solid var(--line)}
+.topbar-inner{max-width:980px;margin:0 auto;padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.brand{font-family:var(--label);font-size:14px;color:var(--ink);text-decoration:none;white-space:nowrap}
+.brand b{color:var(--accent-ink);font-weight:400}
+.acts{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+.acts a{font-family:var(--label);font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-decoration:none;
+  border:1.5px solid var(--line);padding:3px 8px;background:var(--panel-2)}
+.acts a:hover{color:var(--accent-ink);border-color:var(--accent)}
+
+main{max-width:980px;margin:0 auto;padding-block:24px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.panel{position:relative;background:var(--panel);border:1.5px solid var(--line);padding:42px 22px 24px;margin:0 0 28px}
+.panel-label{position:absolute;top:10px;left:12px;right:12px;display:flex;justify-content:space-between;gap:10px;
+  font-family:var(--label);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.panel-label .hot{color:var(--accent-ink)}
+h1,h2,h3{font-family:var(--label);font-weight:400;line-height:1.2;margin:0 0 12px}
+h1{font-size:clamp(28px,5vw,44px);text-wrap:balance}
+h1 em{font-style:normal;color:var(--accent-ink)}
+h2{font-size:clamp(20px,3.4vw,26px)}
+h3{font-size:16px}
+p{margin:0 0 12px;max-width:68ch}
+.lede{font-size:18px;color:var(--muted)}
+.muted{color:var(--muted)}
+
+/* buttons */
+.btn{font-family:var(--label);font-size:13px;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;
+  border:1.5px solid var(--ink);background:var(--panel);color:var(--ink);padding:9px 14px;box-shadow:3px 3px 0 var(--ink);transition:transform .08s,box-shadow .08s}
+.btn:hover:not(:disabled){background:var(--accent-3)}
+.btn:active:not(:disabled){transform:translate(3px,3px);box-shadow:0 0 0 var(--ink)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent-ink);box-shadow:3px 3px 0 var(--accent-ink)}
+.btn.primary:hover:not(:disabled){background:var(--accent-ink)}
+.btn.bad{border-color:var(--bad);color:var(--bad);box-shadow:3px 3px 0 var(--bad)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:14px 0}
+
+/* hero */
+.hero p.lede{margin-bottom:18px}
+.promise{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-top:18px}
+.promise div{border:1.5px dashed var(--line);padding:10px 12px;background:var(--panel-2);font-size:14px}
+.promise b{font-family:var(--label);font-weight:400;color:var(--accent-ink);display:block;font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+
+/* lanes (act 0) */
+.lanes{border:1.5px solid var(--line);background:var(--card);padding:10px 12px;margin:14px 0;overflow:hidden}
+.lane{display:grid;grid-template-columns:64px 1fr;align-items:center;gap:8px;min-height:30px}
+.lane+.lane{border-top:1px dashed var(--grid)}
+.who{font-family:var(--label);font-size:12px;text-transform:uppercase}
+.track{display:flex;gap:5px;align-items:center;flex-wrap:wrap;min-height:22px;position:relative}
+.dot{width:14px;height:14px;border:1.5px solid var(--ink);background:var(--c,#999);animation:pop .25s ease-out}
+.dot.main{background:var(--ink)}
+.dot.bug{position:relative}
+.dot.bug.revealed::after{content:"🐞";position:absolute;top:-16px;left:-4px;font-size:13px}
+.lanes.merged .lane:not(.mainlane) .dot{opacity:.25}
+@keyframes pop{from{transform:scale(0)}to{transform:scale(1)}}
+.week{font-family:var(--label);font-size:12px;color:var(--muted)}
+
+.events{list-style:none;margin:10px 0;padding:0;display:grid;gap:6px}
+.events li{font-family:var(--mono);font-size:13px;padding:6px 10px;border:1.5px solid var(--bad);background:var(--bad-bg);animation:slide .3s ease-out}
+.events li.ok{border-color:var(--ok);background:var(--ok-bg)}
+.events li.warn{border-color:var(--wait);background:var(--wait-bg)}
+@keyframes slide{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:none}}
+
+.meters{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:14px 0}
+.meter{border:1.5px solid var(--line);background:var(--card);padding:10px 12px}
+.meter .k{font-family:var(--label);font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:.06em}
+.meter .v{font-family:var(--mono);font-size:24px;font-weight:600}
+.meter.bad .v{color:var(--bad)} .meter.ok .v{color:var(--ok)}
+
+.checklist{list-style:none;padding:0;margin:10px 0;display:grid;gap:6px;max-width:560px}
+.checklist button{width:100%;text-align:left;font:inherit;font-size:15px;cursor:pointer;background:var(--card);border:1.5px solid var(--line);padding:8px 12px;display:flex;gap:10px;align-items:center}
+.checklist button:hover:not(:disabled){border-color:var(--accent)}
+.checklist button:disabled{cursor:default}
+.checklist .box{width:18px;height:18px;border:1.5px solid var(--ink);flex:none;display:grid;place-items:center;font-size:12px;line-height:1}
+.checklist .done .box{background:var(--ok);color:#fff;border-color:var(--ok)}
+.checklist .fail{border-color:var(--bad);background:var(--bad-bg)}
+.checklist .fail .box{background:var(--bad);color:#fff;border-color:var(--bad)}
+.checklist .next{border-color:var(--accent);box-shadow:3px 3px 0 var(--accent-2)}
+
+.callout{border-left:5px solid var(--accent);background:var(--accent-3);padding:12px 16px;margin:16px 0;font-size:16px}
+.callout b{font-family:var(--label);font-weight:400}
+.takeaway{border:2px solid var(--ink);background:var(--card);padding:14px 16px;margin:18px 0 4px;box-shadow:5px 5px 0 var(--accent-2)}
+.takeaway .t{font-family:var(--label);font-size:12px;text-transform:uppercase;color:var(--accent-ink);letter-spacing:.08em}
+.takeaway p{font-size:18px;margin:4px 0 0;font-weight:500}
+.hidden{display:none!important}
+.reveal{animation:slide .35s ease-out}
+
+/* pipeline */
+.pipe{display:flex;align-items:stretch;gap:0;flex-wrap:wrap;margin:16px 0;row-gap:10px}
+.stage{display:flex;align-items:center}
+.stage+.stage::before{content:"";width:22px;height:2px;background:var(--line);margin:0 2px}
+.chip{font-family:var(--label);font-size:12px;text-transform:uppercase;letter-spacing:.04em;border:1.5px solid var(--line);background:var(--card);
+  padding:8px 10px;min-width:84px;text-align:center;position:relative;transition:background .2s,border-color .2s}
+.chip small{display:block;font-family:var(--mono);font-size:11px;text-transform:none;color:var(--muted);letter-spacing:0;min-height:1.3em}
+.chip.run{border-color:var(--accent);background:var(--accent-3);animation:pulse 0.8s ease-in-out infinite}
+.chip.ok{border-color:var(--ok);background:var(--ok-bg)}
+.chip.fail{border-color:var(--bad);background:var(--bad-bg)}
+.chip.wait{border-color:var(--wait);background:var(--wait-bg)}
+.chip.hl{outline:3px solid var(--accent);outline-offset:2px;background:var(--accent-3)}
+.chip.gate{border-style:dashed}
+.chip.robot{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+.chip.robot small{color:inherit;opacity:.75}
+@keyframes pulse{50%{box-shadow:0 0 0 4px var(--accent-3)}}
+
+.robotbar{display:flex;gap:10px;align-items:center;font-family:var(--mono);font-size:13px;color:var(--muted);margin-top:4px}
+.feedback{min-height:52px;margin:6px 0}
+.feedback .events{margin:0}
+
+/* slider */
+.slider{border:1.5px solid var(--line);background:var(--card);padding:14px 16px;margin:18px 0}
+.slider input{width:100%;accent-color:var(--accent)}
+.ticks{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--muted)}
+.bars{display:grid;grid-template-columns:150px 1fr 64px;gap:8px 10px;align-items:center;margin-top:12px;font-size:14px}
+.bar{height:16px;background:var(--panel-2);border:1.5px solid var(--line);position:relative}
+.bar i{position:absolute;inset:0 auto 0 0;background:var(--accent);transition:width .3s}
+.bar.risk i{background:var(--bad)}
+.bars .num{font-family:var(--mono);text-align:right}
+
+/* toggle */
+.switch{display:flex;align-items:center;gap:12px;cursor:pointer;user-select:none;font-weight:500}
+.switch input{position:absolute;opacity:0}
+.switch .track2{width:52px;height:28px;border:1.5px solid var(--ink);background:var(--panel-2);position:relative;flex:none;transition:background .2s}
+.switch .track2::after{content:"";position:absolute;top:3px;left:3px;width:19px;height:19px;background:var(--ink);transition:transform .2s}
+.switch input:checked+.track2{background:var(--accent-2)}
+.switch input:checked+.track2::after{transform:translateX(24px)}
+.switch input:focus-visible+.track2{outline:2px solid var(--accent);outline-offset:2px}
+.mode{font-family:var(--label);font-size:clamp(18px,3vw,24px);color:var(--accent-ink);margin:12px 0 2px}
+.envs{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin:12px 0}
+.env{border:1.5px solid var(--line);background:var(--card);padding:10px 12px}
+.env .k{font-family:var(--label);font-size:11px;text-transform:uppercase;color:var(--muted)}
+.env .v{font-family:var(--mono);font-size:22px;font-weight:600}
+.release{animation:pulse 1s infinite}
+
+/* yaml */
+.yaml-wrap{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:16px;margin:14px 0}
+.yaml{background:var(--code);color:#e6e6ea;border:1.5px solid var(--ink);padding:10px 0;font-family:var(--mono);font-size:13px;line-height:1.55;overflow-x:auto}
+.yaml .ln{display:block;padding:0 14px;white-space:pre;border-left:3px solid transparent;cursor:default}
+.yaml .ln[data-k]{cursor:pointer}
+.yaml .ln[data-k]:hover,.yaml .ln.active{background:#24365a;border-left-color:var(--accent)}
+.yaml .c{color:#7f8aa0} .yaml .key{color:#9cc2ff} .yaml .s{color:#9fd8b8}
+.explain{border:1.5px solid var(--line);background:var(--card);padding:14px 16px;position:sticky;top:76px;align-self:start}
+.explain .t{font-family:var(--label);font-size:13px;text-transform:uppercase;color:var(--accent-ink);margin-bottom:6px}
+.explain p{font-size:15px}
+
+/* recap + quiz */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin:14px 0}
+.card{border:2px solid var(--ink);background:var(--card);padding:14px 16px;box-shadow:4px 4px 0 var(--accent-2)}
+.card .t{font-family:var(--label);font-size:16px;color:var(--accent-ink)}
+.card .sub{font-family:var(--label);font-size:11px;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.card p{font-size:15px;margin:0}
+.quiz{list-style:none;padding:0;margin:14px 0;display:grid;gap:10px;counter-reset:q}
+.quiz li{border:1.5px solid var(--line);background:var(--card);padding:12px 14px}
+.quiz .q{font-weight:500;margin-bottom:8px}
+.quiz .q::before{counter-increment:q;content:counter(q) ". ";font-family:var(--label);color:var(--accent-ink)}
+.quiz .ans{margin-top:8px;font-size:15px}
+.quiz li.right{border-color:var(--ok);background:var(--ok-bg)}
+.quiz li.wrong{border-color:var(--bad);background:var(--bad-bg)}
+.quiz .btn{font-size:12px;padding:6px 12px}
+.score{font-family:var(--label);font-size:14px}
+
+@media (max-width:720px){
+  .yaml-wrap{grid-template-columns:1fr}
+  .explain{position:static;order:-1}
+  .bars{grid-template-columns:110px 1fr 54px;font-size:13px}
+  .panel{padding:42px 16px 20px}
+  .stage+.stage::before{width:10px}
+  .chip{min-width:70px;padding:7px 7px;font-size:11px}
+  .acts{margin-left:0}
+  .panel-label span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+  .envs{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+  .env{padding:8px}
+  .env .k{font-size:9px}
+  .env .v{font-size:18px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="../">system<b>.design.lab</b></a>
+    <nav class="acts" aria-label="Acts">
+      <a href="#act0">0 · Pain</a><a href="#act1">1 · CI</a><a href="#act2">2 · CD</a><a href="#act3">3 · The file</a><a href="#recap">Recap</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+
+<section class="panel hero">
+  <div class="panel-label"><span>ci-cd.explained</span><span class="hot">● ready</span></div>
+  <h1>You've heard “CI/CD” a hundred times. <em>Let's make it click.</em></h1>
+  <p class="lede">Definitions don't stick. Pain does. In about 5 minutes you'll run a team the old way, watch it fall apart, then fix it one robot at a time.</p>
+  <div class="promise">
+    <div><b>Act 0</b>Ship the old way and feel why it hurts</div>
+    <div><b>Act 1 · CI</b>Hire a robot that checks every change</div>
+    <div><b>Act 2 · CD</b>Let the robot pack and ship it too</div>
+    <div><b>Act 3</b>Read the real file. It's shorter than you think.</div>
+  </div>
+  <div class="row"><a class="btn primary" href="#act0" style="text-decoration:none">Start ↓</a></div>
+</section>
+
+<!-- ============ ACT 0 ============ -->
+<section class="panel" id="act0">
+  <div class="panel-label"><span>act 0 · life without ci/cd</span><span class="week" id="weekLabel">week 0 / 3</span></div>
+  <h2>The old way: everyone codes alone, then merges at the end</h2>
+  <p>Four devs each work on their own branch for three weeks. <code>main</code> stays untouched until <b>merge day</b>. Nobody runs the full test suite until then because it's slow and manual.</p>
+
+  <div class="lanes" id="lanes0"></div>
+
+  <div class="row">
+    <button class="btn" id="weekBtn">Work one week →</button>
+    <button class="btn primary" id="mergeBtn" disabled>It's merge day 😬</button>
+  </div>
+
+  <div id="mergeOut" class="hidden">
+    <h3>Merging…</h3>
+    <ul class="events" id="conflicts"></ul>
+    <div id="bugOut" class="hidden reveal">
+      <ul class="events"><li>🐞 Tests finally run: <b>checkout total is wrong</b>. Introduced by Ben… three weeks ago. Ben: “I honestly don't remember writing that.”</li></ul>
+      <div class="meters">
+        <div class="meter bad"><div class="k">Bug sat unnoticed</div><div class="v">21 days</div></div>
+        <div class="meter bad"><div class="k">Merge conflicts</div><div class="v" id="conflictCount">0</div></div>
+        <div class="meter bad"><div class="k">Time to untangle</div><div class="v">~3 days</div></div>
+      </div>
+      <h3>Finally fixed. Now deploy it, by hand, from the wiki checklist.</h3>
+      <p class="muted">Click each step in order.</p>
+      <ol class="checklist" id="deployList"></ol>
+    </div>
+  </div>
+
+  <div id="act0End" class="hidden reveal">
+    <div class="callout"><b>Notice the pattern:</b> every problem came from two things. Changes were <b>checked late</b> (merge day), and shipping was <b>done by hand</b> (the checklist). CI fixes the first. CD fixes the second.</div>
+    <div class="row"><a class="btn primary" href="#act1" style="text-decoration:none">Hire a robot → Act 1</a></div>
+  </div>
+</section>
+
+<!-- ============ ACT 1 ============ -->
+<section class="panel" id="act1">
+  <div class="panel-label"><span>act 1 · continuous integration</span><span class="hot">ci</span></div>
+  <h2>CI: merge small changes often, and a robot checks every one</h2>
+  <p>Same team, new rule: push <b>small</b> changes to <code>main</code> <b>several times a day</b>. Every push wakes up a robot (a server somewhere) that merges it, builds it, and runs the tests within minutes. Try both buttons.</p>
+
+  <div class="row">
+    <button class="btn" id="pushGood">Push a small change</button>
+    <button class="btn bad" id="pushBad">Push a change with a bug</button>
+    <button class="btn primary hidden" id="fixBtn">Fix it (5 min) &amp; push again</button>
+  </div>
+
+  <div class="pipe" id="pipe1">
+    <div class="stage"><div class="chip robot">🤖 push<small id="p1who">waiting…</small></div></div>
+    <div class="stage"><div class="chip" data-s="merge">Merge<small>into main</small></div></div>
+    <div class="stage"><div class="chip" data-s="build">Build<small>compile it</small></div></div>
+    <div class="stage"><div class="chip" data-s="test">Test<small>run all tests</small></div></div>
+  </div>
+  <div class="lanes"><div class="lane mainlane"><div class="who">main</div><div class="track" id="ciMain"></div></div></div>
+  <div class="feedback" id="fb1"><p class="muted">Each green push adds a square to <code>main</code>. A red one is stopped before it lands.</p></div>
+
+  <div class="slider">
+    <h3>Why “often”? Drag it.</h3>
+    <label for="freq">Team merges into main every: <b id="freqLabel">1 day</b></label>
+    <input type="range" id="freq" min="0" max="4" step="1" value="1">
+    <div class="ticks"><span>1 hour</span><span>1 day</span><span>3 days</span><span>1 week</span><span>3 weeks</span></div>
+    <div class="bars">
+      <span>Lines changed / merge</span><div class="bar"><i id="barLines"></i></div><span class="num" id="numLines"></span>
+      <span>Chance of conflict</span><div class="bar risk"><i id="barRisk"></i></div><span class="num" id="numRisk"></span>
+      <span>Bug found after</span><div class="bar risk"><i id="barFound"></i></div><span class="num" id="numFound"></span>
+    </div>
+    <p class="muted" style="margin:10px 0 0;font-size:14px">Illustrative numbers, but the shape is real: the longer you wait to merge, the bigger and riskier each merge gets.</p>
+  </div>
+
+  <div class="takeaway"><div class="t">CI in one line</div><p>Merge small changes into main often, and a robot builds and tests each one so problems show up in minutes, not on merge day.</p></div>
+  <p class="muted" style="margin-top:12px">The “I” means <b>integration</b>: combining everyone's code. It's “continuous” because it happens all the time instead of once at the end.</p>
+</section>
+
+<!-- ============ ACT 2 ============ -->
+<section class="panel" id="act2">
+  <div class="panel-label"><span>act 2 · continuous delivery / deployment</span><span class="hot">cd</span></div>
+  <h2>CD: same robot, longer pipeline</h2>
+  <p>CI stopped at “tests pass.” CD keeps going: the robot <b>packages</b> the app, puts it on a <b>staging</b> server (a private copy of the real site), and then it goes to <b>production</b>, the site real users see. The one question left: does a human press a button first?</p>
+
+  <label class="switch"><input type="checkbox" id="gateToggle" checked><span class="track2"></span><span>A human approves each release</span></label>
+  <div class="mode" id="modeName">Continuous Delivery</div>
+  <p class="muted" id="modeDesc">Every passing change is ready to ship. A person decides <i>when</i>.</p>
+
+  <div class="pipe" id="pipe2">
+    <div class="stage"><div class="chip" data-s="build">Build</div></div>
+    <div class="stage"><div class="chip" data-s="test">Test</div></div>
+    <div class="stage"><div class="chip" data-s="package">Package<small>zip it up</small></div></div>
+    <div class="stage"><div class="chip" data-s="staging">Staging<small>private copy</small></div></div>
+    <div class="stage" id="gateStage"><div class="chip gate" data-s="gate">🔘 Human<small>approves</small></div></div>
+    <div class="stage"><div class="chip" data-s="prod">Production<small>real users</small></div></div>
+  </div>
+
+  <div class="row">
+    <button class="btn" id="push2">Push a change</button>
+    <button class="btn primary release hidden" id="releaseBtn">Release to users ▶</button>
+  </div>
+
+  <div class="envs">
+    <div class="env"><div class="k">Latest commit</div><div class="v" id="vCommit">v1</div></div>
+    <div class="env"><div class="k">Staging (ready to ship)</div><div class="v" id="vStaging">v1</div></div>
+    <div class="env"><div class="k">Production (users see)</div><div class="v" id="vProd">v1</div></div>
+  </div>
+  <div class="feedback" id="fb2"><p class="muted">Push a few changes with the switch on, then turn it off and push again.</p></div>
+
+  <div class="takeaway"><div class="t">The two CDs, settled</div><p>Continuous <b>Delivery</b>: every passing change is ready to ship, and a human presses the button. Continuous <b>Deployment</b>: there's no button, and passing changes go straight to users.</p></div>
+  <p class="muted" style="margin-top:12px">Both need CI underneath. CD without good tests just ships bugs faster.</p>
+</section>
+
+<!-- ============ ACT 3 ============ -->
+<section class="panel" id="act3">
+  <div class="panel-label"><span>act 3 · the actual file</span><span class="hot">.yml</span></div>
+  <h2>The robot reads a short to-do list</h2>
+  <p>This is a real GitHub Actions file for everything you just watched. It lives in the repo at <code>.github/workflows/ship.yml</code>. <b>Hover or tap a line</b> to see which stage it is.</p>
+
+  <div class="pipe" id="pipe3">
+    <div class="stage"><div class="chip" data-s="trigger">Trigger</div></div>
+    <div class="stage"><div class="chip" data-s="robot">Robot</div></div>
+    <div class="stage"><div class="chip" data-s="checkout">Checkout</div></div>
+    <div class="stage"><div class="chip" data-s="build">Build</div></div>
+    <div class="stage"><div class="chip" data-s="test">Test</div></div>
+    <div class="stage"><div class="chip" data-s="package">Package</div></div>
+    <div class="stage"><div class="chip" data-s="staging">Staging</div></div>
+    <div class="stage"><div class="chip gate" data-s="gate">Gate</div></div>
+    <div class="stage"><div class="chip" data-s="prod">Prod</div></div>
+  </div>
+
+  <div class="yaml-wrap">
+    <pre class="yaml" id="yaml" aria-label="Example workflow file"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 pick a line</div><p id="exP">Each highlighted line maps to one stage of the pipeline above.</p></div>
+  </div>
+
+  <div class="callout"><b>The big reveal:</b> a pipeline is just <b>a trigger</b> (“when someone pushes”) + <b>a list of commands</b> (the same ones you'd type yourself) + <b>a borrowed computer</b> to run them on. GitHub Actions, GitLab CI, Jenkins and CircleCI are all the same idea, just different robots reading different file formats.</div>
+</section>
+
+<!-- ============ RECAP ============ -->
+<section class="panel" id="recap">
+  <div class="panel-label"><span>recap · keep this</span><span class="hot">♥</span></div>
+  <h2>The whole thing on one screen</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">Continuous Integration</div><div class="t">CI</div><p>Merge small changes often. A robot builds and tests every one. Bugs show up in minutes, while they're still cheap to fix.</p></div>
+    <div class="card"><div class="sub">Continuous Delivery</div><div class="t">CD (with button)</div><p>The robot also packages and stages every passing change, so it's always ready to ship. A human picks when.</p></div>
+    <div class="card"><div class="sub">Continuous Deployment</div><div class="t">CD (no button)</div><p>Same pipeline, no button. Every change that passes goes straight to users.</p></div>
+  </div>
+  <div class="takeaway"><div class="t">Why any of it exists</div><p>A problem found minutes after you write it takes minutes to fix. Found three weeks later, it takes days. CI/CD makes “minutes later” the default.</p></div>
+
+  <h3 style="margin-top:28px">Myth or fact? <span class="score" id="score"></span></h3>
+  <ol class="quiz" id="quiz"></ol>
+
+  <div class="callout" style="margin-top:22px"><b>P.S.</b> Next time you see a ✅ or ❌ next to a commit on GitHub, that's the robot from Act 1 reporting back. A “Deploy” job after it is Act 2.</div>
+</section>
+
+</main>
+
+<script>
+(() => {
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const sleep = ms => new Promise(r => setTimeout(r, reduce ? Math.min(ms, 60) : ms));
+const $ = (s, r = document) => r.querySelector(s);
+const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+
+const devs = [
+  { n: 'Ana', c: '#8a5cd6' }, { n: 'Ben', c: '#3b82c4' },
+  { n: 'Cai', c: '#2e9e6a' }, { n: 'Dee', c: '#c58a12' }
+];
+
+/* ---------------- ACT 0 ---------------- */
+const lanes0 = $('#lanes0');
+const mainLane = el('div', 'lane mainlane'); mainLane.append(el('div', 'who', 'main'), el('div', 'track'));
+lanes0.append(mainLane);
+const devTracks = devs.map(d => {
+  const l = el('div', 'lane'); const t = el('div', 'track');
+  l.append(el('div', 'who', d.n), t); lanes0.append(l); return t;
+});
+mainLane.querySelector('.track').append(Object.assign(el('span', 'dot main'), { title: 'main' }));
+
+let week = 0, bugDot = null;
+$('#weekBtn').addEventListener('click', async () => {
+  const btn = $('#weekBtn'); btn.disabled = true; week++;
+  $('#weekLabel').textContent = `week ${week} / 3`;
+  for (let k = 0; k < 3; k++) {
+    devTracks.forEach((t, i) => {
+      const d = el('span', 'dot'); d.style.setProperty('--c', devs[i].c);
+      if (week === 1 && i === 1 && k === 1) { d.classList.add('bug'); bugDot = d; }
+      t.append(d);
+    });
+    await sleep(160);
+  }
+  if (week < 3) btn.disabled = false;
+  else { btn.textContent = '3 weeks done'; $('#mergeBtn').disabled = false; }
+});
+
+const conflictList = [
+  'cart.js: Ana and Cai both rewrote calculateTotal()',
+  'styles.css: 4 overlapping edits to .header',
+  'api/users.js: Ben renamed a function Dee still calls',
+  'package.json: two different versions of the date library',
+  'checkout.js: Ana and Ben edited the same 40 lines',
+  'config.json: three different API URLs',
+  'auth.js: Dee deleted a file Cai changed',
+  'utils/date.js: duplicated helper, slightly different',
+  'README.md: 3 versions of the setup steps'
+];
+$('#mergeBtn').addEventListener('click', async () => {
+  $('#mergeBtn').disabled = true;
+  $('#mergeOut').classList.remove('hidden');
+  lanes0.classList.add('merged');
+  const ul = $('#conflicts');
+  for (const [i, c] of conflictList.entries()) {
+    ul.append(el('li', '', `CONFLICT ${c}`));
+    $('#conflictCount').textContent = i + 1;
+    await sleep(230);
+  }
+  await sleep(400);
+  if (bugDot) bugDot.classList.add('revealed');
+  $('#bugOut').classList.remove('hidden');
+  buildChecklist();
+});
+
+const steps = [
+  'SSH into the production server',
+  'git pull the new code',
+  'npm install on the server',
+  'Copy the config file (.env) into place',
+  'Restart the server',
+  'Click around to check it works'
+];
+function buildChecklist() {
+  const ol = $('#deployList'); ol.innerHTML = '';
+  let next = 0;
+  const btns = steps.map((s, i) => {
+    const li = el('li'); const b = el('button', i === 0 ? 'next' : '', `<span class="box"></span><span>${s}</span>`);
+    b.disabled = i !== 0;
+    b.addEventListener('click', async () => {
+      if (i !== next) return;
+      b.classList.remove('next'); b.disabled = true;
+      if (i === 3) {
+        b.classList.add('fail'); b.querySelector('.box').textContent = '✕';
+        b.lastChild.innerHTML = `${s}<br><small style="color:var(--bad)">Copied the <b>staging</b> config by mistake. Site is down. It's Friday, 6:47pm.</small>`;
+        btns.slice(4).forEach(x => x.disabled = true);
+        await sleep(500);
+        $('#act0End').classList.remove('hidden');
+        return;
+      }
+      b.classList.add('done'); b.querySelector('.box').textContent = '✓';
+      next++; btns[next].disabled = false; btns[next].classList.add('next');
+    });
+    li.append(b); ol.append(li); return b;
+  });
+}
+
+/* ---------------- pipeline helper ---------------- */
+function chips(pipe) { const m = {}; pipe.querySelectorAll('.chip[data-s]').forEach(c => m[c.dataset.s] = c); return m; }
+function resetChips(m) { Object.values(m).forEach(c => c.classList.remove('run', 'ok', 'fail', 'wait')); }
+
+/* ---------------- ACT 1 ---------------- */
+const c1 = chips($('#pipe1'));
+const ciMain = $('#ciMain');
+const fb1 = $('#fb1');
+let busy1 = false, pushN = 0, failedDev = null;
+const goodMsgs = ['fixed a typo on the login page', 'added a "sort by price" option', 'made the button a little bigger', 'added a test for the cart', 'updated the footer links'];
+
+async function push1(buggy, dev) {
+  if (busy1) return; busy1 = true;
+  [$('#pushGood'), $('#pushBad'), $('#fixBtn')].forEach(b => b.disabled = true);
+  dev = dev || devs[pushN % 4]; pushN++;
+  $('#p1who').textContent = `${dev.n} · ${buggy ? 'cart edit' : goodMsgs[pushN % goodMsgs.length].split(' ').slice(0, 2).join(' ')}`;
+  resetChips(c1);
+  fb1.innerHTML = `<p class="muted">🤖 ${dev.n} pushed. The robot wakes up…</p>`;
+  const order = ['merge', 'build', 'test'];
+  let t = 0;
+  for (const s of order) {
+    c1[s].classList.add('run'); await sleep(650); c1[s].classList.remove('run'); t += s === 'test' ? 27 : 8;
+    if (buggy && s === 'test') { c1[s].classList.add('fail'); break; }
+    c1[s].classList.add('ok');
+  }
+  if (buggy) {
+    failedDev = dev;
+    fb1.innerHTML = `<ul class="events"><li>❌ <b>Test failed: checkout total is wrong.</b> Caught <b>${t} seconds</b> after ${dev.n} pushed. ${dev.n} still has the file open and gets a ping right away. <code>main</code> stays clean.</li></ul>`;
+    $('#fixBtn').classList.remove('hidden'); $('#fixBtn').disabled = false;
+  } else {
+    const d = el('span', 'dot'); d.style.setProperty('--c', dev.c); d.title = dev.n; ciMain.append(d);
+    fb1.innerHTML = `<ul class="events"><li class="ok">✅ All green in ${t}s. ${dev.n}'s change is now in <code>main</code>, so everyone else builds on top of it right away. No merge day.</li></ul>`;
+    $('#pushGood').disabled = false; $('#pushBad').disabled = false;
+  }
+  busy1 = false;
+}
+$('#pushGood').addEventListener('click', () => push1(false));
+$('#pushBad').addEventListener('click', () => push1(true));
+$('#fixBtn').addEventListener('click', async () => {
+  $('#fixBtn').classList.add('hidden');
+  await push1(false, failedDev);
+  fb1.querySelector('li').innerHTML += ' <br>Total cost of that bug: <b>about 5 minutes</b>. Compare: 3 days in Act 0.';
+});
+
+const freqData = [
+  { l: '1 hour', lines: 30, risk: 3, found: '1 hour', f: 2 },
+  { l: '1 day', lines: 200, risk: 12, found: '1 day', f: 8 },
+  { l: '3 days', lines: 700, risk: 35, found: '3 days', f: 22 },
+  { l: '1 week', lines: 1600, risk: 60, found: '1 week', f: 45 },
+  { l: '3 weeks', lines: 5000, risk: 92, found: '3 weeks', f: 100 }
+];
+function setFreq() {
+  const d = freqData[+$('#freq').value];
+  $('#freqLabel').textContent = d.l;
+  $('#barLines').style.width = (d.lines / 50) + '%'; $('#numLines').textContent = d.lines.toLocaleString();
+  $('#barRisk').style.width = d.risk + '%'; $('#numRisk').textContent = d.risk + '%';
+  $('#barFound').style.width = d.f + '%'; $('#numFound').textContent = d.found;
+}
+$('#freq').addEventListener('input', setFreq); setFreq();
+
+/* ---------------- ACT 2 ---------------- */
+const c2 = chips($('#pipe2'));
+const fb2 = $('#fb2');
+let v = { commit: 1, staging: 1, prod: 1 }, busy2 = false;
+const gateOn = () => $('#gateToggle').checked;
+function renderV() { $('#vCommit').textContent = 'v' + v.commit; $('#vStaging').textContent = 'v' + v.staging; $('#vProd').textContent = 'v' + v.prod; }
+function setMode() {
+  const on = gateOn();
+  $('#modeName').textContent = on ? 'Continuous Delivery' : 'Continuous Deployment';
+  $('#modeDesc').innerHTML = on ? 'Every passing change is ready to ship. A person decides <i>when</i>.' : 'No button. Every change that passes the pipeline goes straight to users.';
+  $('#gateStage').classList.toggle('hidden', !on);
+  if (!on) $('#releaseBtn').classList.add('hidden');
+  else if (v.staging > v.prod) { $('#releaseBtn').classList.remove('hidden'); c2.gate.classList.add('wait'); }
+}
+$('#gateToggle').addEventListener('change', setMode);
+
+$('#push2').addEventListener('click', async () => {
+  if (busy2) return; busy2 = true; $('#push2').disabled = true; $('#releaseBtn').disabled = true;
+  v.commit++; renderV(); resetChips(c2);
+  fb2.innerHTML = `<p class="muted">🤖 v${v.commit} pushed. CI first, then the CD stages…</p>`;
+  for (const s of ['build', 'test', 'package', 'staging']) {
+    c2[s].classList.add('run'); await sleep(520); c2[s].classList.remove('run'); c2[s].classList.add('ok');
+  }
+  v.staging = v.commit; renderV();
+  if (gateOn()) {
+    c2.gate.classList.add('wait');
+    $('#releaseBtn').classList.remove('hidden'); $('#releaseBtn').disabled = false;
+    $('#releaseBtn').textContent = `Release v${v.staging} to users ▶`;
+    const behind = v.staging - v.prod;
+    fb2.innerHTML = `<ul class="events"><li class="warn">⏸ v${v.staging} passed everything and is <b>sitting on staging, ready to ship</b>. Users are still on v${v.prod}${behind > 1 ? ` (${behind} versions behind, which is fine; you choose when)` : ''}. Push more, or press Release.</li></ul>`;
+  } else {
+    c2.prod.classList.add('run'); await sleep(520); c2.prod.classList.remove('run'); c2.prod.classList.add('ok');
+    v.prod = v.staging; renderV();
+    fb2.innerHTML = `<ul class="events"><li class="ok">🚀 v${v.prod} is live for users. No button, no checklist, no Friday-night SSH. It was pushed a few seconds ago.</li></ul>`;
+  }
+  busy2 = false; $('#push2').disabled = false;
+});
+$('#releaseBtn').addEventListener('click', async () => {
+  const b = $('#releaseBtn'); b.disabled = true; $('#push2').disabled = true; busy2 = true;
+  c2.gate.classList.remove('wait'); c2.gate.classList.add('ok');
+  c2.prod.classList.add('run'); await sleep(520); c2.prod.classList.remove('run'); c2.prod.classList.add('ok');
+  v.prod = v.staging; renderV(); b.classList.add('hidden');
+  fb2.innerHTML = `<ul class="events"><li class="ok">🚀 A human pressed one button and v${v.prod} is live. The robot did every actual step, exactly the same way every time.</li></ul>`;
+  busy2 = false; $('#push2').disabled = false;
+});
+renderV(); setMode();
+
+/* ---------------- ACT 3 ---------------- */
+const Y = [
+  ['<span class="key">name</span>: ship-it', null],
+  ['<span class="key">on</span>:', 'trigger'],
+  ['  <span class="key">push</span>:', 'trigger'],
+  ['    <span class="key">branches</span>: [main]', 'trigger'],
+  ['', null],
+  ['<span class="key">jobs</span>:', null],
+  ['  <span class="key">ci</span>:', null],
+  ['    <span class="key">runs-on</span>: <span class="s">ubuntu-latest</span>', 'robot'],
+  ['    <span class="key">steps</span>:', null],
+  ['      - <span class="key">uses</span>: <span class="s">actions/checkout@v4</span>', 'checkout'],
+  ['      - <span class="key">run</span>: <span class="s">npm ci &amp;&amp; npm run build</span>', 'build'],
+  ['      - <span class="key">run</span>: <span class="s">npm test</span>', 'test'],
+  ['      - <span class="key">uses</span>: <span class="s">actions/upload-artifact@v4</span>', 'package'],
+  ['        <span class="key">with</span>: { name: app, path: dist }', 'package'],
+  ['', null],
+  ['  <span class="key">deploy-staging</span>:', 'staging'],
+  ['    <span class="key">needs</span>: ci', 'needs'],
+  ['    <span class="key">runs-on</span>: <span class="s">ubuntu-latest</span>', 'robot'],
+  ['    <span class="key">steps</span>:', null],
+  ['      - <span class="key">run</span>: <span class="s">./deploy.sh staging</span>', 'staging'],
+  ['', null],
+  ['  <span class="key">deploy-prod</span>:', 'prod'],
+  ['    <span class="key">needs</span>: deploy-staging', 'needs'],
+  ['    <span class="key">environment</span>: <span class="s">production</span>  <span class="c"># requires approval</span>', 'gate'],
+  ['    <span class="key">runs-on</span>: <span class="s">ubuntu-latest</span>', 'robot'],
+  ['    <span class="key">steps</span>:', null],
+  ['      - <span class="key">run</span>: <span class="s">./deploy.sh production</span>', 'prod'],
+];
+const EX = {
+  trigger: ['Trigger: “when”', 'Run this whenever someone pushes to <code>main</code>. This is the “continuous” part: nobody starts the robot, the push does.'],
+  robot: ['Robot: “where”', 'Borrow a fresh Linux machine from GitHub for a few minutes. That machine is the robot. It starts clean every time, so “works on my machine” can\'t sneak in.'],
+  checkout: ['Checkout', 'Download the latest code, including the change that was just merged. This is the <b>integration</b> in CI.'],
+  build: ['Build', 'The exact commands you\'d type yourself. If the code doesn\'t even compile, stop here.'],
+  test: ['Test', 'Run every automated test. This one line is why CI is useful. No tests means the robot has nothing to check.'],
+  package: ['Package', 'Save the built app as a file (an “artifact”). Every later stage ships <i>this exact file</i>, not a rebuild.'],
+  needs: ['needs: “in order”', 'Only start if the previous job passed. One red stage stops everything after it. That\'s what makes it a pipeline.'],
+  staging: ['Deploy to staging', 'Put it on a private copy of the real site. From here on it\'s CD: the change is <b>ready to ship</b>.'],
+  gate: ['The human button', 'In GitHub settings, the <code>production</code> environment can require a reviewer. <b>Keep this line and you have Continuous Delivery. Delete it and you have Continuous Deployment.</b> One line is the whole difference.'],
+  prod: ['Deploy to production', 'Ship to real users. The robot runs the same script every time, so there\'s no wiki checklist and no forgotten config file.'],
+};
+const yaml = $('#yaml'); const c3 = chips($('#pipe3'));
+const hlMap = { needs: [], robot: ['robot'] };
+function pick(k, line) {
+  yaml.querySelectorAll('.ln').forEach(l => l.classList.toggle('active', l.dataset.k === k));
+  Object.values(c3).forEach(c => c.classList.remove('hl'));
+  (hlMap[k] || [k]).forEach(s => c3[s] && c3[s].classList.add('hl'));
+  $('#exT').textContent = EX[k][0]; $('#exP').innerHTML = EX[k][1];
+}
+Y.forEach(([h, k]) => {
+  const s = el('span', 'ln', h || ' ');
+  if (k) {
+    s.dataset.k = k; s.tabIndex = 0; s.setAttribute('role', 'button');
+    s.addEventListener('mouseenter', () => pick(k)); s.addEventListener('focus', () => pick(k)); s.addEventListener('click', () => pick(k));
+  }
+  yaml.append(s);
+});
+Object.entries(c3).forEach(([k, c]) => {
+  if (!EX[k]) return; c.style.cursor = 'pointer'; c.addEventListener('click', () => pick(k));
+});
+
+/* ---------------- QUIZ ---------------- */
+const Q = [
+  ['CI/CD is a tool, like Jenkins or GitHub Actions.', false, 'It\'s a <b>practice</b>: merge often, check automatically, ship automatically. Jenkins and GitHub Actions are just robots that carry it out.'],
+  ['Without automated tests, CI can\'t do much.', true, 'The robot can only check what you\'ve written checks for. With no tests, “green” only means it compiled.'],
+  ['Continuous Delivery means every commit goes to production automatically.', false, 'That\'s <b>Deployment</b>. Delivery means every commit <i>could</i> go out, and a human presses the button.'],
+  ['The “integration” in CI means merging everyone\'s code into main often, ideally at least daily.', true, 'Long-lived branches that merge once a month aren\'t CI, even if a robot runs tests on them.'],
+  ['CD only makes sense for big companies.', false, 'A solo project on GitHub Pages or Vercel is usually continuously deployed: push to main and it\'s live a minute later, and setting that up costs nothing.'],
+];
+let answered = 0, right = 0;
+const quiz = $('#quiz');
+Q.forEach(([q, fact, why]) => {
+  const li = el('li'); li.append(el('div', 'q', q));
+  const row = el('div', 'row'); row.style.margin = '0';
+  const ans = el('div', 'ans hidden');
+  ['Myth', 'Fact'].forEach((lab, i) => {
+    const b = el('button', 'btn', lab);
+    b.addEventListener('click', () => {
+      const ok = (i === 1) === fact;
+      li.classList.add(ok ? 'right' : 'wrong');
+      row.querySelectorAll('button').forEach(x => x.disabled = true);
+      ans.innerHTML = `<b>${ok ? '✓ Right' : '✕ Not quite'}: it's a ${fact ? 'fact' : 'myth'}.</b> ${why}`;
+      ans.classList.remove('hidden');
+      answered++; if (ok) right++;
+      $('#score').textContent = `· ${right}/${answered}` + (answered === Q.length ? (right === Q.length ? ' (you\'ll never have to google it again)' : ' (re-read the recap cards and you\'re set)') : '');
+    });
+    row.append(b);
+  });
+  li.append(row, ans); quiz.append(li);
+});
+})();
+</script>
+</body>
+</html>

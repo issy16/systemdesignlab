@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Run the same query with and without an index and watch how many rows the database has to read.">
+<title>Database Indexing · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/explainer.css">
+</head>
+<body>
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="Sections"><a href="#lab">Lab</a><a href="#optimize">Can it use it?</a><a href="#cost">The cost</a><a href="#real">EXPLAIN</a><a href="#recap">Recap</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>page 2 · stage 1 · one server</span><span class="hot">25 · 26</span></div>
+  <div class="eyebrow">Database indexing, query optimization</div>
+  <h1>Same query. Same data. <em>4 seconds vs 0.1 milliseconds.</em></h1>
+  <div class="scenario"><b>Encore</b>Ana's “My tickets” page runs one query: find every order for this email. With 2,000 orders it was instant. Encore now has 5 million orders, and the page takes 4 seconds. Nobody changed the code.</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">Open the lab ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>lab · break it, then fix it</span><span class="hot" id="modeTag">no index</span></div>
+  <h2>Find Ana's 3 orders</h2>
+  <pre class="sqlbox">SELECT * FROM orders WHERE email = 'ana@encore.example';</pre>
+
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">Orders in the table</span><div id="sizeSeg"></div></div>
+      <div class="ctl"><span class="lab-k">Index</span><div id="idxSeg"></div></div>
+      <div class="ctl"><span class="lab-k">Run the query</span><div id="player"></div></div>
+    </div>
+
+    <div class="compare" style="margin:0">
+      <div>
+        <h3>Table <span class="muted" id="cellNote" style="font-family:var(--body);text-transform:none;font-size:13px"></span></h3>
+        <div class="cells" id="rows" style="--cols:20" aria-hidden="true"></div>
+      </div>
+      <div id="treeBox">
+        <h3>Index on email</h3>
+        <div class="tree" id="tree"></div>
+        <p class="muted" id="treeNote" style="font-size:13px;margin:10px 0 0"></p>
+      </div>
+    </div>
+
+    <div class="meters" style="margin:0">
+      <div class="meter"><div class="k">Rows read</div><div class="v" id="mRows">0</div><div class="d" id="mRowsD">of 5,000,000</div></div>
+      <div class="meter"><div class="k">Matches found</div><div class="v" id="mHits">0 / 3</div><div class="d">Ana's orders</div></div>
+      <div class="meter"><div class="k">Query time</div><div class="v" id="mTime">0 ms</div><div class="d">simulated</div></div>
+    </div>
+    <div class="status" id="status" role="status">Press Play (or Step) to run the query.</div>
+    <ul class="log" id="runs" aria-label="Finished runs"><li class="mut">Finished runs will be listed here so you can compare them.</li></ul>
+  </div>
+
+  <h3>Try this</h3>
+  <ol class="missions" id="missions"></ol>
+
+  <div class="takeaway"><div class="t">Indexing in one line</div><p>Without an index the database must read <b>every row</b> to be sure it found all matches. An index is a sorted lookup structure (usually a B-tree) that jumps straight to the matching rows.</p></div>
+</section>
+
+<section class="panel" id="optimize">
+  <div class="panel-label"><span>act 2 · query optimization</span><span class="hot">26</span></div>
+  <h2>Having an index isn't enough. The query has to be able to use it.</h2>
+  <p>The index stores emails sorted exactly as written. Pick a query and see whether the database can still use it.</p>
+  <div id="qSeg" class="row" style="margin:10px 0"></div>
+  <pre class="sqlbox" id="qSql"></pre>
+  <div class="compare">
+    <div><h3>Plan <span id="qPill"></span></h3><p id="qWhy" style="margin:0"></p></div>
+    <div><h3>Fix</h3><p id="qFix" style="margin:0"></p></div>
+  </div>
+  <div class="takeaway"><div class="t">The one difference</div><p>An index helps only when the database can search the column <b>the same way it's sorted</b>. Wrapping the column in a function, or starting a search with a wildcard, sends it back to reading every row.</p></div>
+</section>
+
+<section class="panel" id="cost">
+  <div class="panel-label"><span>act 3 · the cost</span><span class="hot">tradeoff</span></div>
+  <h2>So why not index every column?</h2>
+  <p>Every index is an extra sorted copy of some data. Each new order has to be written into the table <i>and</i> into every index.</p>
+  <div class="ctl" style="max-width:420px">
+    <label for="nIdx">Indexes on the orders table: <b id="nIdxV">1</b></label>
+    <input type="range" id="nIdx" min="0" max="8" step="1" value="1">
+  </div>
+  <div class="bars" style="max-width:640px">
+    <span>Writes per new order</span><div class="bar"><i id="bW"></i></div><span class="num" id="nW"></span>
+    <span>Extra disk space</span><div class="bar"><i id="bD"></i></div><span class="num" id="nD"></span>
+    <span>Lookups made fast</span><div class="bar"><i id="bL" style="background:var(--ok)"></i></div><span class="num" id="nL"></span>
+  </div>
+  <p class="status" id="costTxt" style="margin-top:12px"></p>
+  <p class="muted" style="font-size:14px">Illustrative proportions. Real costs depend on the database, the column types, and the workload.</p>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>act 4 · the real thing</span><span class="hot">explain</span></div>
+  <h2>Ask the database what it did</h2>
+  <p><code>EXPLAIN ANALYZE</code> (Postgres) shows the plan a query actually used. This is illustrative output for the lab's query, before and after one <code>CREATE INDEX</code>. <b>Hover or tap a line.</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="Example EXPLAIN ANALYZE output"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 pick a line</div><p id="exP">Each highlighted line tells you something you saw in the lab.</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>recap · keep this</span><span class="hot">♥</span></div>
+  <h2>The whole page on one screen</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">Without</div><div class="t">Full scan</div><p>The database reads every row. The cost grows with the table, so the same query gets slower every month.</p></div>
+    <div class="card"><div class="sub">With</div><div class="t">Index</div><p>A sorted tree on the column. A lookup reads a handful of pages, whether the table has a thousand rows or a billion.</p></div>
+    <div class="card"><div class="sub">Check</div><div class="t">EXPLAIN</div><p>Never guess. <code>EXPLAIN ANALYZE</code> tells you whether the index was used and how many rows were read.</p></div>
+  </div>
+  <div class="takeaway"><div class="t">The tradeoff</div><p>Indexes make reads fast and writes slower, and they take space. Index the columns your important queries filter or sort by, not every column.</p></div>
+
+  <h3 style="margin-top:26px">Check it <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="Pages"></nav>
+</main>
+
+<script src="../assets/explainer.js"></script>
+<script>
+(() => {
+const { $, el } = X;
+const SIZES = [2000, 100000, 5000000];
+const MATCH_CELLS = [13, 97, 188];
+const CELLS = 200, CELLS_PER_TICK = 5, ROW_US = 0.8;
+
+/* ---------- query simulation: pure state + step ---------- */
+const depthFor = n => Math.max(2, Math.ceil(Math.log(n) / Math.log(300)));
+function init(size, indexed) {
+  return { size, indexed, step: 0, cell: 0, rowsRead: 0, hits: 0, done: false, depth: depthFor(size) };
+}
+function step(s) {
+  if (s.done) return s;
+  if (!s.indexed) {
+    const next = Math.min(CELLS, s.cell + CELLS_PER_TICK);
+    for (let c = s.cell; c < next; c++) if (MATCH_CELLS.includes(c)) s.hits++;
+    s.cell = next;
+    s.rowsRead = Math.round((s.cell / CELLS) * s.size);
+    if (s.cell >= CELLS) s.done = true;
+  } else {
+    s.step++;
+    if (s.step <= s.depth) s.rowsRead = 0;
+    else { s.hits = 3; s.rowsRead = 3; s.done = true; }
+  }
+  return s;
+}
+const timeMs = s => s.indexed ? (s.step * 0.02 + (s.done ? 0.03 : 0)) : s.rowsRead * ROW_US / 1000;
+const fmtMs = ms => ms < 1 ? ms.toFixed(2) + ' ms' : X.fmt(ms) + ' ms';
+
+/* ---------- UI ---------- */
+let S = init(SIZES[2], false), runs = [];
+const rowsBox = $('#rows');
+for (let i = 0; i < CELLS; i++) rowsBox.append(el('div', 'cell'));
+const cells = [...rowsBox.children];
+
+const mis = X.missions($('#missions'), [
+  { text: 'With <b>5,000,000</b> orders and <b>no index</b>, run the query to the end.', hint: 'It found Ana\'s 3 orders early, but it can\'t stop: there could be more further down.', check: () => runs.some(r => !r.indexed && r.size === 5000000) },
+  { text: 'Switch to <b>Index on email</b> and run it again.', hint: 'Compare the rows read in the run list below the lab.', check: () => runs.some(r => r.indexed && r.size === 5000000) },
+  { text: 'Now try <b>2,000</b> orders with <b>no index</b>.', hint: 'Still a full scan, but it barely matters. Indexes pay off as tables grow.', check: () => runs.some(r => !r.indexed && r.size === 2000) },
+]);
+
+function drawTree() {
+  const box = $('#tree'); box.innerHTML = '';
+  const lv = [];
+  for (let d = 0; d < S.depth; d++) {
+    const row = el('div', 'lvl');
+    const labels = d === 0 ? ['a…m', 'n…z'] : d === S.depth - 1 ? ['aaron… alex', 'ana@encore… → 3 rows', 'andre… anya'] : ['a…f', 'g…m'];
+    labels.forEach((t, i) => {
+      const hot = (d === 0 && i === 0) || (d === S.depth - 1 && i === 1) || (d > 0 && d < S.depth - 1 && i === 0);
+      const n = el('div', 'node', t);
+      if (S.indexed && hot && S.step > d) n.classList.add('hl');
+      row.append(n);
+    });
+    lv.push(row); box.append(row);
+  }
+  $('#treeNote').textContent = S.indexed
+    ? `${S.depth} levels for ${X.fmt(S.size)} rows. Each level narrows the search about 300×, so even a billion rows needs only about 4 levels.`
+    : 'No index yet. Switch it on to use this.';
+  $('#treeBox').style.opacity = S.indexed ? 1 : 0.5;
+}
+function render() {
+  const per = S.size / CELLS;
+  $('#cellNote').textContent = `(each square ≈ ${X.fmt(per)} rows)`;
+  cells.forEach((c, i) => {
+    const match = MATCH_CELLS.includes(i);
+    let cls = 'cell';
+    if (!S.indexed) { if (i < S.cell) cls += match ? ' hit' : ' on'; }
+    else if (S.done && match) cls += ' hit';
+    c.className = cls;
+  });
+  drawTree();
+  $('#mRows').textContent = X.fmt(S.rowsRead);
+  $('#mRowsD').textContent = S.indexed ? `plus ${Math.min(S.step, S.depth)} index pages` : `of ${X.fmt(S.size)}`;
+  $('#mHits').textContent = `${S.hits} / 3`;
+  $('#mTime').textContent = fmtMs(timeMs(S));
+  $('#mTime').parentElement.className = 'meter' + (timeMs(S) > 1000 ? ' bad' : timeMs(S) > 50 ? ' wait' : '');
+  $('#modeTag').textContent = S.indexed ? 'index on email' : 'no index';
+  const st = $('#status');
+  if (!S.step && !S.cell) { st.className = 'status'; st.textContent = 'Press Play (or Step) to run the query.'; }
+  else if (!S.done) {
+    st.className = 'status wait';
+    st.textContent = S.indexed ? `Reading index level ${S.step} of ${S.depth}: comparing “ana@encore.example” and going left or right.`
+      : `Sequential scan: reading row ${X.fmt(S.rowsRead)} of ${X.fmt(S.size)}. ${S.hits ? `Found ${S.hits} so far, but it has to keep going to be sure.` : ''}`;
+  } else {
+    st.className = 'status ' + (timeMs(S) > 1000 ? 'bad' : 'ok');
+    st.textContent = S.indexed ? `✓ Done: ${S.depth} index pages, then exactly 3 rows. ${fmtMs(timeMs(S))}.` : `${timeMs(S) > 1000 ? '✕' : '✓'} Done: read all ${X.fmt(S.size)} rows to return 3. ${fmtMs(timeMs(S))}.`;
+  }
+  mis.update(S);
+}
+function finish() {
+  player.pause();
+  runs.push({ size: S.size, indexed: S.indexed, rows: S.rowsRead, ms: timeMs(S) });
+  const log = $('#runs'); if (runs.length === 1) log.innerHTML = '';
+  log.append(el('li', S.indexed ? 'ok' : (timeMs(S) > 1000 ? 'bad' : ''), `${S.indexed ? 'Index   ' : 'No index'} · ${X.fmt(S.size).padStart(9)} orders · read ${X.fmt(S.rows || S.rowsRead).padStart(9)} rows · ${fmtMs(timeMs(S))}`));
+  mis.update(S);
+}
+const player = X.player($('#player'), {
+  ms: 70,
+  step: () => { if (S.done) { S = init(S.size, S.indexed); } step(S); render(); if (S.done) finish(); },
+  reset: () => { S = init(S.size, S.indexed); render(); },
+});
+const resetRun = () => { player.pause(); S = init(SIZES[sizeSeg.value], idxSeg.value === 1); render(); };
+const sizeSeg = X.seg($('#sizeSeg'), ['2,000', '100,000', '5,000,000'], resetRun, 2);
+const idxSeg = X.seg($('#idxSeg'), ['No index', 'Index on email'], resetRun, 0);
+render();
+
+/* ---------- act 2: can it use the index? ---------- */
+const QV = [
+  ['= exact', "WHERE email = 'ana@encore.example'", true, 'The column is compared directly, so the database walks the sorted index straight to the match.', 'Nothing to fix.'],
+  ['LOWER(email)', "WHERE LOWER(email) = 'ana@encore.example'", false, 'The index is sorted by <code>email</code>, not by <code>LOWER(email)</code>. To compare, the database has to compute LOWER() for every row.', 'Store emails lowercased when they\'re saved, or create an index on the expression: <code>CREATE INDEX ON orders (LOWER(email))</code>.'],
+  ["LIKE '%@gmail.com'", "WHERE email LIKE '%@gmail.com'", false, 'A leading wildcard means “ends with”. A sorted list can\'t help you find everything that <i>ends</i> with something, just as a phone book can\'t find all surnames ending in “-son”.', 'Search on a column that starts with what you know (e.g. store the domain separately), or use a full-text or trigram index.'],
+  ["LIKE 'ana%'", "WHERE email LIKE 'ana%'", true, '“Starts with” works with sorted order: jump to “ana” and read forward until the prefix stops matching.', 'Works with a B-tree index. In Postgres this needs the C collation or a <code>text_pattern_ops</code> index.'],
+];
+const showQ = i => {
+  const [, w, ok, why, fix] = QV[i];
+  $('#qSql').textContent = 'SELECT * FROM orders ' + w + ';';
+  $('#qPill').innerHTML = ok ? '<span class="pill ok">✓ Index scan</span>' : '<span class="pill bad">✕ Full scan</span>';
+  $('#qWhy').innerHTML = why; $('#qFix').innerHTML = fix;
+};
+X.seg($('#qSeg'), QV.map(q => q[0]), showQ, 0); showQ(0);
+
+/* ---------- act 3: write cost ---------- */
+function drawCost() {
+  const n = +$('#nIdx').value;
+  $('#nIdxV').textContent = n;
+  $('#bW').style.width = ((1 + n) / 9) * 100 + '%'; $('#nW').textContent = 1 + n;
+  $('#bD').style.width = Math.min(100, n * 14) + '%'; $('#nD').textContent = '+' + n * 15 + '%';
+  $('#bL').style.width = (n / 8) * 100 + '%'; $('#nL').textContent = n + ' cols';
+  $('#costTxt').innerHTML = n === 0 ? 'No indexes: inserts are as cheap as possible, but every lookup is a full scan.'
+    : n <= 3 ? `${n} index${n > 1 ? 'es' : ''}: each new order costs ${1 + n} writes. A reasonable price for fast lookups on the columns you actually search by.`
+    : `${n} indexes: every ticket sale now does ${1 + n} writes. During an on-sale rush, that slows down the exact thing you're trying to sell. Drop indexes no query uses.`;
+}
+$('#nIdx').addEventListener('input', drawCost); drawCost();
+
+/* ---------- act 4: EXPLAIN ---------- */
+X.codeMap($('#code'), [
+  ['<span class="c">-- before: no index</span>', null],
+  ['<span class="key">Seq Scan</span> on orders  (actual time=0.4..3912.5 rows=3)', 'seq'],
+  ['  Filter: (email = <span class="s">\'ana@encore.example\'</span>)', 'filter'],
+  ['  <span class="key">Rows Removed by Filter</span>: 4999997', 'removed'],
+  ['Execution Time: <span class="s">3912.6 ms</span>', 'time'],
+  ['', null],
+  ['<span class="key">CREATE INDEX</span> orders_email_idx ON orders (email);', 'create'],
+  ['', null],
+  ['<span class="c">-- after</span>', null],
+  ['<span class="key">Index Scan</span> using orders_email_idx on orders', 'idx'],
+  ['  <span class="key">Index Cond</span>: (email = <span class="s">\'ana@encore.example\'</span>)', 'cond'],
+  ['Execution Time: <span class="s">0.08 ms</span>', 'time2'],
+], {
+  seq: ['Seq Scan', 'Sequential scan: read the table from top to bottom. This is the lab with the index switched off.'],
+  filter: ['Filter', 'Each row is read first and checked second. A filter throws rows away <i>after</i> the work of reading them.'],
+  removed: ['Rows Removed by Filter', 'The giveaway. Almost 5 million rows read and thrown away to return 3. A big number here on a hot query means it needs an index.'],
+  time: ['Execution Time', 'Illustrative, not a benchmark. The point is the shape: this number grows with the table.'],
+  create: ['CREATE INDEX', 'Builds the sorted tree once. From then on the database keeps it up to date on every insert, update and delete (act 3).'],
+  idx: ['Index Scan', 'The planner chose the index: walk the tree, then fetch only the matching rows.'],
+  cond: ['Index Cond', 'The condition is being answered by the index itself, not checked row by row. Compare it with “Filter” above.'],
+  time2: ['After', 'Stays about the same at 5 thousand or 5 billion rows, because the tree only gets slightly deeper.'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: '“Search orders by email” was fast in development and is slow in production. The code is identical. What\'s the most likely cause?', opts: [
+    ['The production server has a slower CPU', false, 'Possible, but it wouldn\'t explain going from instant to seconds. A full scan that grows with the data does.'],
+    ['There\'s no index on email, and production has far more rows', true, 'A full scan is cheap on 2,000 rows and expensive on 5 million. Dev data hides the problem.'],
+    ['The query needs SELECT email instead of SELECT *', false, 'Selecting fewer columns helps a little, but the database still has to read every row to find the matches.'],
+  ] },
+  { q: 'There\'s an index on email, but EXPLAIN still shows a Seq Scan for <code>WHERE LOWER(email) = ?</code>. Why?', opts: [
+    ['The index is broken and needs rebuilding', false, 'The index is fine. It just isn\'t sorted by the value the query compares.'],
+    ['The index is sorted by email, not by LOWER(email)', true, 'Wrapping the column in a function hides it from the index. Index the expression, or store emails lowercased.'],
+    ['Postgres never uses indexes for text columns', false, 'It does, all the time. The exact-match query in the lab used one.'],
+  ] },
+  { q: 'Ben wants to add an index to all 12 columns of the orders table “to be safe”. What happens?', opts: [
+    ['Every query gets faster and nothing else changes', false, 'Reads that use them get faster, but each insert now updates 12 extra structures.'],
+    ['Ticket sales (inserts) get slower and the table takes much more disk space', true, 'Indexes cost writes and storage. Add them for real query patterns, and remove ones nothing uses.'],
+    ['The database will refuse more than one index per table', false, 'It will happily let you create them. That\'s why this mistake is common.'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'database-indexing');
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="See how an innocent loop turns into 101 database queries, and how a connection pool decides who waits.">
+<title>N+1 and Connection Pools · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/explainer.css">
+</head>
+<body>
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="Sections"><a href="#n1">N+1</a><a href="#lab">Pool lab</a><a href="#real">The code</a><a href="#recap">Recap</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>page 3 · stage 1 · one server</span><span class="hot">27 · 28</span></div>
+  <div class="eyebrow">N+1 queries, connection pooling</div>
+  <h1>Four lines of code. <em>101 trips to the database.</em></h1>
+  <div class="scenario"><b>Encore</b>Cai built a “This week's concerts” page: list the concerts, show each venue's name. It looks perfect with 5 test concerts. With real data it's slow, and at busy times other pages start failing with “timed out waiting for a database connection”.</div>
+  <div class="row"><a class="btn primary" href="#n1" style="text-decoration:none">Start ↓</a></div>
+</section>
+
+<section class="panel" id="n1">
+  <div class="panel-label"><span>act 1 · the n+1 query</span><span class="hot">27</span></div>
+  <h2>Load the page and count the queries</h2>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">How the code fetches venues</span><div id="patSeg"></div></div>
+      <div class="ctl">
+        <label for="nC">Concerts on the page: <b id="nCV">20</b></label>
+        <input type="range" id="nC" min="5" max="100" step="5" value="20">
+      </div>
+      <div class="ctl"><span class="lab-k">Run it</span><div><button class="btn primary" id="load" type="button">Load the page</button></div></div>
+    </div>
+    <pre class="sqlbox" id="patCode"></pre>
+    <div class="meters" style="margin:0">
+      <div class="meter"><div class="k">Queries sent</div><div class="v" id="mQ">–</div></div>
+      <div class="meter"><div class="k">Database time</div><div class="v" id="mT">–</div><div class="d">~2.5 ms per round trip (simulated)</div></div>
+    </div>
+    <ul class="log" id="qlog" aria-label="Query log"><li class="mut">The query log appears here.</li></ul>
+    <div class="status" id="n1Status" role="status">Press “Load the page”.</div>
+  </div>
+  <div class="takeaway"><div class="t">N+1 in one line</div><p><b>1</b> query to get the list, then <b>N</b> more, one per item, usually hidden inside a loop or an ORM's lazy loading. Fetch related data in bulk instead.</p></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>lab · the connection pool</span><span class="hot" id="poolTag">pool of 10</span></div>
+  <h2>Every query needs a connection. There aren't many.</h2>
+  <p>Opening a database connection is slow (about 30 ms here: network handshake, login, setup). Encore's database plan also allows only <b>20 connections</b> in total. A <b>connection pool</b> opens a few connections once and lends them out. A request borrows one, runs its queries, and gives it back. If none are free, the request waits.</p>
+
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl">
+        <label for="rate">Traffic: <b id="rateV">40</b> page loads/second</label>
+        <input type="range" id="rate" min="10" max="300" step="10" value="40">
+      </div>
+      <div class="ctl">
+        <label for="pool">Pool size: <b id="poolV">10</b> connections</label>
+        <input type="range" id="pool" min="1" max="20" step="1" value="10">
+      </div>
+      <div class="ctl"><span class="lab-k">Query pattern</span><div id="qSeg"></div></div>
+      <div class="ctl"><span class="lab-k">Connections</span><div id="cSeg"></div></div>
+      <div class="ctl"><span class="lab-k">Simulation</span><div id="player"></div></div>
+    </div>
+    <div>
+      <div class="lab-k" style="font-size:14px;font-weight:500;margin-bottom:6px" id="slotLbl">Pool connections (busy = filled)</div>
+      <div class="tokens" id="slots" aria-hidden="true"></div>
+    </div>
+    <div class="meters" style="margin:0">
+      <div class="meter"><div class="k">Page load time</div><div class="v" id="mLat">0 ms</div><div class="d">average, last 3 s</div></div>
+      <div class="meter"><div class="k">Waiting for a connection</div><div class="v" id="mWait">0</div><div class="d">requests in line</div></div>
+      <div class="meter"><div class="k">Connections open</div><div class="v" id="mOpen">0 / 20</div><div class="d">database limit is 20</div></div>
+      <div class="meter"><div class="k">Errors</div><div class="v" id="mErr">0</div><div class="d">last 3 s</div></div>
+    </div>
+    <div class="status" id="status" role="status">Press Play to start sending traffic.</div>
+  </div>
+
+  <h3>Try this</h3>
+  <ol class="missions" id="missions"></ol>
+
+  <div class="takeaway"><div class="t">The one difference</div><p>Without a pool, every request <b>opens its own connection</b>: slow, and a traffic spike blows past the database's limit. With a pool, requests <b>borrow from a fixed set</b>: fast, and the database is protected. When the pool runs out, requests wait their turn.</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>act 3 · the real thing</span><span class="hot">orm</span></div>
+  <h2>What it looks like in the code</h2>
+  <p>Written with Prisma-style syntax, but every ORM (Django, Rails, Sequelize, Hibernate…) has the same trap and the same fix. <b>Hover or tap a line.</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="Example ORM code"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 pick a line</div><p id="exP">Each highlighted line maps to something from the two labs.</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>recap · keep this</span><span class="hot">♥</span></div>
+  <h2>The whole page on one screen</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">The bug</div><div class="t">N+1 queries</div><p>One query for the list, plus one per item. Invisible with test data, painful with real data. Look for queries inside loops.</p></div>
+    <div class="card"><div class="sub">The fix</div><div class="t">Fetch in bulk</div><p>A JOIN, or the ORM's eager loading (<code>include</code>, <code>select_related</code>, <code>includes</code>). 2 queries instead of 101.</p></div>
+    <div class="card"><div class="sub">The guard</div><div class="t">Connection pool</div><p>Reuse a fixed set of open connections. Faster requests, and the database never sees more connections than it can handle.</p></div>
+  </div>
+  <div class="takeaway"><div class="t">The tradeoff</div><p>A bigger pool lets more requests run at once, but it can't go past what the database allows, and every app server has its own pool. Fix slow queries first: they hold connections longer and drain the pool.</p></div>
+
+  <h3 style="margin-top:26px">Check it <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="Pages"></nav>
+</main>
+
+<script src="../assets/explainer.js"></script>
+<script>
+(() => {
+const { $, el } = X;
+const RT = 2.5, CONNECT = 30, DB_LIMIT = 20, RENDER = 20, DT = 100, WAIT_MAX = 2000;
+const VENUES = ['The Forum', 'Red Rocks', 'Brixton Academy', 'Paradiso', 'Budokan', 'Fillmore', 'Olympia', 'Roundhouse'];
+
+/* ---------- act 1: N+1 ---------- */
+const PATS = [
+  { label: 'Loop (N+1)', code: n => `concerts = SELECT * FROM concerts LIMIT ${n};\nfor (c of concerts)\n  c.venue = SELECT * FROM venues WHERE id = c.venue_id;`, queries: n => 1 + n },
+  { label: 'Eager load', code: n => `concerts = SELECT * FROM concerts LIMIT ${n};\nvenues   = SELECT * FROM venues WHERE id IN (…${n} ids…);`, queries: () => 2 },
+  { label: 'JOIN', code: n => `SELECT concerts.*, venues.name\nFROM concerts JOIN venues ON venues.id = concerts.venue_id\nLIMIT ${n};`, queries: () => 1 },
+];
+let pat = 0, busy = false;
+const showPat = () => { $('#patCode').textContent = PATS[pat].code(+$('#nC').value); $('#nCV').textContent = $('#nC').value; };
+X.seg($('#patSeg'), PATS.map(p => p.label), i => { pat = i; showPat(); }, 0);
+$('#nC').addEventListener('input', showPat); showPat();
+$('#load').addEventListener('click', async () => {
+  if (busy) return; busy = true; $('#load').disabled = true;
+  const n = +$('#nC').value, q = PATS[pat].queries(n);
+  const log = $('#qlog'); log.innerHTML = '';
+  const lines = pat === 0
+    ? ['SELECT * FROM concerts LIMIT ' + n, ...Array.from({ length: n }, (_, i) => `SELECT * FROM venues WHERE id = ${101 + i}   -- ${VENUES[i % VENUES.length]}`)]
+    : pat === 1 ? ['SELECT * FROM concerts LIMIT ' + n, `SELECT * FROM venues WHERE id IN (101, 102, … ${100 + n})`]
+    : [`SELECT concerts.*, venues.name FROM concerts JOIN venues … LIMIT ${n}`];
+  for (let i = 0; i < lines.length; i++) {
+    if (i < 12 || i === lines.length - 1) log.append(el('li', i ? '' : 'mut', `${String(i + 1).padStart(3)}  ${X.esc(lines[i])}`));
+    else if (i === 12) log.append(el('li', 'wait', `     … ${lines.length - 13} more like this …`));
+    $('#mQ').textContent = i + 1;
+    $('#mT').textContent = X.fmt((i + 1) * RT) + ' ms';
+    if (i < 40) await X.sleep(35);
+  }
+  const ms = q * RT;
+  $('#mQ').parentElement.className = 'meter' + (q > 10 ? ' bad' : ' ok');
+  const st = $('#n1Status');
+  st.className = 'status ' + (q > 10 ? 'bad' : 'ok');
+  st.textContent = q > 10
+    ? `✕ ${q} queries for one page, ${X.fmt(ms)} ms of waiting on the database. Each one is fast. There are just too many, and the count grows with the page.`
+    : `✓ ${q} ${q === 1 ? 'query' : 'queries'}, ${X.fmt(ms)} ms. Same page, same data, and the count stays the same at 5 concerts or 500.`;
+  busy = false; $('#load').disabled = false;
+});
+
+/* ---------- pool simulation: pure state + tick ---------- */
+function init(seed) { return { r: seed, t: 0, rate: 40, pool: 10, joined: false, pooled: true, slots: Array(10).fill(0), active: [], queue: [], done: [], errs: [], ticks: 0 }; }
+const holdMs = s => (s.joined ? 2 : 21) * RT + (s.pooled ? 0 : CONNECT);
+function tick(s) {
+  const t0 = s.t, t1 = t0 + DT;
+  if (s.t % 1000 === 0) s.mod = 0.6 + 0.8 * X.rnd(s);
+  const arr = [];
+  for (let i = 0, n = X.poisson(s, s.rate * (s.mod || 1) * DT / 1000); i < n; i++) arr.push(t0 + X.rnd(s) * DT);
+  arr.sort((a, b) => a - b);
+  if (s.pooled) {
+    while (s.slots.length < s.pool) s.slots.push(t0);
+    if (s.slots.length > s.pool) s.slots = s.slots.sort((a, b) => a - b).slice(0, s.pool);
+    s.queue.push(...arr);
+    while (s.queue.length) {
+      let wi = 0;
+      for (let i = 1; i < s.slots.length; i++) if (s.slots[i] < s.slots[wi]) wi = i;
+      const start = Math.max(s.slots[wi], s.queue[0]);
+      if (start >= t1) break;
+      const a = s.queue.shift();
+      const fin = start + holdMs(s);
+      s.slots[wi] = fin;
+      s.done.push([fin, fin - a + RENDER]);
+    }
+    while (s.queue.length && t1 - s.queue[0] > WAIT_MAX) { s.queue.shift(); s.errs.push(t1); }
+  } else {
+    s.queue = [];
+    for (const a of arr) {
+      s.active = s.active.filter(f => f > a);
+      if (s.active.length >= DB_LIMIT) { s.errs.push(a); continue; }
+      const fin = a + holdMs(s);
+      s.active.push(fin);
+      s.done.push([fin, fin - a + RENDER]);
+    }
+  }
+  s.t = t1; s.ticks++;
+  s.active = s.active.filter(f => f > t1);
+  s.done = s.done.filter(d => d[0] > t1 - 4000);
+  s.errs = s.errs.filter(t => t > t1 - 3000);
+  return s;
+}
+function metrics(s) {
+  const win = s.done.filter(d => d[0] <= s.t && d[0] > s.t - 3000).map(d => d[1]);
+  const busySlots = s.pooled ? s.slots.filter(f => f > s.t).length : s.active.length;
+  return { lat: X.avg(win), wait: s.queue.length, open: s.pooled ? s.pool : busySlots, busy: busySlots, err: s.errs.length };
+}
+
+/* ---------- pool UI ---------- */
+let S = init(11);
+const mis = X.missions($('#missions'), [
+  { text: 'Press <b>Play</b> with the N+1 pattern, a pool of 10, and 40 page loads/second.', hint: 'Each page holds a connection for ~53 ms (21 queries). Only a few connections are busy at once.', check: s => s.ticks >= 30 && !s.joined && s.pooled },
+  { text: 'Raise traffic to <b>200</b>/second.', hint: 'Now the pool runs dry. Requests line up waiting for a connection, and some give up after 2 s.', check: s => s.rate >= 200 && !s.joined && s.pooled && (s.queue.length > 20 || s.errs.length > 0) },
+  { text: 'Keep the traffic, but switch the query pattern to <b>JOIN</b>.', hint: 'Each request now holds a connection for 5 ms instead of 53. The same pool serves 10× the traffic.', check: s => s.joined && s.rate >= 200 && s.pooled && s.queue.length < 5 && s.ticks > 20 },
+  { text: 'Switch to <b>New connection per request</b> and push traffic to 300.', hint: 'Every page now pays 30 ms to connect, and the spikes go over the database\'s 20-connection limit.', check: s => !s.pooled && s.rate >= 300 && s.errs.length > 0 },
+]);
+const resetTicks = () => { S.ticks = 0; };
+function render() {
+  const m = metrics(S);
+  $('#rateV').textContent = S.rate; $('#poolV').textContent = S.pool;
+  $('#poolTag').textContent = S.pooled ? `pool of ${S.pool}` : 'no pool';
+  $('#pool').disabled = !S.pooled;
+  const slots = $('#slots'); slots.innerHTML = '';
+  if (S.pooled) {
+    $('#slotLbl').textContent = `Pool connections: ${m.busy} of ${S.pool} busy`;
+    for (let i = 0; i < S.pool; i++) slots.append(el('span', 'tok' + (i < m.busy ? '' : ' empty')));
+  } else {
+    $('#slotLbl').textContent = `Open connections: ${m.busy} of the database's ${DB_LIMIT}`;
+    for (let i = 0; i < DB_LIMIT; i++) slots.append(el('span', 'tok' + (i < m.busy ? '' : ' empty')));
+  }
+  $('#mLat').textContent = X.fmt(m.lat) + ' ms';
+  $('#mWait').textContent = X.fmt(m.wait);
+  $('#mOpen').textContent = `${m.open} / ${DB_LIMIT}`;
+  $('#mErr').textContent = X.fmt(m.err);
+  $('#mErr').parentElement.className = 'meter' + (m.err ? ' bad' : '');
+  $('#mWait').parentElement.className = 'meter' + (m.wait > 20 ? ' bad' : m.wait > 0 ? ' wait' : '');
+  const st = $('#status');
+  if (!S.t) { st.className = 'status'; st.textContent = 'Press Play to start sending traffic.'; }
+  else if (m.err && !S.pooled) { st.className = 'status bad'; st.textContent = `✕ FATAL: too many connections. Without a pool, a spike opened more than the database's ${DB_LIMIT}. ${m.err} requests failed in the last 3 s.`; }
+  else if (m.err) { st.className = 'status bad'; st.textContent = `✕ ${m.err} requests timed out waiting for a connection. All ${S.pool} are busy ${S.joined ? '' : 'running N+1 queries'}.`; }
+  else if (m.wait > 0) { st.className = 'status wait'; st.textContent = `⚠ All ${S.pool} connections busy: ${m.wait} requests waiting their turn.`; }
+  else { st.className = 'status ok'; st.textContent = `✓ Healthy: a connection is free whenever a request needs one. Each page holds one for ~${X.fmt(holdMs(S))} ms.`; }
+  player.clock(`t = ${(S.t / 1000).toFixed(1)} s`);
+  mis.update(S);
+}
+const player = X.player($('#player'), {
+  step: () => { tick(S); render(); }, stepTicks: 5,
+  reset: () => { const keep = { rate: S.rate, pool: S.pool, joined: S.joined, pooled: S.pooled }; S = Object.assign(init(11), keep); S.slots = Array(S.pool).fill(0); mis.reset(); render(); },
+});
+$('#rate').addEventListener('input', e => { S.rate = +e.target.value; resetTicks(); render(); });
+$('#pool').addEventListener('input', e => { S.pool = +e.target.value; resetTicks(); render(); });
+X.seg($('#qSeg'), ['N+1 (21 queries)', 'JOIN (1 query)'], i => { S.joined = i === 1; resetTicks(); render(); }, 0);
+X.seg($('#cSeg'), ['Pool (reuse)', 'New connection per request'], i => { S.pooled = i === 0; S.queue = []; S.active = []; resetTicks(); render(); }, 0);
+render();
+
+/* ---------- act 3: code ---------- */
+X.codeMap($('#code'), [
+  ['<span class="c">// ✕ N+1: 1 query for the list…</span>', null],
+  ['<span class="key">const</span> concerts = <span class="key">await</span> db.concert.findMany({ take: 20 });', 'list'],
+  ['<span class="key">for</span> (<span class="key">const</span> c <span class="key">of</span> concerts) {', 'loop'],
+  ['  c.venue = <span class="key">await</span> db.venue.findUnique({ where: { id: c.venueId } });', 'loop'],
+  ['}', null],
+  ['', null],
+  ['<span class="c">// ✓ 2 queries, no matter how many concerts</span>', null],
+  ['<span class="key">const</span> concerts = <span class="key">await</span> db.concert.findMany({', 'fix'],
+  ['  take: 20, <span class="key">include</span>: { venue: <span class="s">true</span> },', 'fix'],
+  ['});', null],
+  ['', null],
+  ['<span class="c"># .env: the pool lives in the connection string</span>', null],
+  ['DATABASE_URL=<span class="s">"postgresql://app@db:5432/encore</span>', 'url'],
+  ['  <span class="s">?connection_limit=10&amp;pool_timeout=2"</span>', 'pool'],
+], {
+  list: ['The “1”', 'One query fetches the concerts. Nothing wrong yet.'],
+  loop: ['The “N”', 'An <code>await</code> on a query inside a loop: one round trip per concert. With lazy-loading ORMs, it can even hide inside a template that just prints <code>c.venue.name</code>.'],
+  fix: ['Eager loading', '<code>include</code> tells the ORM to fetch all the venues in one extra query (<code>WHERE id IN (…)</code>). Django calls it <code>select_related</code>, Rails calls it <code>includes</code>.'],
+  url: ['One app, one pool', 'The app opens its connections once at startup and keeps them. Every request borrows from this set.'],
+  pool: ['Pool settings', '<code>connection_limit=10</code> is the pool size from the lab. <code>pool_timeout=2</code> is how long a request waits for a free connection before failing (the timeouts you saw).'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: 'The query log for one page shows 1 query on <code>orders</code> followed by 50 nearly identical queries on <code>users</code>. What\'s going on?', opts: [
+    ['An N+1: the code loads each order\'s user one at a time', true, 'The give-away pattern: one list query, then one query per row. Eager-load users or JOIN them.'],
+    ['The database is retrying a failed query', false, 'Retries would repeat the same query. These differ only by the id. That\'s a loop.'],
+    ['It\'s normal: ORMs always run one query per row', false, 'Only when you let them lazy-load. Every ORM has a way to fetch related rows in bulk.'],
+  ] },
+  { q: 'At peak, Encore logs “timed out waiting for a connection from the pool”. The database CPU is at 15%. What\'s the best first step?', opts: [
+    ['Raise the pool size to 500', false, 'The database only allows so many connections, and each app server has its own pool. It also hides the real problem.'],
+    ['Find what holds connections for a long time (slow or N+1 queries) and fix it', true, 'Low database CPU with an exhausted pool means connections are mostly being held, not used. Shorter holds free the pool.'],
+    ['Turn off pooling so each request opens its own connection', false, 'That makes every request slower, and spikes hit the database\'s connection limit instead.'],
+  ] },
+  { q: 'Encore runs 6 app servers, each with a pool of 10. The database allows 50 connections. What happens at peak?', opts: [
+    ['Nothing: pools are shared across servers', false, 'Each server process has its own pool. 6 × 10 = 60 connections can be requested.'],
+    ['Up to 60 connections are requested, so some fail against the 50 limit', true, 'Size pools so that servers × pool size stays under the database limit, or put a shared pooler (like PgBouncer) in front.'],
+    ['The database queues the extra 10 automatically', false, 'Most databases refuse connections over the limit with an error rather than queueing them.'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'n-plus-1-pooling');
+})();
+</script>
+</body>
+</html>

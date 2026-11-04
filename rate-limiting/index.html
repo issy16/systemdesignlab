@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Send bursts of requests through a token bucket, fight off a scraper bot, and see why limits belong to each user.">
+<title>Rate Limiting · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/explainer.css">
+</head>
+<body>
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="Sections"><a href="#lab">Lab</a><a href="#real">The response</a><a href="#recap">Recap</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>page 7 · stage 2 · more traffic</span><span class="hot">1</span></div>
+  <div class="eyebrow">Rate limiting, token bucket</div>
+  <h1>One bot shouldn't be able <em>to take the site down for everyone.</em></h1>
+  <div class="scenario"><b>Encore</b>A scalper's bot hits the seat map 150 times a second, looking for cheap seats to resell. The server handles about 50 requests a second. Ana, a real fan, just wants to check out. Your job: slow the bot down without slowing Ana down.</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">Open the lab ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>lab · break it, then fix it</span><span class="hot" id="tag">no limit</span></div>
+  <h2>The token bucket</h2>
+  <p>Each bucket holds up to <b>B</b> tokens and refills at <b>R</b> tokens per second. Every request spends one token. No token means the request is rejected right away with <code>429 Too Many Requests</code>, so the server never has to do that work. Numbers are simulated.</p>
+
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">Rate limiter</span><div id="modeSeg"></div></div>
+      <div class="ctl">
+        <label for="cap">Bucket size B (burst): <b id="capV">10</b> tokens</label>
+        <input type="range" id="cap" min="1" max="30" step="1" value="10">
+      </div>
+      <div class="ctl">
+        <label for="refill">Refill rate R: <b id="refillV">5</b> tokens/second</label>
+        <input type="range" id="refill" min="1" max="30" step="1" value="5">
+      </div>
+      <div class="ctl"><span class="lab-k">Traffic</span>
+        <div class="presets"><button class="btn sm bad" id="bot" type="button" aria-pressed="false">🤖 Bot: off</button><button class="btn sm" id="burst" type="button">Ana: 15 quick clicks</button></div>
+      </div>
+      <div class="ctl"><span class="lab-k">Simulation</span><div id="player"></div></div>
+    </div>
+
+    <div class="compare" style="margin:0">
+      <div><h3 id="bA">Ana's bucket</h3><div class="tokens" id="tA" aria-hidden="true"></div><p class="muted" style="font-size:13px;margin:6px 0 0" id="tAt"></p></div>
+      <div><h3 id="bB">Bot's bucket</h3><div class="tokens" id="tB" aria-hidden="true"></div><p class="muted" style="font-size:13px;margin:6px 0 0" id="tBt"></p></div>
+    </div>
+
+    <div class="meters" style="margin:0">
+      <div class="meter"><div class="k">Ana's requests</div><div class="v" id="mAna">–</div><div class="d" id="mAnaD">succeeded, last 5 s</div></div>
+      <div class="meter"><div class="k">Bot's requests</div><div class="v" id="mBot">–</div><div class="d" id="mBotD">succeeded, last 5 s</div></div>
+      <div class="meter"><div class="k">Server load</div><div class="v" id="mLoad">0%</div><div class="d">~50 requests/s capacity</div></div>
+    </div>
+    <div>
+      <div class="lab-k" style="font-size:14px;font-weight:500;margin-bottom:6px">Ana's request log</div>
+      <ul class="log" id="log" aria-label="Ana's request log"><li class="mut">Ana loads a page about once a second.</li></ul>
+    </div>
+    <div class="status" id="status" role="status">Press Play to start.</div>
+  </div>
+
+  <h3>Try this</h3>
+  <ol class="missions" id="missions"></ol>
+
+  <div class="takeaway"><div class="t">The one difference</div><p>A <b>single shared limit</b> protects the server but punishes everyone for the bot's behavior. A <b>limit per user</b> (per account, API key or IP) protects the server <i>and</i> keeps the bot's behavior the bot's problem.</p></div>
+  <div class="takeaway"><div class="t">Rate limiting in one line</div><p>Cap how many requests each client can make in a time window, and reject the extra ones cheaply with a 429 before they cost real work. The bucket size allows short bursts; the refill rate sets the long-run limit.</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>act 2 · the real thing</span><span class="hot">http 429</span></div>
+  <h2>What the bot actually receives, and the code behind it</h2>
+  <p><b>Hover or tap a line.</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="Example 429 response and token bucket code"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 pick a line</div><p id="exP">Each highlighted line maps to the lab.</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>recap · keep this</span><span class="hot">♥</span></div>
+  <h2>The whole page on one screen</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">What</div><div class="t">Rate limit</div><p>A cap on requests per client per time window. Extra requests get a fast 429 instead of using up server capacity.</p></div>
+    <div class="card"><div class="sub">How</div><div class="t">Token bucket</div><p>Bucket size = how big a burst is allowed. Refill rate = the sustained limit. Simple, cheap, and the most common algorithm.</p></div>
+    <div class="card"><div class="sub">Who</div><div class="t">Per client</div><p>Key the bucket by user, API key or IP so one heavy client can't use up everyone's allowance.</p></div>
+  </div>
+  <div class="takeaway"><div class="t">The tradeoff</div><p>Limits that are too tight block real fans at exactly the busiest moment, and limits that are too loose don't protect anything. Allow realistic bursts, limit per client, and tell clients when to come back (<code>Retry-After</code>).</p></div>
+
+  <h3 style="margin-top:26px">Check it <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="Pages"></nav>
+</main>
+
+<script src="../assets/explainer.js"></script>
+<script>
+(() => {
+const { $, el } = X;
+const DT = 100, SERVER_CAP = 50, QMAX = 40, WIN = 5000, BOT_RATE = 150;
+
+/* ---------- simulation: pure state + tick ---------- */
+function init(seed, o = {}) {
+  const s = Object.assign({ r: seed, t: 0, mode: 0, cap: 10, refill: 5, bot: false, burst: 0, burstDone: false, ticks: 0, busy: 0, queue: [], ev: [], log: [] }, o);
+  s.b = { ana: s.cap, bot: s.cap, shared: s.cap };
+  return s;
+}
+function take(s, who) {
+  if (s.mode === 0) return true;
+  const k = s.mode === 1 ? 'shared' : who;
+  if (s.b[k] >= 1) { s.b[k] -= 1; return true; }
+  return false;
+}
+function tick(s) {
+  const t0 = s.t, t1 = t0 + DT;
+  for (const k of ['ana', 'bot', 'shared']) s.b[k] = Math.min(s.cap, s.b[k] + s.refill * DT / 1000);
+  const reqs = [];
+  for (let i = 0, n = X.poisson(s, 1 * DT / 1000); i < n; i++) reqs.push(['ana', t0 + X.rnd(s) * DT]);
+  if (s.burst > 0) { const k = Math.min(s.burst, 5); for (let i = 0; i < k; i++) reqs.push(['ana', t0 + i * 15]); s.burst -= k; if (!s.burst) s.burstDone = true; }
+  if (s.bot) for (let i = 0, n = X.poisson(s, BOT_RATE * DT / 1000); i < n; i++) reqs.push(['bot', t0 + X.rnd(s) * DT]);
+  reqs.sort((a, b) => a[1] - b[1]);
+  const drain = until => {
+    while (s.queue.length) {
+      const start = Math.max(s.busy, s.queue[0]);
+      if (start >= until) break;
+      s.queue.shift(); s.busy = start + 1000 / SERVER_CAP;
+    }
+  };
+  for (const [who, at] of reqs) {
+    drain(at);
+    let code;
+    if (!take(s, who)) code = 429;
+    else if (s.queue.length >= QMAX) code = 503;
+    else { s.queue.push(at); code = 200; }
+    s.ev.push({ t: at, who, code });
+    if (who === 'ana') {
+      const k = s.mode === 1 ? 'shared' : 'ana';
+      s.log.push({ t: at, code, wait: code === 429 ? (1 - s.b[k]) / s.refill : 0 });
+    }
+  }
+  drain(t1);
+  s.t = t1; s.ticks++;
+  s.ev = s.ev.filter(e => e.t > t1 - WIN);
+  s.log = s.log.slice(-12);
+  return s;
+}
+function metrics(s) {
+  const of = who => { const e = s.ev.filter(x => x.who === who); return { n: e.length, ok: e.filter(x => x.code === 200).length, r429: e.filter(x => x.code === 429).length, r503: e.filter(x => x.code === 503).length }; };
+  const accepted = s.ev.filter(e => e.code === 200 && e.t > s.t - 1000).length;
+  return { ana: of('ana'), bot: of('bot'), load: Math.min(1, accepted / SERVER_CAP), q: s.queue.length };
+}
+
+/* ---------- UI ---------- */
+let S = init(41);
+const t0 = () => { S.ticks = 0; };
+const mis = X.missions($('#missions'), [
+  { text: 'Press <b>Play</b> with no rate limit and the bot off.', hint: 'Ana loads a page about once a second. Everything works.', check: s => s.ticks >= 20 && !s.bot && s.mode === 0 },
+  { text: 'Turn the <b>bot on</b>.', hint: '150 requests/s against a server that handles 50. The line fills up and Ana starts getting 503s.', check: s => s.bot && s.mode === 0 && metrics(s).ana.r503 > 0 },
+  { text: 'Switch to <b>One shared bucket</b>.', hint: 'The server is safe now, but the bot spends the shared tokens, so Ana gets 429s too.', check: s => s.bot && s.mode === 1 && metrics(s).ana.r429 > 0 },
+  { text: 'Switch to <b>A bucket per user</b>.', hint: 'Now the bot only empties its own bucket. Ana keeps getting 200s.', check: s => s.bot && s.mode === 2 && s.ticks > 50 && metrics(s).ana.ok >= 3 && metrics(s).ana.r429 === 0 && metrics(s).ana.r503 === 0 },
+  { text: 'Click <b>Ana: 15 quick clicks</b>.', hint: 'The first 10 pass (that\'s the bucket size, the allowed burst). The rest wait for the refill.', check: s => s.mode === 2 && s.burstDone },
+]);
+function drawBucket(box, txt, tokens, label) {
+  box.innerHTML = '';
+  for (let i = 0; i < S.cap; i++) box.append(el('span', 'tok' + (i < Math.floor(tokens) ? '' : ' empty')));
+  txt.textContent = `${Math.floor(tokens)} of ${S.cap} tokens${label ? ' · ' + label : ''}`;
+}
+function render() {
+  const m = metrics(S);
+  $('#capV').textContent = S.cap; $('#refillV').textContent = S.refill;
+  $('#tag').textContent = ['no limit', 'one shared bucket', 'bucket per user'][S.mode];
+  $('#bot').textContent = S.bot ? '🤖 Bot: on (150/s)' : '🤖 Bot: off';
+  $('#bot').setAttribute('aria-pressed', S.bot ? 'true' : 'false');
+  if (S.mode === 0) {
+    $('#bA').textContent = 'No limiter'; $('#bB').textContent = ' ';
+    $('#tA').innerHTML = ''; $('#tB').innerHTML = ''; $('#tAt').textContent = 'Every request goes straight to the server.'; $('#tBt').textContent = '';
+  } else if (S.mode === 1) {
+    $('#bA').textContent = 'One bucket for everyone'; $('#bB').textContent = ' ';
+    drawBucket($('#tA'), $('#tAt'), S.b.shared, 'shared by Ana and the bot'); $('#tB').innerHTML = ''; $('#tBt').textContent = '';
+  } else {
+    $('#bA').textContent = 'Ana\'s bucket'; $('#bB').textContent = 'Bot\'s bucket';
+    drawBucket($('#tA'), $('#tAt'), S.b.ana); drawBucket($('#tB'), $('#tBt'), S.b.bot);
+  }
+  const pct = x => (x.n ? Math.round((x.ok / x.n) * 100) + '%' : '–');
+  $('#mAna').textContent = pct(m.ana);
+  $('#mAnaD').textContent = m.ana.n ? `${m.ana.ok} ok · ${m.ana.r429} × 429 · ${m.ana.r503} × 503` : 'succeeded, last 5 s';
+  $('#mAna').parentElement.className = 'meter' + (m.ana.n && m.ana.ok < m.ana.n ? ' bad' : m.ana.n ? ' ok' : '');
+  $('#mBot').textContent = S.bot ? pct(m.bot) : 'off';
+  $('#mBotD').textContent = S.bot && m.bot.n ? `${m.bot.ok} ok · ${m.bot.r429} × 429 · ${m.bot.r503} × 503` : 'succeeded, last 5 s';
+  $('#mLoad').textContent = Math.round(m.load * 100) + '%';
+  $('#mLoad').parentElement.className = 'meter' + (m.q >= QMAX * 0.8 ? ' bad' : m.load > 0.8 ? ' wait' : '');
+  const log = $('#log');
+  if (S.log.length) {
+    log.innerHTML = '';
+    S.log.slice(-8).forEach(l => {
+      const ts = (l.t / 1000).toFixed(1).padStart(5) + 's';
+      const line = l.code === 200 ? `${ts}  GET /seats → 200 OK` : l.code === 429 ? `${ts}  GET /seats → 429 Too Many Requests (retry in ${Math.max(0.1, l.wait).toFixed(1)} s)` : `${ts}  GET /seats → 503 Service Unavailable (server overloaded)`;
+      log.append(el('li', l.code === 200 ? 'ok' : l.code === 429 ? 'wait' : 'bad', line));
+    });
+  }
+  const st = $('#status');
+  if (!S.t) { st.className = 'status'; st.textContent = 'Press Play to start.'; }
+  else if (m.ana.r503) { st.className = 'status bad'; st.textContent = '✕ The server is overloaded. The bot\'s requests fill the line, so Ana\'s requests fail with 503 too.'; }
+  else if (m.ana.r429 && S.mode === 1) { st.className = 'status bad'; st.textContent = '✕ The server is safe, but Ana is blocked. She\'s sharing one bucket with the bot, which spends almost every token.'; }
+  else if (m.ana.r429) { st.className = 'status wait'; st.textContent = '⚠ Ana went past her own limit with that burst. She just waits for the refill, and the bot can\'t affect her.'; }
+  else if (S.bot && S.mode === 2) { st.className = 'status ok'; st.textContent = `✓ The bot gets 429s from its own bucket (about ${S.refill} requests/s get through). Ana is unaffected, and the server load stays low.`; }
+  else { st.className = 'status ok'; st.textContent = '✓ Everything is getting through.'; }
+  player.clock(`t = ${(S.t / 1000).toFixed(1)} s`);
+  mis.update(S);
+}
+const player = X.player($('#player'), {
+  step: () => { tick(S); render(); }, stepTicks: 5,
+  reset: () => { S = init(41, { mode: S.mode, cap: S.cap, refill: S.refill, bot: S.bot }); mis.reset(); render(); },
+});
+X.seg($('#modeSeg'), ['No limit', 'One shared bucket', 'A bucket per user'], i => { S.mode = i; S.b = { ana: S.cap, bot: S.cap, shared: S.cap }; t0(); render(); }, 0);
+$('#cap').addEventListener('input', e => { S.cap = +e.target.value; for (const k in S.b) S.b[k] = Math.min(S.b[k], S.cap); t0(); render(); });
+$('#refill').addEventListener('input', e => { S.refill = +e.target.value; t0(); render(); });
+$('#bot').addEventListener('click', () => { S.bot = !S.bot; t0(); if (!player.running && S.bot) player.play(); render(); });
+$('#burst').addEventListener('click', () => { S.burst = 15; S.burstDone = false; if (!player.running) player.play(); render(); });
+render();
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="key">HTTP/1.1 429 Too Many Requests</span>', 'status'],
+  ['<span class="key">Retry-After</span>: <span class="s">2</span>', 'retry'],
+  ['<span class="key">RateLimit-Limit</span>: <span class="s">10</span>', 'headers'],
+  ['<span class="key">RateLimit-Remaining</span>: <span class="s">0</span>', 'headers'],
+  ['', null],
+  ['<span class="c">// token bucket, one per user</span>', null],
+  ['<span class="key">function</span> allow(userId, now) {', null],
+  ['  <span class="key">const</span> b = buckets.get(userId) ?? { tokens: B, last: now };', 'key'],
+  ['  b.tokens = Math.min(B, b.tokens + (now - b.last) * R);', 'refill'],
+  ['  b.last = now;', 'refill'],
+  ['  buckets.set(userId, b);', 'key'],
+  ['  <span class="key">if</span> (b.tokens &lt; 1) <span class="key">return false</span>;  <span class="c">// → 429</span>', 'reject'],
+  ['  b.tokens -= 1;', 'spend'],
+  ['  <span class="key">return true</span>;', 'spend'],
+  ['}', null],
+], {
+  status: ['429', 'The standard status code for “you\'re sending too many requests”. It costs the server almost nothing to send, which is the whole point.'],
+  retry: ['Retry-After', 'Tells the client how many seconds to wait. Well-behaved clients wait. That\'s the “retry in … s” in Ana\'s log.'],
+  headers: ['Limit headers', 'Lets clients see their allowance before they hit it. These names come from an IETF draft standard. Many APIs use <code>X-RateLimit-*</code> instead.'],
+  key: ['One bucket per user', 'The bucket is looked up by <code>userId</code>. Use one key for everyone and you get the shared bucket from the lab. Real systems store buckets in Redis so every server shares them.'],
+  refill: ['Refill', 'Instead of a timer, refill lazily: add R tokens per second that passed since the last request, never more than B.'],
+  reject: ['Reject', 'Out of tokens: refuse now, before any expensive work happens.'],
+  spend: ['Spend', 'One request, one token. Expensive endpoints can cost more than one.'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: 'A bucket holds 10 tokens and refills at 1 per second. A full-bucket fan clicks 10 times instantly, then once a second. What happens?', opts: [
+    ['All 10 quick clicks pass, and then the 1-per-second clicks keep passing', true, 'The bucket size allows the burst. After that the refill exactly matches 1 click per second.'],
+    ['Only the first click passes', false, 'That would be a bucket size of 1. A bigger bucket exists to allow bursts.'],
+    ['All of them get 429', false, 'The bucket starts full, so the burst is allowed.'],
+  ] },
+  { q: 'Encore\'s API has one global limit of 1,000 requests/s. A single partner\'s buggy script uses all of it. What\'s the fix?', opts: [
+    ['Raise the global limit to 10,000', false, 'The script would just use more. The problem is that one client can use everyone\'s allowance.'],
+    ['Give each client (API key) its own limit', true, 'Per-client buckets mean the buggy script hits its own limit while other partners carry on.'],
+    ['Remove the limit and add more servers', false, 'Then the buggy script just costs you more servers.'],
+  ] },
+  { q: 'Your app receives <code>429</code> with <code>Retry-After: 5</code> from a payment provider. What should it do?', opts: [
+    ['Retry immediately in a loop until it works', false, 'That makes things worse for everyone, and some providers will block you.'],
+    ['Wait about 5 seconds, then retry', true, 'Respect Retry-After. For repeated failures, wait longer each time (exponential backoff, page 9).'],
+    ['Treat it as a permanent failure and give up', false, '429 is temporary by definition. You\'re just being asked to slow down.'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'rate-limiting');
+})();
+</script>
+</body>
+</html>

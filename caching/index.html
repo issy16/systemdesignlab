@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Put a cache in front of a struggling database, then find the stale data it creates and fix it with invalidation.">
+<title>Caching · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/explainer.css">
+</head>
+<body>
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="Sections"><a href="#lab">Lab</a><a href="#real">The code</a><a href="#recap">Recap</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>page 5 · stage 2 · more traffic</span><span class="hot">2 · 49 · 50</span></div>
+  <div class="eyebrow">Caching, edge caching, cache invalidation</div>
+  <h1>Caching is easy. <em>Knowing when the copy is wrong is the hard part.</em></h1>
+  <div class="scenario"><b>Encore</b>Every fan on a concert page asks the database the same question: “how many seats are left?” At 200 page views a second, the database gives up. Ana adds a cache. The database recovers, and then fans start buying seats that were already gone.</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">Open the lab ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>lab · break it, then fix it</span><span class="hot" id="modeTag">no cache</span></div>
+  <h2>200 page views a second, one database</h2>
+  <p>Encore has 20 concerts, and a few are far more popular than the rest. Fans buy about 2 tickets a second, and every purchase changes a seat count. The database handles about <b>100 queries a second</b> before it slows down. Fans are 150 ms away from Encore's servers. All numbers are simulated.</p>
+
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">Cache</span><div id="modeSeg"></div></div>
+      <div class="ctl">
+        <label for="ttl">TTL (how long a copy is kept): <b id="ttlV">10 s</b></label>
+        <input type="range" id="ttl" min="0" max="5" step="1" value="2">
+      </div>
+      <div class="ctl">
+        <label for="size">Cache size: <b id="sizeV">20</b> concerts</label>
+        <input type="range" id="size" min="1" max="20" step="1" value="20">
+      </div>
+      <div class="ctl"><span class="lab-k">When a ticket is sold</span><div id="invSeg"></div></div>
+      <div class="ctl"><span class="lab-k">Simulation</span><div id="player"></div></div>
+    </div>
+
+    <div class="compare" style="margin:0">
+      <div>
+        <h3>Reunion Tour · Night 1</h3>
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-family:var(--mono);font-size:14px">
+          <span class="muted">Fans see</span><b id="seen">500 seats left</b>
+          <span class="muted">Database</span><b id="truth">500 seats left</b>
+        </div>
+        <div style="margin-top:8px" id="stalePill"><span class="pill ok">✓ in sync</span></div>
+      </div>
+      <div>
+        <h3>Database load</h3>
+        <div class="bar" style="height:18px"><i id="dbBar"></i></div>
+        <p class="muted" style="font-size:13px;margin:6px 0 0" id="dbTxt">0 queries/s of ~100</p>
+      </div>
+    </div>
+
+    <div class="meters" style="margin:0">
+      <div class="meter"><div class="k">Hit rate</div><div class="v" id="mHit">–</div><div class="d">answered by the cache</div></div>
+      <div class="meter"><div class="k">Page latency</div><div class="v" id="mLat">0 ms</div><div class="d">average for a fan</div></div>
+      <div class="meter"><div class="k">Stale reads</div><div class="v" id="mStale">0%</div><div class="d" id="mOff">wrong seat count shown</div></div>
+      <div class="meter"><div class="k">Database queries</div><div class="v" id="mDb">0/s</div><div class="d">capacity ~100/s</div></div>
+    </div>
+    <div class="status" id="status" role="status">Press Play to start the traffic.</div>
+  </div>
+
+  <h3>Try this</h3>
+  <ol class="missions" id="missions"></ol>
+
+  <div class="compare">
+    <div><h3>TTL only</h3><p style="margin:0">Every copy expires after a fixed time. Simple, and works with any cache, but fans can see an old answer for up to the full TTL. Long TTL means less load and more staleness, short TTL means the opposite.</p></div>
+    <div><h3>Delete on write</h3><p style="margin:0">When the data changes, delete (or update) the cached copy. Reads stay fast and fresh. But <i>every</i> code path that changes the data has to remember to do it. This is cache <b>invalidation</b>.</p></div>
+  </div>
+  <div class="takeaway"><div class="t">The one difference</div><p>A cache is a <b>copy</b>. The real question isn't “is it fast?” but “<b>how wrong can the copy be, and for how long?</b>” TTL limits how long. Invalidation removes the copy the moment it's wrong.</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>act 2 · the real thing</span><span class="hot">redis</span></div>
+  <h2>The cache-aside pattern, plus an edge header</h2>
+  <p>This is the most common way apps use a cache like Redis or Memcached. <b>Hover or tap a line.</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="Example caching code"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 pick a line</div><p id="exP">Each highlighted line maps to a control in the lab.</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>recap · keep this</span><span class="hot">♥</span></div>
+  <h2>The whole page on one screen</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">What</div><div class="t">Caching</div><p>Keep a copy of an answer so you don't recompute or refetch it. Fewer database queries, faster pages.</p></div>
+    <div class="card"><div class="sub">Where</div><div class="t">Edge caching</div><p>Keep the copy in a CDN close to the fan, so hits skip the trip to your servers entirely. Only for data that's the same for everyone.</p></div>
+    <div class="card"><div class="sub">When it's wrong</div><div class="t">Invalidation</div><p>Delete or update the copy when the data changes, and use TTLs as a backstop. Decide how stale each kind of data is allowed to be.</p></div>
+  </div>
+  <div class="takeaway"><div class="t">The tradeoff</div><p>Every cache trades freshness for speed. A seat count can be a few seconds old on the concert page, but the checkout must always ask the database. Cache what can be slightly wrong, never what must be exactly right.</p></div>
+
+  <h3 style="margin-top:26px">Check it <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="Pages"></nav>
+</main>
+
+<script src="../assets/explainer.js"></script>
+<script>
+(() => {
+const { $ } = X;
+const TTLS = [1, 5, 10, 30, 60, 300], N = 20, DT = 100, DB_CAP = 100, FAR = 150, EDGE = 15, WIN = 3000;
+const W = Array.from({ length: N }, (_, i) => 1 / (i + 1)), WSUM = W.reduce((a, b) => a + b, 0);
+const pick = s => { let u = X.rnd(s) * WSUM; for (let i = 0; i < N; i++) { u -= W[i]; if (u <= 0) return i; } return N - 1; };
+
+/* ---------- simulation: pure state + tick ---------- */
+function init(seed, o = {}) {
+  return Object.assign({ r: seed, t: 0, rate: 200, mode: 0, ttl: 10, size: 20, inv: false, seats: Array(N).fill(500), ver: Array(N).fill(0), cache: new Map(), ev: [], dbq: [], ticks: 0 }, o);
+}
+function dbLatency(s) {
+  const load = s.dbq.filter(t => t > s.t - 1000).length / DB_CAP;
+  return load >= 1 ? 1500 : Math.min(1500, 20 / (1 - load));
+}
+function tick(s) {
+  const t0 = s.t, t1 = t0 + DT;
+  for (let i = 0, n = X.poisson(s, 2 * DT / 1000); i < n; i++) {
+    const k = pick(s);
+    if (s.seats[k] > 0) { s.seats[k]--; s.ver[k]++; }
+    if (s.inv) s.cache.delete(k);
+  }
+  const reads = X.poisson(s, s.rate * DT / 1000);
+  for (let i = 0; i < reads; i++) {
+    const at = t0 + (i / Math.max(1, reads)) * DT, k = pick(s);
+    const e = s.mode ? s.cache.get(k) : null;
+    if (e && e.exp > at) {
+      e.used = at;
+      s.ev.push({ t: at, hit: 1, stale: e.ver < s.ver[k] ? 1 : 0, off: s.ver[k] - e.ver, lat: s.mode === 2 ? EDGE : FAR + 2 });
+    } else {
+      const lat = FAR + dbLatency(s);
+      s.dbq.push(at);
+      s.ev.push({ t: at, hit: 0, stale: 0, off: 0, lat });
+      if (s.mode) {
+        if (!s.cache.has(k) && s.cache.size >= s.size) {
+          let lru = null; for (const [kk, v] of s.cache) if (!lru || v.used < lru[1].used) lru = [kk, v];
+          s.cache.delete(lru[0]);
+        }
+        s.cache.set(k, { seats: s.seats[k], ver: s.ver[k], exp: at + s.ttl * 1000, used: at });
+      }
+    }
+  }
+  s.t = t1; s.ticks++;
+  s.ev = s.ev.filter(e => e.t > t1 - WIN);
+  s.dbq = s.dbq.filter(t => t > t1 - 1000);
+  return s;
+}
+function metrics(s) {
+  const e = s.ev, n = e.length || 1, hits = e.filter(x => x.hit), stale = e.filter(x => x.stale);
+  return {
+    hit: s.mode ? hits.length / n : null, lat: X.avg(e.map(x => x.lat)), stale: stale.length / n,
+    off: stale.length ? X.avg(stale.map(x => x.off)) : 0, dbqps: s.dbq.length,
+  };
+}
+
+/* ---------- UI ---------- */
+let S = init(21);
+const ticks0 = () => { S.ticks = 0; };
+const mis = X.missions($('#missions'), [
+  { text: 'Press <b>Play</b> with <b>no cache</b>.', hint: 'Every page view is a database query: 200 a second against a capacity of ~100. Watch the latency.', check: s => s.mode === 0 && s.ticks >= 25 },
+  { text: 'Turn on the <b>App cache</b>.', hint: 'Popular concerts get answered from memory. The database calms down within a second.', check: s => s.mode > 0 && s.ticks >= 25 && metrics(s).hit > 0.9 },
+  { text: 'Raise the <b>TTL to 60 s</b> and watch “Fans see” vs “Database”.', hint: 'Seats are selling, but the cached copy doesn\'t know. Fans now see seats that don\'t exist.', check: s => s.mode > 0 && s.ttl >= 60 && !s.inv && s.ticks >= 30 && metrics(s).stale > 0.2 },
+  { text: 'Switch “When a ticket is sold” to <b>Delete the cached copy</b>.', hint: 'Stale reads drop to almost zero, and the hit rate stays high.', check: s => s.mode > 0 && s.inv && s.ticks >= 30 && metrics(s).stale < 0.01 },
+  { text: 'Switch to the <b>Edge cache</b>.', hint: 'Hits are now answered by a CDN next to the fan, so they skip the 150 ms trip to Encore.', check: s => s.mode === 2 && s.ticks >= 25 },
+]);
+function render() {
+  const m = metrics(S);
+  $('#ttlV').textContent = S.ttl + ' s'; $('#sizeV').textContent = S.size;
+  $('#modeTag').textContent = ['no cache', 'app cache', 'edge cache'][S.mode];
+  ['ttl', 'size'].forEach(id => ($('#' + id).disabled = !S.mode));
+  $('#mHit').textContent = m.hit == null ? '–' : (m.hit * 100).toFixed(0) + '%';
+  $('#mLat').textContent = X.fmt(m.lat) + ' ms';
+  $('#mLat').parentElement.className = 'meter' + (m.lat > 600 ? ' bad' : m.lat > 250 ? ' wait' : ' ok');
+  $('#mStale').textContent = (m.stale * 100).toFixed(1) + '%';
+  $('#mStale').parentElement.className = 'meter' + (m.stale > 0.2 ? ' bad' : m.stale > 0.01 ? ' wait' : '');
+  $('#mOff').textContent = m.stale ? `off by ${m.off.toFixed(1)} seats on average` : 'wrong seat count shown';
+  $('#mDb').textContent = m.dbqps + '/s';
+  const load = Math.min(1, m.dbqps / DB_CAP);
+  $('#dbBar').style.width = load * 100 + '%';
+  $('#dbBar').style.background = load >= 1 ? 'var(--bad)' : load > 0.7 ? 'var(--wait)' : 'var(--ok)';
+  $('#dbTxt').textContent = `${m.dbqps} queries/s of ~${DB_CAP}${load >= 1 ? ': overloaded' : ''}`;
+  const e = S.mode ? S.cache.get(0) : null;
+  const seen = e && e.exp > S.t ? e.seats : S.seats[0];
+  $('#seen').textContent = seen + ' seats left';
+  $('#truth').textContent = S.seats[0] + ' seats left';
+  $('#stalePill').innerHTML = seen === S.seats[0] ? '<span class="pill ok">✓ in sync</span>' : `<span class="pill bad">✕ stale by ${seen - S.seats[0]}</span> fans can try to buy seats that are gone`;
+  const st = $('#status');
+  if (!S.t) { st.className = 'status'; st.textContent = 'Press Play to start the traffic.'; }
+  else if (load >= 1) { st.className = 'status bad'; st.textContent = `✕ The database is overloaded: ${m.dbqps} queries/s. Every page view waits behind the others.`; }
+  else if (m.stale > 0.2) { st.className = 'status bad'; st.textContent = `✕ Fast, but wrong: ${(m.stale * 100).toFixed(0)}% of page views show an old seat count. Copies live ${S.ttl} s, and seats sell every second.`; }
+  else if (m.stale > 0.01) { st.className = 'status wait'; st.textContent = `⚠ Mostly fresh, but ${(m.stale * 100).toFixed(1)}% of page views show an outdated seat count.`; }
+  else { st.className = 'status ok'; st.textContent = S.mode ? `✓ Fast and fresh: ${(m.hit * 100).toFixed(0)}% hits, and the database only sees misses.` : '✓ The database keeps up for now.'; }
+  player.clock(`t = ${(S.t / 1000).toFixed(1)} s`);
+  mis.update(S);
+}
+const player = X.player($('#player'), {
+  step: () => { tick(S); render(); }, stepTicks: 5,
+  reset: () => { S = init(21, { mode: S.mode, ttl: S.ttl, size: S.size, inv: S.inv }); mis.reset(); render(); },
+});
+X.seg($('#modeSeg'), ['No cache', 'App cache', 'Edge cache (CDN)'], i => { S.mode = i; if (!i) S.cache.clear(); ticks0(); render(); }, 0);
+X.seg($('#invSeg'), ['Do nothing (wait for TTL)', 'Delete the cached copy'], i => { S.inv = i === 1; ticks0(); render(); }, 0);
+$('#ttl').addEventListener('input', e => { S.ttl = TTLS[+e.target.value]; ticks0(); render(); });
+$('#size').addEventListener('input', e => { S.size = +e.target.value; while (S.cache.size > S.size) S.cache.delete(S.cache.keys().next().value); ticks0(); render(); });
+render();
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="key">async function</span> getConcert(id) {', null],
+  ['  <span class="key">const</span> cached = <span class="key">await</span> redis.get(<span class="s">`concert:${id}`</span>);', 'get'],
+  ['  <span class="key">if</span> (cached) <span class="key">return</span> JSON.parse(cached);', 'hit'],
+  ['  <span class="key">const</span> concert = <span class="key">await</span> db.concerts.find(id);', 'miss'],
+  ['  <span class="key">await</span> redis.set(<span class="s">`concert:${id}`</span>, JSON.stringify(concert),', 'ttl'],
+  ['                  { EX: <span class="s">10</span> });', 'ttl'],
+  ['  <span class="key">return</span> concert;', null],
+  ['}', null],
+  ['', null],
+  ['<span class="key">async function</span> buyTicket(id, fan) {', null],
+  ['  <span class="key">await</span> db.tickets.insert({ concertId: id, fan });', 'write'],
+  ['  <span class="key">await</span> redis.del(<span class="s">`concert:${id}`</span>);', 'del'],
+  ['}', null],
+  ['', null],
+  ['<span class="c"># Response header: let CDNs keep a copy for 10 s</span>', null],
+  ['<span class="key">Cache-Control</span>: public, max-age=<span class="s">10</span>', 'edge'],
+], {
+  get: ['Look in the cache first', 'Each concert has its own key. That\'s why cache size matters: if a key was evicted to make room, this lookup misses.'],
+  hit: ['Hit', 'Found it: no database query at all. The hit rate meter counts how often this line returns.'],
+  miss: ['Miss', 'Not cached (or expired): ask the database. These are the queries on the database load bar.'],
+  ttl: ['TTL', '<code>EX: 10</code> means “forget this after 10 seconds”. It\'s the TTL slider. It guarantees a copy is never more than 10 s old.'],
+  write: ['The write', 'A seat was sold. The database changes, and the cached copy is now wrong.'],
+  del: ['Invalidate', 'Delete the copy so the next read fetches fresh data. This is the “Delete the cached copy” switch. Forget this line in one code path and you get stale data that\'s very hard to track down.'],
+  edge: ['Edge caching', 'Tells CDNs (and browsers) they may keep and share this response for 10 s. <code>public</code> means it\'s the same for everyone. Never use it on personal data like a fan\'s orders.'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: 'Fans see “12 seats left” on the concert page, but checkout says the show is sold out. What\'s the likely cause?', opts: [
+    ['The checkout has a bug', false, 'Checkout reads the database, which is right. The concert page is the one showing an old copy.'],
+    ['The concert page shows a cached seat count that wasn\'t invalidated when seats sold', true, 'Delete or update the cached copy on every sale, or shorten the TTL, and always re-check the database at checkout.'],
+    ['The cache is too small', false, 'A small cache causes misses (slow), not wrong answers.'],
+  ] },
+  { q: 'Afraid of stale data, Dee sets every TTL to half a second. What happens during an on-sale rush?', opts: [
+    ['Fresh data and no downside', false, 'Copies expire so fast that most reads miss.'],
+    ['The hit rate collapses and the database load comes back', true, 'TTL trades staleness for load. Very short TTLs give up most of the benefit. Invalidation on write is usually the better tool for fresh data.'],
+    ['The cache starts returning errors', false, 'It keeps working, it just rarely has a copy when you ask.'],
+  ] },
+  { q: 'Which of these should not go in a shared edge cache (CDN)?', opts: [
+    ['The concert poster image', false, 'Same for everyone and rarely changes. A perfect fit.'],
+    ['A fan\'s personal “My orders” page', true, 'A shared cache could serve one fan\'s orders to another. Personal responses need <code>Cache-Control: private</code> or no caching.'],
+    ['The venue\'s address and seating map', false, 'Same for everyone and slow to change. A great fit for the edge.'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'caching');
+})();
+</script>
+</body>
+</html>

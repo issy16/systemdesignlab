@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Push traffic into a simulated server and watch average latency, P99 and throughput change. Learn why the average lies.">
+<title>Latency and Throughput · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/explainer.css">
+</head>
+<body>
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="Sections"><a href="#lab">Lab</a><a href="#p99">Avg vs P99</a><a href="#tail">Tail</a><a href="#real">Real query</a><a href="#recap">Recap</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>page 1 · stage 1 · one server</span><span class="hot">91 · 92 · 93 · 94</span></div>
+  <div class="eyebrow">Latency, throughput, P99, tail latency</div>
+  <h1>“The average is 90 ms.” <em>So why are fans furious?</em></h1>
+  <div class="scenario"><b>Encore</b>Tickets for the reunion tour go on sale at 10:00. At 9:59 the site feels instant. At 10:01 support is flooded with “checkout is frozen”, but Dee's dashboard still shows a healthy average. You're about to find out who's right.</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">Open the lab ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>lab · break it, then fix it</span><span class="hot" id="srvTag">1 server</span></div>
+  <h2>One server, rising traffic</h2>
+  <p>Each request is a fan loading a page, and fans arrive in bursts, like real traffic. The server works on 2 requests at a time, and each needs about 20 ms of work. That comes out to roughly <b>100 requests per second</b> (simulated numbers, not a benchmark). Every response also spends 40 ms on the network. Requests that arrive while both workers are busy wait in line.</p>
+
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl">
+        <label for="rate">Traffic: <b id="rateV">40</b> requests/second</label>
+        <input type="range" id="rate" min="10" max="170" step="10" value="40">
+        <div class="presets"><button class="btn sm" data-rate="40" type="button">Normal day</button><button class="btn sm" data-rate="130" type="button">On-sale spike</button></div>
+      </div>
+      <div class="ctl">
+        <span class="lab-k">Simulation</span>
+        <div id="player"></div>
+        <button class="btn sm" id="addSrv" type="button">+ Add a second server</button>
+      </div>
+    </div>
+    <div class="meters" style="margin:0">
+      <div class="meter"><div class="k">Throughput</div><div class="v" id="mTp">0</div><div class="d">finished / second</div></div>
+      <div class="meter"><div class="k">Average latency</div><div class="v" id="mAvg">0 ms</div><div class="d">last 4 seconds</div></div>
+      <div class="meter"><div class="k">P99 latency</div><div class="v" id="mP99">0 ms</div><div class="d">slowest 1 in 100</div></div>
+      <div class="meter"><div class="k">Waiting in line</div><div class="v" id="mQ">0</div><div class="d"><span id="mTo">0</span> gave up (5 s timeout)</div></div>
+    </div>
+    <canvas class="chart" id="chart" aria-label="Average and P99 latency over the last 15 seconds"></canvas>
+    <div class="legend"><span><i style="background:var(--accent)"></i>average</span><span><i style="background:var(--bad)"></i>P99</span><span>last 15 s of simulated time</span></div>
+    <div class="status" id="status" role="status">Press Play to start sending traffic.</div>
+  </div>
+
+  <h3>Try this</h3>
+  <ol class="missions" id="missions"></ol>
+
+  <div class="takeaway"><div class="t">Latency vs throughput in one line</div><p><b>Latency</b> is how long one request takes. <b>Throughput</b> is how many requests finish per second. Near a server's limit, throughput stops rising and latency shoots up.</p></div>
+</section>
+
+<section class="panel" id="p99">
+  <div class="panel-label"><span>act 2 · why the average lies</span><span class="hot">p99</span></div>
+  <h2>100 real requests, sorted from fastest to slowest</h2>
+  <p>These are the last 100 requests your simulated server finished. (If you haven't run the lab yet, this is a sample at 100 requests/second.) Switch between the two lines.</p>
+  <div class="row">
+    <div id="lineSeg"></div>
+    <button class="btn sm" id="grab" type="button">↻ Grab the latest 100</button>
+  </div>
+  <div id="strip" style="position:relative;height:170px;display:flex;align-items:flex-end;gap:1px;border:1.5px solid var(--line);background:var(--card);padding:6px 6px 0" aria-hidden="true"></div>
+  <p class="status" id="stripTxt" style="margin-top:10px"></p>
+  <div class="takeaway"><div class="t">The one difference</div><p>The <b>average</b> blends everyone into one number that describes nobody. <b>P99</b> is the time the slowest 1% of users waited. Those are the fans writing to support.</p></div>
+</section>
+
+<section class="panel" id="tail">
+  <div class="panel-label"><span>act 3 · tail latency multiplies</span><span class="hot">fan-out</span></div>
+  <h2>One page, many calls</h2>
+  <p>Encore's concert page doesn't make one request. It calls the seat map, prices, recommendations, reviews… Each call is slow only 1% of the time. But the page is slow if <i>any</i> of its calls is slow.</p>
+  <div class="ctl" style="max-width:420px">
+    <label for="fan">Backend calls per page load: <b id="fanV">10</b></label>
+    <input type="range" id="fan" min="1" max="100" step="1" value="10">
+  </div>
+  <div class="cells" id="pages" style="--cols:20;max-width:520px;margin:14px 0" aria-hidden="true"></div>
+  <p class="status" id="fanTxt" role="status"></p>
+  <div class="takeaway"><div class="t">Tail latency</div><p>The rare slow requests at the end of the distribution are the <b>tail</b>. With fan-out, rare per call becomes common per page, so big systems watch P99 and even P99.9.</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>act 4 · the real thing</span><span class="hot">promql</span></div>
+  <h2>What these numbers look like on a real dashboard</h2>
+  <p>Most teams graph latency with Prometheus or a similar tool. These are the three queries behind the three meters you just watched. <b>Hover or tap a line.</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="Example monitoring queries"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 pick a line</div><p id="exP">Each highlighted line maps to one meter from the lab.</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>recap · keep this</span><span class="hot">♥</span></div>
+  <h2>The whole page on one screen</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">How long</div><div class="t">Latency</div><p>Time from request to response for one request. What a single fan feels.</p></div>
+    <div class="card"><div class="sub">How many</div><div class="t">Throughput</div><p>Requests finished per second. What the server delivers overall. It has a ceiling.</p></div>
+    <div class="card"><div class="sub">How bad for the unlucky</div><div class="t">P99 / tail</div><p>99% of requests were faster than this. The tail grows first when a server gets busy, and fan-out makes it everyone's problem.</p></div>
+  </div>
+  <div class="takeaway"><div class="t">The tradeoff</div><p>Running a server closer to 100% busy gets more throughput per dollar, but latency explodes near the limit. Leave headroom, and judge speed by P99, not the average.</p></div>
+
+  <h3 style="margin-top:26px">Check it <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="Pages"></nav>
+</main>
+
+<script src="../assets/explainer.js"></script>
+<script>
+(() => {
+const { $, $$, el } = X;
+const SEED = 7, PER_SERVER = 2, DT = 100, NET = 40, WIN = 4000;
+
+/* ---------- simulation (pure state + tick) ---------- */
+function init(seed, rate) {
+  return { r: seed, t: 0, mod: 1, rate, servers: 1, workers: Array(PER_SERVER).fill(0), queue: [], done: [], timeouts: [], hAvg: [], hP99: [], ticksAtRate: 0 };
+}
+const service = s => 3 + X.expo(s, 16);
+function tick(s) {
+  const t0 = s.t, t1 = t0 + DT;
+  if (s.t % 1000 === 0) s.mod = 0.6 + 0.8 * X.rnd(s); // real traffic comes in bursts
+  const n = X.poisson(s, s.rate * s.mod * DT / 1000);
+  const arrivals = [];
+  for (let i = 0; i < n; i++) arrivals.push(t0 + X.rnd(s) * DT);
+  s.queue.push(...arrivals.sort((a, b) => a - b));
+  while (s.queue.length) {
+    let wi = 0;
+    for (let i = 1; i < s.workers.length; i++) if (s.workers[i] < s.workers[wi]) wi = i;
+    const start = Math.max(s.workers[wi], s.queue[0]);
+    if (start >= t1) break;
+    const arr = s.queue.shift();
+    const fin = start + service(s);
+    s.workers[wi] = fin;
+    s.done.push([fin + NET, fin - arr + NET]);
+  }
+  while (s.queue.length && t1 - s.queue[0] > 5000) { s.queue.shift(); s.timeouts.push(t1); }
+  s.t = t1;
+  s.done = s.done.filter(d => d[0] > t1 - WIN - 1000);
+  s.timeouts = s.timeouts.filter(t => t > t1 - 5000);
+  s.ticksAtRate++;
+  const m = metrics(s);
+  s.hAvg.push(m.avg); s.hP99.push(m.p99);
+  if (s.hAvg.length > 150) { s.hAvg.shift(); s.hP99.shift(); }
+  return s;
+}
+function metrics(s) {
+  const win = s.done.filter(d => d[0] <= s.t && d[0] > s.t - WIN).map(d => d[1]);
+  return { tp: win.length / (WIN / 1000), avg: X.avg(win), p99: X.pct(win, 0.99), q: s.queue.length, to: s.timeouts.length };
+}
+function addServer(s) { s.servers = 2; while (s.workers.length < PER_SERVER * 2) s.workers.push(s.t); }
+
+/* ---------- lab UI ---------- */
+let S = init(SEED, 40);
+const rate = $('#rate');
+const mis = X.missions($('#missions'), [
+  { text: 'Press <b>Play</b> at normal traffic (40 requests/second).', hint: 'Average and P99 sit close together. Nobody waits.', check: s => s.t >= 3000 && s.rate <= 60 },
+  { text: 'Slide traffic up to <b>100</b> requests/second and keep it there for a few seconds.', hint: 'The server is about 95% busy, so short lines form at random. Watch P99 pull away from the average.', check: s => s.rate === 100 && s.ticksAtRate >= 50 },
+  { text: 'Hit <b>On-sale spike</b> (130/s).', hint: 'Throughput gets stuck near 100/s. The line grows every second, so every request waits longer.', check: s => s.rate >= 110 && s.ticksAtRate >= 30 && (s.queue.length > 50 || s.timeouts.length > 0) },
+  { text: '<b>Add a second server</b> while the spike is still running.', hint: 'Double the capacity, and the line drains. This is horizontal scaling (page 6).', check: s => s.servers === 2 && s.rate >= 110 && s.queue.length < 10 && s.ticksAtRate > 20 },
+]);
+function render() {
+  const m = metrics(S);
+  $('#rateV').textContent = S.rate;
+  $('#mTp').textContent = X.fmt(m.tp);
+  $('#mAvg').textContent = X.fmt(m.avg) + ' ms';
+  $('#mP99').textContent = X.fmt(m.p99) + ' ms';
+  $('#mQ').textContent = X.fmt(m.q);
+  $('#mTo').textContent = X.fmt(m.to);
+  $('#mP99').parentElement.className = 'meter' + (m.p99 > 1000 ? ' bad' : m.p99 >= 250 ? ' wait' : '');
+  $('#mQ').parentElement.className = 'meter' + (m.q > 100 ? ' bad' : m.q > 10 ? ' wait' : '');
+  const cap = 104 * S.servers;
+  const st = $('#status');
+  if (S.t === 0) { st.className = 'status'; st.textContent = 'Press Play to start sending traffic.'; }
+  else if (m.q > 50 || m.to > 0) { st.className = 'status bad'; st.textContent = `✕ Saturated: ${S.rate} requests/s arrive but the ${S.servers === 1 ? 'server' : 'servers'} can only finish about ${cap}/s. The line grows every second, so latency keeps climbing.`; }
+  else if (m.p99 >= 250 || m.q >= 10) { st.className = 'status wait'; st.textContent = `⚠ Busy: requests are starting to queue. The slowest ones (P99 ${X.fmt(m.p99)} ms) feel it long before the average (${X.fmt(m.avg)} ms) does.`; }
+  else { st.className = 'status ok'; st.textContent = `✓ Healthy: requests start almost as soon as they arrive. P99 ${X.fmt(m.p99)} ms.`; }
+  $('#srvTag').textContent = S.servers + (S.servers === 1 ? ' server' : ' servers');
+  $('#addSrv').disabled = S.servers > 1;
+  X.lineChart($('#chart'), [{ data: S.hAvg, token: '--accent' }, { data: S.hP99, token: '--bad' }], { points: 150, unit: 'ms', niceMax: true });
+  player.clock(`t = ${(S.t / 1000).toFixed(1)} s`);
+  mis.update(S);
+}
+const player = X.player($('#player'), {
+  step: () => { tick(S); render(); },
+  stepTicks: 5,
+  reset: () => { S = init(SEED, +rate.value); mis.reset(); render(); },
+});
+rate.addEventListener('input', () => { S.rate = +rate.value; S.ticksAtRate = 0; render(); });
+$$('[data-rate]').forEach(b => b.addEventListener('click', () => { rate.value = b.dataset.rate; rate.dispatchEvent(new Event('input')); if (!player.running) player.play(); }));
+$('#addSrv').addEventListener('click', () => { addServer(S); S.ticksAtRate = 0; render(); });
+addEventListener('resize', () => render());
+render();
+
+/* ---------- act 2: sorted strip ---------- */
+let lineMode = 2;
+X.seg($('#lineSeg'), ['Average', 'P99', 'Both'], i => { lineMode = i; drawStrip(); }, 2);
+let sample = null;
+function grab() {
+  let lat = S.done.filter(d => d[0] <= S.t).slice(-100).map(d => d[1]);
+  if (lat.length < 100) {
+    const s = init(99, 100);
+    for (let i = 0; i < 80; i++) tick(s);
+    lat = s.done.filter(d => d[0] <= s.t).slice(-100).map(d => d[1]);
+  }
+  sample = lat.sort((a, b) => a - b);
+  drawStrip();
+}
+function drawStrip() {
+  const box = $('#strip'); box.innerHTML = '';
+  const max = sample[sample.length - 1] * 1.05;
+  const avg = X.avg(sample), p99 = X.pct(sample, 0.99), p50 = X.pct(sample, 0.5);
+  sample.forEach(v => {
+    const b = el('div');
+    b.style.cssText = `flex:1;min-width:0;height:${(v / max) * 100}%;background:var(${v >= p99 ? '--bad' : '--accent-2'})`;
+    box.append(b);
+  });
+  const line = (v, token, label) => {
+    const l = el('div', '', `<span style="position:absolute;right:4px;top:-18px;font-family:var(--mono);font-size:11px;color:var(${token});background:var(--card);padding:0 3px">${label} ${X.fmt(v)} ms</span>`);
+    l.style.cssText = `position:absolute;left:0;right:0;bottom:${(v / max) * 164}px;border-top:2px dashed var(${token})`;
+    box.append(l);
+  };
+  if (lineMode !== 1) line(avg, '--accent-ink', 'average');
+  if (lineMode !== 0) line(p99, '--bad', 'P99');
+  const slow = sample.filter(v => v >= p99).length;
+  $('#stripTxt').innerHTML = lineMode === 0
+    ? `Average: <b>${X.fmt(avg)} ms</b>. Half of these requests finished under ${X.fmt(p50)} ms, and the slowest took ${X.fmt(sample[99])} ms. The average hides that.`
+    : `P99: <b>${X.fmt(p99)} ms</b>. 99 of 100 requests were faster than this. The red bar${slow > 1 ? 's are' : ' is'} the fan${slow > 1 ? 's' : ''} who emailed support. The average (${X.fmt(avg)} ms) is ${(p99 / Math.max(avg, 1)).toFixed(1)}× smaller.`;
+}
+$('#grab').addEventListener('click', grab);
+grab();
+
+/* ---------- act 3: fan-out ---------- */
+function drawFan() {
+  const n = +$('#fan').value;
+  $('#fanV').textContent = n;
+  const s = { r: 4242 };
+  const grid = $('#pages'); grid.innerHTML = '';
+  let slow = 0;
+  for (let p = 0; p < 100; p++) {
+    let bad = false;
+    for (let c = 0; c < n; c++) if (X.rnd(s) < 0.01) bad = true;
+    if (bad) slow++;
+    grid.append(el('div', 'cell ' + (bad ? 'bad' : 'hit'), ''));
+  }
+  const exp = (1 - Math.pow(0.99, n)) * 100;
+  $('#fanTxt').innerHTML = `Each square is one page load. <b>${slow} of these 100</b> hit at least one slow call (red). On average, ${exp.toFixed(1)}% of page loads would. With 1 call it's 1%.`;
+}
+$('#fan').addEventListener('input', drawFan);
+drawFan();
+
+/* ---------- act 4: real queries ---------- */
+X.codeMap($('#code'), [
+  ['<span class="c"># Throughput: requests finished per second</span>', null],
+  ['sum(<span class="key">rate</span>(http_requests_total<span class="s">[1m]</span>))', 'tp'],
+  ['', null],
+  ['<span class="c"># Average latency: total time ÷ number of requests</span>', null],
+  ['sum(rate(http_request_duration_seconds_<span class="key">sum</span>[1m]))', 'avg'],
+  ['  / sum(rate(http_request_duration_seconds_<span class="key">count</span>[1m]))', 'avg'],
+  ['', null],
+  ['<span class="c"># P99: 99% of requests were faster than this</span>', null],
+  ['<span class="key">histogram_quantile</span>(<span class="s">0.99</span>,', 'p99'],
+  ['  sum by (le) (rate(http_request_duration_seconds_<span class="key">bucket</span><span class="s">[5m]</span>)))', 'bucket'],
+], {
+  tp: ['Throughput', 'Counts finished requests and turns the count into “per second”, averaged over the last minute. This is the <b>Throughput</b> meter.'],
+  avg: ['Average latency', 'Total seconds spent on requests ÷ number of requests. Simple, and the reason dashboards can look calm while fans suffer.'],
+  p99: ['P99', 'Asks for the 99th percentile. Change <code>0.99</code> to <code>0.5</code> and you get the median, or to <code>0.999</code> for the deeper tail.'],
+  bucket: ['Buckets and window', 'Servers count requests into time buckets (under 50 ms, under 100 ms, …). The quantile is estimated from those buckets over the last 5 minutes. Short windows react faster, long ones are smoother.'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: 'The dashboard shows an average latency of 90 ms, but fans say checkout “hangs”. What do you check first?', opts: [
+    ['P99 latency for checkout', true, 'The average blends a few very slow requests in with many fast ones. P99 shows what the unlucky fans are actually waiting.'],
+    ['The average over a longer time window', false, 'A longer window smooths things even more. It hides the slow requests instead of revealing them.'],
+    ['Whether the server CPU is at 100%', false, 'Useful later, but it doesn\'t tell you what users feel. Latency percentiles do.'],
+  ] },
+  { q: 'Traffic grows from 50 to 120 requests/second on a server that tops out around 100/s. What happens?', opts: [
+    ['Latency roughly doubles and then stays steady', false, 'Past the limit it doesn\'t settle. Requests pile up faster than they finish, so the wait keeps growing every second.'],
+    ['Throughput gets stuck near 100/s and latency keeps climbing as the line grows', true, 'Throughput has a ceiling. Everything above it waits in line, and the line grows until requests time out.'],
+    ['Nothing changes until the CPU reaches 100%', false, 'Queuing starts well before 100%. You saw P99 rise at around 90% busy.'],
+  ] },
+  { q: 'Encore\'s concert page calls 20 backend services. Each one is slow 1% of the time. Roughly how often is the page slow?', opts: [
+    ['About 1%, same as each call', false, 'The page waits for all 20. Any one of them being slow makes the page slow.'],
+    ['About 18%', true, '1 − 0.99²⁰ ≈ 0.18. That\'s why big systems care so much about the tail.'],
+    ['Exactly 20%', false, 'Close, but the chances overlap (sometimes two calls are slow at once). The exact answer is 1 − 0.99²⁰ ≈ 18%.'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'latency-throughput');
+})();
+</script>
+</body>
+</html>

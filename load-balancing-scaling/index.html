@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Scale up, scale out, kill a server, and compare load balancing algorithms under a traffic spike.">
+<title>Load Balancing and Scaling · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/explainer.css">
+</head>
+<body>
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="Sections"><a href="#lab">Lab</a><a href="#real">The config</a><a href="#recap">Recap</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>page 6 · stage 2 · more traffic</span><span class="hot">3 · 46 · 47</span></div>
+  <div class="eyebrow">Load balancing, horizontal scaling, vertical scaling</div>
+  <h1>Buy a bigger server, or buy more servers? <em>Then decide who gets each request.</em></h1>
+  <div class="scenario"><b>Encore</b>One server ran Encore just fine, until the reunion tour went on sale. Dee has two options: scale <b>up</b> (a bigger machine) or scale <b>out</b> (more machines behind a load balancer). Try both, then pull the plug on one.</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">Open the lab ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>lab · break it, then fix it</span><span class="hot" id="tag">1 server</span></div>
+  <h2>The on-sale spike</h2>
+  <p>9 in 10 requests are quick page views. 1 in 10 is a checkout that needs about 8× the work. Each server works through its own line, one request at a time. Capacities are simulated, not benchmarks.</p>
+
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl">
+        <label for="rate">Traffic: <b id="rateV">30</b> requests/second</label>
+        <input type="range" id="rate" min="10" max="300" step="10" value="30">
+        <div class="presets"><button class="btn sm" type="button" data-rate="30">Normal day</button><button class="btn sm" type="button" data-rate="150">On-sale spike</button></div>
+      </div>
+      <div class="ctl"><span class="lab-k">Change the servers</span>
+        <div class="presets">
+          <button class="btn sm" id="up" type="button">⬆ Bigger machine (scale up)</button>
+          <button class="btn sm" id="out" type="button">＋ Add a server (scale out)</button>
+          <button class="btn sm bad" id="kill" type="button">✕ Kill a server</button>
+        </div>
+      </div>
+      <div class="ctl"><span class="lab-k">Load balancer sends each request to</span><div id="algoSeg"></div></div>
+      <div class="ctl"><span class="lab-k">Simulation</span><div id="player"></div></div>
+    </div>
+    <div class="servers" id="servers" aria-label="Servers"></div>
+    <div class="meters" style="margin:0">
+      <div class="meter"><div class="k">Served</div><div class="v" id="mTp">0/s</div><div class="d">requests finished</div></div>
+      <div class="meter"><div class="k">P95 latency</div><div class="v" id="mP95">0 ms</div><div class="d">slowest 1 in 20</div></div>
+      <div class="meter"><div class="k">Errors</div><div class="v" id="mErr">0</div><div class="d">503s in the last 3 s</div></div>
+      <div class="meter"><div class="k">Capacity</div><div class="v" id="mCap">0/s</div><div class="d">all servers, roughly</div></div>
+    </div>
+    <div class="status" id="status" role="status">Press Play to start the traffic.</div>
+  </div>
+
+  <h3>Try this</h3>
+  <ol class="missions" id="missions"></ol>
+
+  <div class="compare">
+    <div><h3>Scale up (vertical)</h3><p style="margin:0">One bigger machine. No code changes and nothing to coordinate. But there's a largest machine you can buy, upgrading usually means downtime, and when it dies, everything dies with it.</p></div>
+    <div><h3>Scale out (horizontal)</h3><p style="margin:0">More machines behind a <b>load balancer</b>. Grows almost without limit and survives losing a machine. But the app must not keep important state in one server's memory, since the next request may land elsewhere.</p></div>
+  </div>
+  <div class="takeaway"><div class="t">The one difference</div><p>Scaling <b>up</b> makes one server stronger. Scaling <b>out</b> adds servers and needs a load balancer to split the traffic. How it splits matters: <b>least connections</b> notices a server stuck on slow requests, while <b>round robin</b> keeps sending it more.</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>act 2 · the real thing</span><span class="hot">nginx</span></div>
+  <h2>A load balancer is a few lines of config</h2>
+  <p>This is nginx, one of the most common load balancers. Cloud load balancers (AWS ALB, Cloudflare, GCP) have the same settings in a web console. <b>Hover or tap a line.</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="Example nginx load balancer config"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 pick a line</div><p id="exP">Each highlighted line maps to a control in the lab.</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>recap · keep this</span><span class="hot">♥</span></div>
+  <h2>The whole page on one screen</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">Stronger</div><div class="t">Vertical scaling</div><p>A bigger machine. Easiest first step, with a hard ceiling and a single point of failure.</p></div>
+    <div class="card"><div class="sub">More</div><div class="t">Horizontal scaling</div><p>More machines. Survives failures and keeps growing, as long as servers are interchangeable (stateless).</p></div>
+    <div class="card"><div class="sub">Traffic cop</div><div class="t">Load balancer</div><p>Splits requests across servers, skips dead ones, and picks a strategy: round robin, least connections, and others.</p></div>
+  </div>
+  <div class="takeaway"><div class="t">The tradeoff</div><p>Scaling up is simple until it isn't. Scaling out costs some design work (shared sessions, a shared database) but removes the ceiling and the single point of failure. Most teams start up and move out.</p></div>
+
+  <h3 style="margin-top:26px">Check it <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="Pages"></nav>
+</main>
+
+<script src="../assets/explainer.js"></script>
+<script>
+(() => {
+const { $, $$, el } = X;
+const SIZES = [{ name: 'medium', cap: 120 }, { name: 'large', cap: 240 }, { name: 'x-large', cap: 480 }];
+const DT = 100, MEAN_WORK = 0.9 * 1 + 0.1 * 8, QMAX = 120, WIN = 3000;
+const reqCap = units => Math.round(units / MEAN_WORK);
+
+/* ---------- simulation: pure state + tick ---------- */
+function init(seed, o = {}) {
+  return Object.assign({ r: seed, t: 0, rate: 30, algo: 0, rr: 0, servers: [mk(1, 0)], next: 2, kills: 0, done: [], errs: [], ticks: 0, log: {} }, o);
+}
+function mk(id, size) { return { id, size, alive: true, q: [], busy: 0 }; }
+function outstanding(sv, at) { return sv.q.length + (sv.busy > at ? 1 : 0); }
+function tick(s) {
+  const t0 = s.t, t1 = t0 + DT;
+  const n = X.poisson(s, s.rate * DT / 1000);
+  for (let i = 0; i < n; i++) {
+    const at = t0 + X.rnd(s) * DT, work = X.rnd(s) < 0.1 ? 8 : 1;
+    const alive = s.servers.filter(x => x.alive);
+    if (!alive.length) { s.errs.push(at); continue; }
+    let sv;
+    if (s.algo === 0) { sv = alive[s.rr % alive.length]; s.rr++; }
+    else if (s.algo === 1) sv = alive.reduce((a, b) => (outstanding(b, at) < outstanding(a, at) ? b : a));
+    else sv = alive[Math.floor(X.rnd(s) * alive.length)];
+    if (sv.q.length >= QMAX) { s.errs.push(at); continue; }
+    sv.q.push({ at, work });
+  }
+  for (const sv of s.servers) {
+    if (!sv.alive) continue;
+    sv.q.sort((a, b) => a.at - b.at);
+    const cap = SIZES[sv.size].cap;
+    while (sv.q.length) {
+      const start = Math.max(sv.busy, sv.q[0].at);
+      if (start >= t1) break;
+      const r = sv.q.shift();
+      sv.busy = start + (r.work / cap) * 1000;
+      s.done.push([sv.busy, sv.busy - r.at]);
+    }
+  }
+  s.t = t1; s.ticks++;
+  s.done = s.done.filter(d => d[0] > t1 - WIN - 1000);
+  s.errs = s.errs.filter(t => t > t1 - WIN);
+  return s;
+}
+function metrics(s) {
+  const win = s.done.filter(d => d[0] <= s.t && d[0] > s.t - WIN).map(d => d[1]);
+  const alive = s.servers.filter(x => x.alive);
+  return { tp: win.length / (WIN / 1000), p95: X.pct(win, 0.95), err: s.errs.length, cap: alive.reduce((a, x) => a + reqCap(SIZES[x.size].cap), 0), alive: alive.length };
+}
+
+/* ---------- UI ---------- */
+let S = init(31);
+const flags = { scaledUpAlone: false, killedAlone: false, killedOut: false, k5: 0 };
+const healthy = m => m.p95 < 500 && m.err === 0;
+const mis = X.missions($('#missions'), [
+  { text: 'Press <b>Play</b> on a normal day (30 requests/s, 1 medium server).', hint: 'Plenty of headroom. Every request is served quickly.', check: s => s.ticks >= 20 && s.rate <= 40 },
+  { text: 'Hit <b>On-sale spike</b> (150/s).', hint: 'The server\'s line fills up. Requests wait, then get 503 errors.', check: s => s.rate >= 150 && (metrics(s).err > 0 || metrics(s).p95 > 1000) },
+  { text: 'Scale <b>up</b>: click “Bigger machine” until one server keeps up.', hint: 'It works, but there\'s no bigger machine after x-large.', check: s => { const m = metrics(s); const ok = s.servers.length === 1 && s.rate >= 150 && s.ticks > 25 && healthy(m); if (ok) flags.scaledUpAlone = true; return ok; } },
+  { text: 'Now <b>kill</b> that server.', hint: 'One machine means one point of failure. Everything is down.', check: s => { if (metrics(s).alive === 0 && s.servers.length === 1) flags.killedAlone = true; return flags.killedAlone; } },
+  { text: 'Scale <b>out</b> instead: add medium servers until the spike is handled.', hint: 'The load balancer spreads the work. Each medium server handles about 70 requests/s.', check: s => metrics(s).alive >= 3 && s.rate >= 150 && s.ticks > 25 && healthy(metrics(s)), then: () => (flags.k5 = S.kills) },
+  { text: 'Add one more, then <b>kill one</b> server.', hint: 'The load balancer stops sending to it. Only the requests already in its line fail, and the site stays up.', check: s => { const m = metrics(s); if (s.kills > flags.k5 && m.alive >= 3 && s.ticks > 25 && m.p95 < 800) flags.killedOut = true; return flags.killedOut; } },
+  { text: 'With the spike running, compare <b>Round robin</b> and <b>Least connections</b>.', hint: 'Look at the P95 and at each server\'s line. Round robin keeps feeding a server that got stuck with checkouts.', check: s => s.algo === 1 && s.ticks > 30 && s.rate >= 150 },
+]);
+function render() {
+  const m = metrics(S);
+  $('#rateV').textContent = S.rate;
+  const box = $('#servers'); box.innerHTML = '';
+  S.servers.forEach(sv => {
+    const lineLen = sv.q.length, cap = SIZES[sv.size].cap;
+    const util = sv.alive ? Math.min(1, (sv.q.reduce((a, r) => a + r.work, 0) + (sv.busy > S.t ? 1 : 0)) / (cap * 0.5)) : 0;
+    const state = !sv.alive ? ['down', 'bad'] : lineLen >= QMAX * 0.8 ? ['overloaded', 'bad'] : lineLen > 15 ? ['busy', 'wait'] : ['ok', 'ok'];
+    const d = el('div', 'server' + (sv.alive ? '' : ' down'));
+    d.innerHTML = `<div class="nm"><span>app-${sv.id}</span><span class="pill ${state[1]}">${state[0]}</span></div>
+      <div class="mono">${SIZES[sv.size].name} · ~${reqCap(cap)} req/s</div>
+      <div class="bar ${state[1] === 'bad' ? 'risk' : ''}"><i style="width:${util * 100}%"></i></div>
+      <div class="mono">line: ${sv.alive ? lineLen : '–'}</div>`;
+    box.append(d);
+  });
+  $('#tag').textContent = `${m.alive} of ${S.servers.length} server${S.servers.length > 1 ? 's' : ''} up`;
+  $('#mTp').textContent = X.fmt(m.tp) + '/s';
+  $('#mP95').textContent = X.fmt(m.p95) + ' ms';
+  $('#mP95').parentElement.className = 'meter' + (m.p95 > 1000 ? ' bad' : m.p95 > 400 ? ' wait' : '');
+  $('#mErr').textContent = X.fmt(m.err);
+  $('#mErr').parentElement.className = 'meter' + (m.err ? ' bad' : '');
+  $('#mCap').textContent = m.cap + '/s';
+  const single = S.servers.filter(x => x.alive);
+  $('#up').disabled = !single.length || single.every(x => x.size === SIZES.length - 1);
+  $('#up').textContent = $('#up').disabled && single.length ? '⬆ Already the largest machine' : '⬆ Bigger machine (scale up)';
+  $('#out').disabled = S.servers.filter(x => x.alive).length >= 8;
+  $('#kill').disabled = !m.alive;
+  const st = $('#status');
+  if (!S.t) { st.className = 'status'; st.textContent = 'Press Play to start the traffic.'; }
+  else if (!m.alive) { st.className = 'status bad'; st.textContent = '✕ Total outage: no servers are left. Every request fails.'; }
+  else if (m.err) { st.className = 'status bad'; st.textContent = `✕ Overloaded: ${S.rate} requests/s against roughly ${m.cap}/s of capacity. ${m.err} requests got a 503 in the last 3 s.`; }
+  else if (m.p95 > 400) { st.className = 'status wait'; st.textContent = `⚠ Keeping up, but lines are forming. P95 is ${X.fmt(m.p95)} ms.`; }
+  else { st.className = 'status ok'; st.textContent = `✓ Healthy: ${m.alive} server${m.alive > 1 ? 's' : ''}, P95 ${X.fmt(m.p95)} ms.`; }
+  player.clock(`t = ${(S.t / 1000).toFixed(1)} s`);
+  mis.update(S);
+}
+const player = X.player($('#player'), {
+  step: () => { tick(S); render(); }, stepTicks: 5,
+  reset: () => { S = init(31, { rate: S.rate, algo: S.algo }); Object.keys(flags).forEach(k => (flags[k] = k === 'k5' ? 0 : false)); mis.reset(); render(); },
+});
+const t0 = () => { S.ticks = 0; };
+$('#rate').addEventListener('input', e => { S.rate = +e.target.value; t0(); render(); });
+$$('[data-rate]').forEach(b => b.addEventListener('click', () => { $('#rate').value = b.dataset.rate; $('#rate').dispatchEvent(new Event('input')); if (!player.running) player.play(); }));
+$('#up').addEventListener('click', () => { S.servers.forEach(sv => { if (sv.alive && sv.size < SIZES.length - 1) sv.size++; }); t0(); render(); });
+$('#out').addEventListener('click', () => { S.servers.push(mk(S.next++, 0)); t0(); render(); });
+$('#kill').addEventListener('click', () => {
+  const sv = S.servers.find(x => x.alive); if (!sv) return;
+  sv.alive = false; S.kills++; sv.q.forEach(r => S.errs.push(S.t)); sv.q = []; t0(); render();
+});
+X.seg($('#algoSeg'), ['Round robin', 'Least connections', 'Random'], i => { S.algo = i; t0(); render(); }, 0);
+render();
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="key">upstream</span> encore_app {', 'upstream'],
+  ['    <span class="key">least_conn</span>;', 'algo'],
+  ['    <span class="key">server</span> app1.internal:3000;', 'servers'],
+  ['    <span class="key">server</span> app2.internal:3000;', 'servers'],
+  ['    <span class="key">server</span> app3.internal:3000 max_fails=3 fail_timeout=10s;', 'fails'],
+  ['}', null],
+  ['', null],
+  ['<span class="key">server</span> {', null],
+  ['    <span class="key">listen</span> 443 ssl;', 'listen'],
+  ['    <span class="key">location</span> / {', null],
+  ['        <span class="key">proxy_pass</span> http://encore_app;', 'proxy'],
+  ['        <span class="key">proxy_next_upstream</span> error timeout;', 'retry'],
+  ['    }', null],
+  ['}', null],
+], {
+  upstream: ['The pool of servers', 'A named group of interchangeable app servers. Scaling out means adding a line to it (or letting autoscaling do it for you).'],
+  algo: ['Balancing algorithm', 'Leave this line out and nginx uses <b>round robin</b>. <code>least_conn</code> sends each request to the server with the fewest active requests. That\'s the lab\'s “Least connections”.'],
+  servers: ['Servers', 'Each line is one app server, like the boxes in the lab. They must be interchangeable: same code, no important state kept in local memory.'],
+  fails: ['Skip dead servers', 'After 3 failures, nginx stops sending traffic to this server for 10 s. That\'s why killing one server only cost the requests already waiting in its line.'],
+  listen: ['One front door', 'Fans connect to the load balancer, never to an app server directly. That\'s what lets you add and remove servers without anyone noticing.'],
+  proxy: ['Forward', 'Pass each request to a server picked from the upstream group.'],
+  retry: ['Try another', 'If the chosen server errors or times out, retry the request on a different one. Only safe for requests that can be repeated (see Idempotency, page 10).'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: 'Encore runs on the largest machine the cloud provider sells, and it\'s at 95% CPU during on-sales. What now?', opts: [
+    ['Upgrade to a bigger machine', false, 'There isn\'t one. That\'s the ceiling of vertical scaling.'],
+    ['Scale out: run several servers behind a load balancer', true, 'Horizontal scaling has no single-machine ceiling, and it removes the single point of failure.'],
+    ['Restart the server more often', false, 'Restarting doesn\'t add capacity. It just causes short outages.'],
+  ] },
+  { q: 'After scaling out to 3 servers, fans get logged out at random. Why?', opts: [
+    ['The load balancer is broken', false, 'It\'s doing its job: spreading requests across servers.'],
+    ['Sessions are stored in one server\'s memory, so the next request lands on a server that doesn\'t know the fan', true, 'Horizontal scaling needs stateless servers. Move sessions to a shared store (Redis, the database, or signed cookies).'],
+    ['Three servers is an unlucky number', false, 'Any number above one has the same problem while state lives in local memory.'],
+  ] },
+  { q: 'One server keeps getting stuck on slow checkout requests while the others sit idle. Which balancing setting helps most?', opts: [
+    ['Round robin', false, 'Round robin hands out requests in turn, no matter how busy each server is.'],
+    ['Least connections', true, 'It sends new requests to the server with the fewest active ones, so a server stuck on slow work gets fewer new requests.'],
+    ['Sending every request to the first server', false, 'That turns your three servers back into one.'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'load-balancing-scaling');
+})();
+</script>
+</body>
+</html>

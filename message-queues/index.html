@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Move slow work onto a queue, watch it back up, add workers, apply backpressure, and catch poison messages in a dead letter queue.">
+<title>Message Queues · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/explainer.css">
+</head>
+<body>
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="Sections"><a href="#sync">Why a queue</a><a href="#lab">Queue lab</a><a href="#real">The code</a><a href="#recap">Recap</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>page 8 · stage 2 · more traffic</span><span class="hot">15 · 20 · 44</span></div>
+  <div class="eyebrow">Message queues, dead letter queues, backpressure</div>
+  <h1>The fan doesn't need to wait <em>for the email to be sent.</em></h1>
+  <div class="scenario"><b>Encore</b>Checkout does three things: charge the card, send the ticket email, then tell the fan “done”. Today the email provider is having a slow day, and every checkout waits for it. Some fans give up and click “Buy” again.</div>
+  <div class="row"><a class="btn primary" href="#sync" style="text-decoration:none">Start ↓</a></div>
+</section>
+
+<section class="panel" id="sync">
+  <div class="panel-label"><span>act 1 · do it now, or do it later</span><span class="hot" id="syncTag">inside checkout</span></div>
+  <h2>Buy a ticket</h2>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl">
+        <label for="prov">Email provider response time: <b id="provV">300 ms</b></label>
+        <input type="range" id="prov" min="0" max="6" step="1" value="1">
+        <div class="presets"><button class="btn sm" type="button" data-prov="1">Normal day</button><button class="btn sm" type="button" data-prov="5">Slow day</button></div>
+      </div>
+      <div class="ctl"><span class="lab-k">The email is sent</span><div id="syncSeg"></div></div>
+      <div class="ctl"><span class="lab-k">&nbsp;</span><div><button class="btn primary" id="buy" type="button">Buy a ticket</button></div></div>
+    </div>
+    <div class="pipe" id="pipe" style="margin:0"></div>
+    <div class="status" id="syncRes" role="status">Press “Buy a ticket”.</div>
+  </div>
+  <div class="takeaway"><div class="t">Message queue in one line</div><p>Instead of doing slow work while someone waits, the app puts a small note (a <b>message</b>) on a <b>queue</b> and answers right away. Separate <b>workers</b> take messages off the queue and do the work at their own pace.</p></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>lab · break it, then fix it</span><span class="hot" id="tag">queue</span></div>
+  <h2>The email queue on a busy day</h2>
+  <p>Each order adds one message to the queue. Each worker sends about <b>4 emails a second</b>. This small broker (the queue server) can hold <b>200 messages</b> in memory. All numbers are simulated.</p>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl">
+        <label for="rate">Orders: <b id="rateV">4</b> per second</label>
+        <input type="range" id="rate" min="1" max="40" step="1" value="4">
+        <div class="presets"><button class="btn sm" type="button" data-rate="4">Normal day</button><button class="btn sm" type="button" data-rate="30">On-sale</button></div>
+      </div>
+      <div class="ctl">
+        <label for="workers">Workers: <b id="workersV">3</b> (≈ <span id="capV">12</span> emails/s)</label>
+        <input type="range" id="workers" min="1" max="10" step="1" value="3">
+      </div>
+      <div class="ctl"><span class="lab-k">When the queue is full</span><div id="limSeg"></div></div>
+      <div class="ctl"><span class="lab-k">A message that keeps failing</span><div id="dlqSeg"></div>
+        <button class="btn sm bad" id="poison" type="button" style="margin-top:6px">＋ Add a broken message</button></div>
+      <div class="ctl"><span class="lab-k">Simulation</span><div id="player"></div></div>
+    </div>
+    <div>
+      <div class="lab-k" style="font-size:14px;font-weight:500;margin-bottom:6px" id="qLbl">Queue</div>
+      <div class="queue" id="queue" aria-hidden="true"></div>
+      <div class="bar risk" style="margin-top:8px"><i id="memBar"></i></div>
+      <p class="muted" style="font-size:13px;margin:4px 0 0" id="memTxt"></p>
+    </div>
+    <div class="compare" style="margin:0">
+      <div><h3>Workers</h3><div class="tokens" id="wk" aria-hidden="true"></div><p class="muted" style="font-size:13px;margin:6px 0 0" id="wkTxt"></p></div>
+      <div><h3>Dead letter queue</h3><div class="queue" id="dlq" aria-hidden="true"></div><p class="muted" style="font-size:13px;margin:6px 0 0" id="dlqTxt">Empty.</p></div>
+    </div>
+    <div class="meters" style="margin:0">
+      <div class="meter"><div class="k">Waiting</div><div class="v" id="mQ">0</div><div class="d">messages in queue</div></div>
+      <div class="meter"><div class="k">Email delay</div><div class="v" id="mAge">0 s</div><div class="d">age of the oldest message</div></div>
+      <div class="meter"><div class="k">Sent</div><div class="v" id="mSent">0/s</div><div class="d">emails delivered</div></div>
+      <div class="meter"><div class="k">Lost</div><div class="v" id="mLost">0</div><div class="d" id="mLostD">in broker crashes</div></div>
+    </div>
+    <div class="status" id="status" role="status">Press Play to start taking orders.</div>
+  </div>
+
+  <h3>Try this</h3>
+  <ol class="missions" id="missions"></ol>
+
+  <div class="compare">
+    <div><h3>Backpressure</h3><p style="margin:0">When the consumer can't keep up, the system tells the producer to <b>slow down</b> (refuse, wait or retry later) instead of buffering forever. A queue with no limit just turns “slow” into “out of memory”.</p></div>
+    <div><h3>Dead letter queue</h3><p style="margin:0">A message that fails again and again (a <b>poison message</b>) is moved aside after a few tries, so it stops blocking workers. A person or a tool looks at the dead letter queue later.</p></div>
+  </div>
+  <div class="takeaway"><div class="t">The one difference</div><p>Without a queue, <b>the fan waits for the slowest step</b>. With a queue, the fan waits only for the steps that matter right now, and the rest catch up. The queue absorbs spikes, but only if its size is limited and its failures go somewhere.</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>act 3 · the real thing</span><span class="hot">code + config</span></div>
+  <h2>Producer, worker, and two settings</h2>
+  <p>The syntax is generic. BullMQ, Celery, Sidekiq, SQS and RabbitMQ all follow the same pattern. <b>Hover or tap a line.</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="Example queue code and config"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 pick a line</div><p id="exP">Each highlighted line maps to a control in the labs.</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>recap · keep this</span><span class="hot">♥</span></div>
+  <h2>The whole page on one screen</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">Decouple</div><div class="t">Message queue</div><p>Producers drop messages, workers process them later. Fast responses, and spikes get absorbed instead of passed on.</p></div>
+    <div class="card"><div class="sub">Slow down</div><div class="t">Backpressure</div><p>Limit the queue and push back on producers when it's full. Bounded is better than out of memory.</p></div>
+    <div class="card"><div class="sub">Set aside</div><div class="t">Dead letter queue</div><p>After N failed tries, move the message aside so one bad message can't keep a worker busy forever.</p></div>
+  </div>
+  <div class="takeaway"><div class="t">The tradeoff</div><p>A queue makes work <b>eventually</b> happen instead of happening <b>now</b>. That's perfect for emails, PDFs and analytics, but the fan's seat must still be reserved during checkout. Watch the queue's length and age: they're your early warning.</p></div>
+
+  <h3 style="margin-top:26px">Check it <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="Pages"></nav>
+</main>
+
+<script src="../assets/explainer.js"></script>
+<script>
+(() => {
+const { $, $$, el } = X;
+
+/* ---------- act 1: sync vs queue ---------- */
+const PROV = [100, 300, 800, 1500, 2500, 4000, 6000], CHARGE = 300, TIMEOUT = 3000;
+let viaQueue = false, buying = false;
+const stages = viaQ => viaQ
+  ? [['charge', 'Charge card', CHARGE], ['enqueue', 'Add to queue', 5], ['respond', 'Tell the fan', 0]]
+  : [['charge', 'Charge card', CHARGE], ['email', 'Send email', PROV[+$('#prov').value]], ['respond', 'Tell the fan', 0]];
+function drawPipe() {
+  const p = $('#pipe'); p.innerHTML = '';
+  stages(viaQueue).forEach(([k, label, ms]) => {
+    const st = el('div', 'stage'); const c = el('div', 'chip', `${label}<small>${ms ? X.fmt(ms) + ' ms' : ''}</small>`);
+    c.dataset.s = k; st.append(c); p.append(st);
+  });
+  if (viaQueue) { const st = el('div', 'stage'); st.append(el('div', 'chip gate', 'Worker: send email<small>later</small>')); p.append(st); }
+  $('#provV').textContent = X.fmt(PROV[+$('#prov').value]) + ' ms';
+  $('#syncTag').textContent = viaQueue ? 'via queue' : 'inside checkout';
+}
+X.seg($('#syncSeg'), ['Inside checkout', 'Later, via a queue'], i => { viaQueue = i === 1; drawPipe(); }, 0);
+$('#prov').addEventListener('input', drawPipe);
+$$('[data-prov]').forEach(b => b.addEventListener('click', () => { $('#prov').value = b.dataset.prov; drawPipe(); }));
+drawPipe();
+$('#buy').addEventListener('click', async () => {
+  if (buying) return; buying = true; $('#buy').disabled = true;
+  drawPipe();
+  const chips = X.$$('#pipe .chip');
+  let total = 0, timedOut = false;
+  const st = stages(viaQueue);
+  for (let i = 0; i < st.length; i++) {
+    const [, , ms] = st[i];
+    X.chip(chips[i], 'run');
+    await X.sleep(Math.min(1400, 250 + ms / 4));
+    total += ms;
+    if (!viaQueue && total > TIMEOUT && i === 1) { X.chip(chips[i], 'fail', '✕ timed out'); timedOut = true; break; }
+    X.chip(chips[i], 'ok', '✓ done');
+  }
+  const res = $('#syncRes');
+  if (timedOut) {
+    res.className = 'status bad';
+    res.innerHTML = `✕ The fan waited over ${TIMEOUT / 1000} s and got a timeout, even though <b>the card was already charged</b>. Many will click “Buy” again. (That's how double charges happen: see Idempotency, page 10.)`;
+  } else if (viaQueue) {
+    X.chip(chips[3], 'wait', '⏸ queued');
+    res.className = 'status ok';
+    res.innerHTML = `✓ The fan sees “done” after <b>${X.fmt(total)} ms</b>, no matter how slow the email provider is. A worker sends the email a moment later${PROV[+$('#prov').value] > 2000 ? ' (it takes a while today, and that\'s fine)' : ''}.`;
+    await X.sleep(Math.min(1500, PROV[+$('#prov').value] / 3));
+    X.chip(chips[3], 'ok', '✓ sent');
+  } else {
+    res.className = 'status ' + (total > 1500 ? 'wait' : 'ok');
+    res.innerHTML = `${total > 1500 ? '⚠' : '✓'} The fan waited <b>${X.fmt(total)} ms</b>: ${X.fmt(CHARGE)} for the card plus ${X.fmt(total - CHARGE)} for an email they didn't need yet.`;
+  }
+  buying = false; $('#buy').disabled = false;
+});
+
+/* ---------- queue simulation: pure state + tick ---------- */
+const DT = 100, PER_WORKER = 4, MEM = 200, LIMIT = 100, MAX_TRIES = 3;
+function init(seed, o = {}) {
+  return Object.assign({ r: seed, t: 0, rate: 4, workers: 3, bounded: false, dlqOn: false, q: [], w: [], dlq: [], sent: [], lost: 0, crashes: 0, down: 0, pushed: [], ticks: 0, poisonTries: 0, id: 0 }, o);
+}
+function tick(s) {
+  const t0 = s.t, t1 = t0 + DT;
+  if (s.down > t0) { s.t = t1; s.ticks++; return s; }
+  for (let i = 0, n = X.poisson(s, s.rate * DT / 1000); i < n; i++) {
+    if (s.bounded && s.q.length >= LIMIT) { s.pushed.push(t0); continue; }
+    s.q.push({ id: s.id++, at: t0 + X.rnd(s) * DT, poison: false, tries: 0 });
+  }
+  if (!s.bounded && s.q.length >= MEM) { s.lost += s.q.length; s.q = []; s.w = []; s.crashes++; s.down = t1 + 2000; s.t = t1; s.ticks++; return s; }
+  while (s.w.length < s.workers) s.w.push({ busy: 0, job: null });
+  if (s.w.length > s.workers) s.w.length = s.workers;
+  for (const w of s.w) {
+    while (true) {
+      if (w.job && w.busy <= t1) {
+        const j = w.job; w.job = null;
+        if (j.poison) {
+          j.tries++; s.poisonTries = Math.max(s.poisonTries, j.tries);
+          if (s.dlqOn && j.tries >= MAX_TRIES) s.dlq.push(j); else s.q.push(j);
+        } else s.sent.push(w.busy);
+      }
+      if (w.job || !s.q.length) break;
+      const start = Math.max(w.busy, t0);
+      if (start >= t1) break;
+      w.job = s.q.shift(); w.busy = start + 1000 / PER_WORKER;
+    }
+  }
+  s.t = t1; s.ticks++;
+  s.sent = s.sent.filter(t => t > t1 - 3000);
+  s.pushed = s.pushed.filter(t => t > t1 - 3000);
+  return s;
+}
+function metrics(s) {
+  const real = s.q.filter(j => !j.poison);
+  return { q: s.q.length, age: real.length ? (s.t - Math.min(...real.map(j => j.at))) / 1000 : 0, sent: s.sent.length / 3, pushed: s.pushed.length, down: s.down > s.t };
+}
+
+/* ---------- UI ---------- */
+let S = init(51);
+const t0 = () => { S.ticks = 0; };
+const mis = X.missions($('#missions'), [
+  { text: 'Press <b>Play</b> on a normal day: 4 orders/s, 3 workers.', hint: 'Workers send emails faster than orders arrive. The queue stays near empty.', check: s => s.ticks >= 20 && s.rate <= 6 },
+  { text: 'Hit <b>On-sale</b> (30 orders/s) and watch the queue grow.', hint: 'Checkout is still fast for fans. The cost shows up as email delay, which grows every second.', check: s => s.rate >= 25 && s.q.length > 60 },
+  { text: 'Keep it running with the queue <b>Unbounded</b>.', hint: 'The broker fills up, runs out of memory, and every waiting message is lost.', check: s => s.crashes > 0 },
+  { text: 'Switch “When the queue is full” to <b>Push back at 100</b>.', hint: 'The queue stops growing. New messages get “busy, try later” instead of crashing everything.', check: s => s.bounded && s.ticks > 20 && s.pushed.length > 0 },
+  { text: 'Add <b>workers</b> until the queue drains.', hint: '30 orders/s needs at least 8 workers at 4 emails/s each. 10 clears the backlog faster.', check: s => s.workers * PER_WORKER >= s.rate && s.rate >= 25 && s.q.length < 10 && s.ticks > 20 },
+  { text: 'Click <b>Add a broken message</b> while it\'s set to retry forever.', hint: 'It fails, goes back in the queue, fails again… and keeps a worker busy every time.', check: s => !s.dlqOn && s.poisonTries >= 5 },
+  { text: 'Switch to <b>Dead letter queue after 3 tries</b>.', hint: 'The broken message is moved aside, and the workers get back to real emails.', check: s => s.dlqOn && s.dlq.length > 0 },
+]);
+function render() {
+  const m = metrics(S);
+  $('#rateV').textContent = S.rate; $('#workersV').textContent = S.workers; $('#capV').textContent = S.workers * PER_WORKER;
+  $('#tag').textContent = S.bounded ? 'bounded queue' : 'unbounded queue';
+  const qb = $('#queue'); qb.innerHTML = '';
+  S.q.slice(0, 120).forEach(j => qb.append(el('span', 'msg' + (j.poison ? ' bad' : ''))));
+  if (S.q.length > 120) qb.append(el('span', 'more', `+${S.q.length - 120} more`));
+  $('#qLbl').textContent = m.down ? 'Queue: broker restarting…' : `Queue: ${S.q.length} message${S.q.length === 1 ? '' : 's'}${S.bounded ? ` (limit ${LIMIT})` : ''}`;
+  const memPct = Math.min(1, S.q.length / MEM);
+  $('#memBar').style.width = memPct * 100 + '%';
+  $('#memTxt').textContent = m.down ? 'Broker crashed: out of memory. Restarting with an empty queue.' : `Broker memory: ${Math.round(memPct * 100)}% (holds ${MEM} messages)${m.pushed ? ` · ${m.pushed} new messages pushed back in the last 3 s` : ''}`;
+  const wk = $('#wk'); wk.innerHTML = '';
+  let poisonBusy = 0;
+  S.w.forEach(w => { const busy = w.job && w.busy > S.t; if (busy && w.job.poison) poisonBusy++; wk.append(el('span', 'tok' + (busy ? (w.job.poison ? '' : '') : ' empty'))); });
+  X.$$('#wk .tok').forEach((tk, i) => { const w = S.w[i]; if (w && w.job && w.job.poison && w.busy > S.t) tk.style.background = 'var(--bad)'; });
+  $('#wkTxt').textContent = `${S.w.filter(w => w.job && w.busy > S.t).length} of ${S.workers} busy${poisonBusy ? ` · ${poisonBusy} stuck on a broken message` : ''}`;
+  const d = $('#dlq'); d.innerHTML = '';
+  S.dlq.forEach(() => d.append(el('span', 'msg bad')));
+  $('#dlqTxt').textContent = S.dlq.length ? `${S.dlq.length} message${S.dlq.length > 1 ? 's' : ''} set aside after ${MAX_TRIES} failed tries: “invalid recipient address”. Fix and replay later.` : (S.dlqOn ? 'Empty. Broken messages land here after 3 tries.' : 'Off: broken messages are retried forever.');
+  $('#mQ').textContent = X.fmt(m.q);
+  $('#mQ').parentElement.className = 'meter' + (m.q > 200 ? ' bad' : m.q > 30 ? ' wait' : '');
+  $('#mAge').textContent = m.age.toFixed(1) + ' s';
+  $('#mAge').parentElement.className = 'meter' + (m.age > 10 ? ' bad' : m.age > 3 ? ' wait' : '');
+  $('#mSent').textContent = m.sent.toFixed(1) + '/s';
+  $('#mLost').textContent = X.fmt(S.lost);
+  $('#mLost').parentElement.className = 'meter' + (S.lost ? ' bad' : '');
+  $('#mLostD').textContent = S.crashes ? `${S.crashes} broker crash${S.crashes > 1 ? 'es' : ''}` : 'in broker crashes';
+  const st = $('#status');
+  if (!S.t) { st.className = 'status'; st.textContent = 'Press Play to start taking orders.'; }
+  else if (m.down) { st.className = 'status bad'; st.textContent = `✕ The broker ran out of memory and crashed. ${X.fmt(S.lost)} ticket emails are gone for good.`; }
+  else if (poisonBusy && !S.dlqOn && S.poisonTries >= 3) { st.className = 'status bad'; st.textContent = `✕ A broken message has failed ${S.poisonTries} times and keeps coming back, using up a worker every time.`; }
+  else if (m.pushed) { st.className = 'status wait'; st.textContent = `⚠ Backpressure: the queue is full, so new messages are refused (“try again later”). Memory is safe. Add workers to catch up.`; }
+  else if (m.q > 30) { st.className = 'status wait'; st.textContent = `⚠ Orders arrive faster than workers can send (${S.rate}/s in, ~${S.workers * PER_WORKER}/s out). Emails are ${m.age.toFixed(0)} s behind and the delay keeps growing.`; }
+  else { st.className = 'status ok'; st.textContent = `✓ Keeping up: emails go out about ${Math.max(0.3, m.age).toFixed(1)} s after the order.`; }
+  player.clock(`t = ${(S.t / 1000).toFixed(1)} s`);
+  mis.update(S);
+}
+const player = X.player($('#player'), {
+  step: () => { tick(S); render(); }, stepTicks: 5,
+  reset: () => { S = init(51, { rate: S.rate, workers: S.workers, bounded: S.bounded, dlqOn: S.dlqOn }); mis.reset(); render(); },
+});
+$('#rate').addEventListener('input', e => { S.rate = +e.target.value; t0(); render(); });
+$$('[data-rate]').forEach(b => b.addEventListener('click', () => { $('#rate').value = b.dataset.rate; $('#rate').dispatchEvent(new Event('input')); if (!player.running) player.play(); }));
+$('#workers').addEventListener('input', e => { S.workers = +e.target.value; t0(); render(); });
+X.seg($('#limSeg'), ['Unbounded', 'Push back at 100'], i => { S.bounded = i === 1; t0(); render(); }, 0);
+X.seg($('#dlqSeg'), ['Retry forever', 'Dead letter queue after 3 tries'], i => {
+  S.dlqOn = i === 1;
+  if (S.dlqOn) S.q = S.q.filter(j => { if (j.poison && j.tries >= MAX_TRIES) { S.dlq.push(j); return false; } return true; });
+  t0(); render();
+}, 0);
+$('#poison').addEventListener('click', () => { S.q.unshift({ id: S.id++, at: S.t, poison: true, tries: 0 }); if (!player.running) player.play(); render(); });
+render();
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="c">// checkout: do what matters now, queue the rest</span>', null],
+  ['<span class="key">await</span> payments.charge(order);', 'charge'],
+  ['<span class="key">await</span> queue.send(<span class="s">"send-ticket-email"</span>, { orderId: order.id });', 'send'],
+  ['<span class="key">return</span> res.json({ ok: <span class="s">true</span> });', 'respond'],
+  ['', null],
+  ['<span class="c">// worker: a separate process. Run as many copies as you need.</span>', null],
+  ['queue.process(<span class="s">"send-ticket-email"</span>, <span class="key">async</span> (job) =&gt; {', 'worker'],
+  ['  <span class="key">await</span> email.sendTicket(job.data.orderId);  <span class="c">// throws → retried</span>', 'retry'],
+  ['});', null],
+  ['', null],
+  ['<span class="c">// SQS redrive policy: after 3 receives, move it to the DLQ</span>', null],
+  ['{ <span class="key">"deadLetterTargetArn"</span>: <span class="s">"arn:aws:sqs:…:emails-dlq"</span>,', 'dlq'],
+  ['  <span class="key">"maxReceiveCount"</span>: <span class="s">3</span> }', 'dlq'],
+  ['', null],
+  ['<span class="c">// RabbitMQ queue limit: refuse new messages when full</span>', null],
+  ['{ <span class="key">"x-max-length"</span>: <span class="s">100</span>, <span class="key">"x-overflow"</span>: <span class="s">"reject-publish"</span> }', 'limit'],
+], {
+  charge: ['Do the critical part now', 'Charging the card (and reserving the seat) must succeed before the fan hears “done”. That stays in the request.'],
+  send: ['Produce a message', 'A tiny note with just an id. Adding it takes milliseconds, so the fan isn\'t waiting on the email provider. This is the “Add to queue” step in act 1.'],
+  respond: ['Answer fast', 'The checkout response no longer depends on how slow the email provider is today.'],
+  worker: ['Consume', 'Workers pull messages and do the slow work. More copies means more throughput. That\'s the Workers slider.'],
+  retry: ['Retries', 'If sending throws, the queue gives the message back for another try. Great for temporary failures, and a trap for permanent ones (the broken message).'],
+  dlq: ['Dead letter queue', 'After <code>maxReceiveCount</code> failed tries, the message moves to a separate queue for a human or a tool to inspect and replay.'],
+  limit: ['Backpressure', 'Cap the queue and refuse new messages when it\'s full, so producers learn to slow down or retry later. No more “out of memory”.'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: 'Ticket emails go through a queue. The email provider is down for 10 minutes. What do fans experience?', opts: [
+    ['Checkout fails for 10 minutes', false, 'Checkout only adds a message to the queue. It doesn\'t need the email provider.'],
+    ['Checkout works, and the emails arrive late once the provider is back', true, 'Messages wait in the queue and workers retry. The outage turns into a delay instead of failed purchases.'],
+    ['The emails are lost', false, 'Messages stay in the queue until they\'re processed. That\'s the point of a durable queue.'],
+  ] },
+  { q: 'One message has a malformed address. It fails, goes back to the queue, and fails again, thousands of times. What fixes it?', opts: [
+    ['More workers', false, 'More workers just fail the same message more often.'],
+    ['A max retry count, then move it to a dead letter queue', true, 'Set it aside after a few tries, alert someone, and fix or replay it later.'],
+    ['Delete the queue and start over', false, 'You\'d lose every good message along with the bad one.'],
+  ] },
+  { q: 'The queue length has grown steadily all day and never comes back down. What does that tell you?', opts: [
+    ['The queue is doing its job, so nothing is wrong', false, 'A queue should absorb short spikes. Growth that never ends means the backlog will never be processed.'],
+    ['Consumers are slower than producers. Add workers, speed up the work, or apply backpressure.', true, 'Queue length and the age of the oldest message are the two numbers to alert on.'],
+    ['The broker needs more disk space', false, 'More space only delays the problem. The rates in and out don\'t match.'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'message-queues');
+})();
+</script>
+</body>
+</html>

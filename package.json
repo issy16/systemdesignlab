@@ -1,0 +1,12 @@
+{
+  "name": "systemdesignlab",
+  "private": true,
+  "description": "Interactive system design explainers. Static site; these scripts only run the browser tests.",
+  "scripts": {
+    "test": "node tests/smoke.js && node tests/missions.js",
+    "docs": "node tests/gen-docs.js"
+  },
+  "devDependencies": {
+    "playwright": "1.49.1"
+  }
+}
