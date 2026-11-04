@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="zh-Hans-CN" data-lang="zh-cn" data-slug="tls-secrets">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="看看咖啡厅 Wi-Fi 上的窃听者在有没有 TLS 时分别看到什么，再从 repo 里找出一把外泄的（假的）API 密钥，并正确地修好它。">
+<title>TLS 与机密管理 · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/explainer.css">
+</head>
+<body>
+<!-- Plan. Stuck point: "HTTPS = the padlock" without knowing what it protects; secrets "deleted from the code" are still leaked.
+     Lab 1: café Wi-Fi eavesdropper, HTTP vs HTTPS, handshake with real vs fake certificate.
+     Lab 2: fake repo with a committed (fake) key: find it, then delete vs rotate + move to a secret store. -->
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="章节"><a href="#lab">TLS</a><a href="#secrets">机密</a><a href="#real">设置档</a><a href="#recap">重点整理</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>第 19 页 · 阶段 5 · 上线与维运</span><span class="hot">67 · 71 · 73</span></div>
+  <div class="eyebrow">TLS、传输中加密、机密管理</div>
+  <h1>咖啡厅 Wi-Fi 上的某个人，<em>可以读到你送出的所有东西。除非……</em></h1>
+  <div class="scenario"><b>Encore</b>一位歌迷在咖啡厅登录 Encore。隔壁桌的陌生人在同一个 Wi-Fi 上跑封包侧录工具。另一方面，一把金流 API 密钥已经在 Encore 的 repo 里躺了三个月。这里没有任何东西是真的：网络、攻击者和密钥都是模拟的。</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">打开实验室 ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>实验室 1 · 窃听者</span><span class="hot" id="tag">http</span></div>
+  <h2>陌生人看到了什么</h2>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">网站使用</span><div id="protoSeg"></div></div>
+      <div class="ctl"><span class="lab-k">&nbsp;</span><div><button class="btn primary" id="send" type="button">送出登录数据</button></div></div>
+    </div>
+    <div class="compare" style="margin:0">
+      <div><h3>歌迷的浏览器送出的内容</h3><pre class="sqlbox" id="plain"></pre></div>
+      <div><h3>攻击者截取到的内容 👀</h3><pre class="sqlbox" id="wire">（目前还没有）</pre></div>
+    </div>
+    <div class="status" id="st1" role="status">按「送出登录数据」。</div>
+  </div>
+  <h3 style="margin-top:20px">HTTPS 怎么创建秘密通道</h3>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">服务器出示的凭证</span><div id="certSeg"></div></div>
+      <div class="ctl"><span class="lab-k">交握</span><div class="presets"><button class="btn sm" id="hsStep" type="button">下一步 →</button><button class="btn sm" id="hsReset" type="button">↺ 重新开始</button></div></div>
+    </div>
+    <div class="pipe" id="hs" style="margin:0"></div>
+    <div class="status" id="hsTxt" role="status">按「下一步」，一步步走过 TLS 交握。</div>
+  </div>
+</section>
+
+<section class="panel" id="secrets">
+  <div class="panel-label"><span>实验室 2 · 外泄的密钥</span><span class="hot" id="tag2">已外泄</span></div>
+  <h2>在 Encore 的 repo 里找出机密</h2>
+  <p>这是 Encore repository 的假副本。里面某处有一把金流 API 密钥。（它显然是假的：<code>EXAMPLE-not-a-real-key</code>。）像扫描公开 repo 的机器人那样搜索看看。</p>
+  <div class="lab">
+    <div class="ctl" style="max-width:420px"><label for="grep">搜索所有文件</label><input class="input" id="grep" placeholder="试试：key、secret、sk_" autocomplete="off" spellcheck="false"></div>
+    <ul class="log" id="hits" aria-label="搜索结果"><li class="mut">输入文字来搜索 5 个文件。</li></ul>
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">修好它</span>
+        <div class="presets"><button class="btn sm" id="fDelete" type="button">删掉那一行并提交</button><button class="btn sm" id="fRotate" type="button">轮替密钥</button><button class="btn sm" id="fMove" type="button">移到机密保存库</button></div></div>
+    </div>
+    <div class="status" id="st2" role="status">先找出密钥。</div>
+  </div>
+  <h3>试试看</h3>
+  <ol class="missions" id="missions"></ol>
+  <div class="compare">
+    <div><h3>TLS（传输中加密）</h3><p style="margin:0">加密两台机器之间的数据，并用一张由浏览器信任的机构签署的<b>凭证（certificate）</b>，证明服务器真的是它所宣称的那一个。凡是数据传输的地方都要用：浏览器到网站，以及服务到服务。</p></div>
+    <div><h3>机密管理（Secrets management）</h3><p style="margin:0">密钥、密码和权杖放在机密保存库里（或在部署时注入成环境变量），绝不放在代码或 git 里。每个机密都要能<b>轮替（rotate）</b>：换成新的，同时撤销旧的。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">关键差别</div><p>加密只有在<b>密钥保密</b>时才有用。TLS 让攻击者读不到传输中的数据；外泄的密钥则让他们直接从大门走进来。机密一旦曝光，删掉它也无法让它恢复保密。你必须<b>轮替</b>它。</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>第 3 幕 · 真实世界</span><span class="hot">设置</span></div>
+  <h2>网页服务器里的 TLS，以及 App 里的机密</h2>
+  <p><b>把鼠标移到某一行上，或点一下。</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="TLS 设置与机密使用范例"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 选一行</div><p id="exP">每一行反白后，都会对应到实验室。</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>重点整理 · 带走这些</span><span class="hot">♥</span></div>
+  <h2>整页浓缩在一个画面</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">私密＋真实</div><div class="t">TLS</div><p>加密连接并验证服务器的凭证。攻击者看得到你连到哪里，看不到你送了什么。</p></div>
+    <div class="card"><div class="sub">到处都要</div><div class="t">传输中加密</div><p>不只是浏览器：数据库、队列和内部 API 也一样。数据中心内部的网络并不会自动变得安全。</p></div>
+    <div class="card"><div class="sub">移出代码</div><div class="t">机密管理（Secrets management）</div><p>把机密存在机密管理工具里，每个服务只给它需要的，一有外泄就轮替。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">取舍</div><p>TLS 只要一点设置，在今天几乎不影响速度，没有理由跳过它。机密管理工具会多一个相依服务和一些流程，但一把外泄的密钥造成的损失可能大得多。把凭证更新和机密轮替自动化，别让它们依赖某人记得去做。</p></div>
+  <h3 style="margin-top:26px">考考自己 <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="页面"></nav>
+</main>
+
+<script src="../../assets/explainer.js"></script>
+<script src="../../assets/i18n.zh-cn.js"></script>
+<script>
+(() => {
+const { $, el, esc } = X;
+const flags = { http: false, https: false, fake: false, found: false, rotated: false, moved: false, deleted: false };
+
+/* ---------- lab 1: eavesdropper ---------- */
+const REQ = 'POST /login HTTP/1.1\nHost: encore.example\nCookie: session=8f2c41aa\nContent-Type: application/x-www-form-urlencoded\n\nemail=ana%40encore.example&password=tickets123';
+let https = false;
+$('#plain').textContent = REQ;
+function gibberish(seed, n) { const s = { r: seed }, h = '0123456789abcdef'; let out = ''; for (let i = 0; i < n; i++) { out += h[Math.floor(X.rnd(s) * 16)]; if (i % 32 === 31) out += '\n'; else if (i % 4 === 3) out += ' '; } return out; }
+X.seg($('#protoSeg'), ['HTTP', 'HTTPS (TLS)'], i => { https = i === 1; $('#tag').textContent = https ? 'https' : 'http'; $('#wire').textContent = '（目前还没有）'; $('#st1').className = 'status'; $('#st1').textContent = '按「送出登录数据」。'; }, 0);
+$('#send').addEventListener('click', () => {
+  const st = $('#st1');
+  if (!https) {
+    $('#wire').textContent = REQ;
+    st.className = 'status bad'; st.textContent = '✕ 全部都看得懂：email、密码和会话 cookie。光凭那个 cookie，攻击者就算不知道密码也能冒充这位歌迷。';
+    flags.http = true;
+  } else {
+    $('#wire').textContent = 'to: 203.0.113.7:443   SNI: encore.example   size: 612 bytes\n\n' + gibberish(19, 256);
+    st.className = 'status ok'; st.textContent = '✓ 攻击者看得到歌迷连到哪个网站，以及大概送了多少数据。请求内容、密码和 cookie 都无法读取。';
+    flags.https = true;
+  }
+  mis.update(flags);
+});
+const HS = [
+  ['ClientHello', '浏览器 → 服务器', '嗨，我要连 encore.example。这是我支持的加密套件，以及我这一半的密钥交换数据。'],
+  ['ServerHello', '服务器 → 浏览器', '我们用 TLS 1.3 和这个加密套件吧。这是我这一半的密钥交换数据，还有我的凭证。'],
+  ['检查凭证', '在浏览器中', ''],
+  ['共享密钥', '双方', '双方各自把两半数据组合（ECDHE）成同一把秘密密钥。它从来没有在网络上传输过，所以攻击者算不出来。'],
+  ['加密的数据', '双向', '从这里开始，每一个字节都用那把密钥加密。这就是攻击者看到的那堆乱码。'],
+];
+let fake = false, hsAt = -1;
+function drawHS() {
+  const p = $('#hs'); p.innerHTML = '';
+  HS.forEach(([name, who], i) => {
+    const st = el('div', 'stage'); const c = el('div', 'chip', `${name}<small>${who}</small>`);
+    st.append(c); p.append(st);
+    if (i < hsAt || (i === hsAt && !(fake && i === 2))) X.chip(c, 'ok', '✓');
+    if (fake && i === 2 && hsAt >= 2) X.chip(c, 'fail', '✕ 被拒绝');
+    if (i === hsAt + 1 && !(fake && hsAt >= 2)) X.chip(c, '', '');
+  });
+  const t = $('#hsTxt');
+  if (hsAt < 0) { t.className = 'status'; t.textContent = '按「下一步」，一步步走过 TLS 交握。'; return; }
+  if (hsAt === 2) {
+    if (fake) { t.className = 'status bad'; t.textContent = '✕「你的连接不是私人连接」（NET::ERR_CERT_AUTHORITY_INVALID）。攻击者的凭证声称自己是 encore.example，但没有任何浏览器信任的机构签署它。浏览器在送出任何东西之前就停下来了。'; flags.fake = true; mis.update(flags); }
+    else { t.className = 'status ok'; t.textContent = '✓ 这张凭证属于 encore.example、还没过期，而且由浏览器信任的机构签署（这里是 Let\'s Encrypt）。所以这真的是 Encore 的服务器。'; }
+    return;
+  }
+  t.className = 'status ok'; t.textContent = HS[hsAt][2];
+}
+X.seg($('#certSeg'), ['Encore 的真凭证', '攻击者的假凭证'], i => { fake = i === 1; hsAt = -1; drawHS(); }, 0);
+$('#hsStep').addEventListener('click', () => { if (fake && hsAt >= 2) return; hsAt = Math.min(HS.length - 1, hsAt + 1); drawHS(); });
+$('#hsReset').addEventListener('click', () => { hsAt = -1; drawHS(); });
+drawHS();
+
+/* ---------- lab 2: leaked key ---------- */
+const FILES = {
+  'README.md': ['# Encore', 'Ticketing for live music.', 'Run `npm start` and open http://localhost:3000'],
+  'src/payments.js': ['import Stripe from "stripe";', 'import { STRIPE_KEY } from "../config.js";', 'export const stripe = new Stripe(STRIPE_KEY);'],
+  'config.js': ['// TODO: move this somewhere safer', 'export const STRIPE_KEY = "sk_live_EXAMPLE-not-a-real-key-4f9a";', 'export const PORT = 3000;'],
+  '.env.example': ['STRIPE_SECRET_KEY=', 'DATABASE_URL='],
+  '.github/workflows/deploy.yml': ['- run: npm ci && npm test', '- run: ./deploy.sh'],
+};
+function drawHits() {
+  const q = $('#grep').value.trim().toLowerCase();
+  const ul = $('#hits'); ul.innerHTML = '';
+  if (!q) { ul.append(el('li', 'mut', '输入文字来搜索 5 个文件。')); return; }
+  let n = 0;
+  Object.entries(FILES).forEach(([f, lines]) => lines.forEach((l, i) => {
+    if (!l.toLowerCase().includes(q)) return;
+    n++;
+    const live = l.includes('sk_live_') && !flags.moved;
+    ul.append(el('li', live ? 'bad' : '', esc(`${f}:${i + 1}  ${l}`) + (live ? esc('   ← 三个月前提交的，存在每一份 clone 和 fork 里') : '')));
+    if (l.includes('sk_live_')) { flags.found = true; }
+  }));
+  if (!n) ul.append(el('li', 'mut', '没有符合的结果。'));
+  mis.update(flags); drawFix();
+}
+function drawFix() {
+  const st = $('#st2');
+  $('#tag2').textContent = flags.rotated && flags.moved ? 'fixed' : 'leaked';
+  if (!flags.found) { st.className = 'status'; st.textContent = '先找出密钥。'; return; }
+  if (flags.rotated && flags.moved) { st.className = 'status ok'; st.textContent = '✓ 修好了。外泄的密钥已被撤销，对任何拷贝了它的人都毫无价值。新的密钥放在机密保存库里，在部署时以 STRIPE_SECRET_KEY 的形式提供给 App。它再也不会出现在 git 里。'; return; }
+  if (flags.rotated) { st.className = 'status wait'; st.textContent = '⚠ 旧密钥已撤销：很好。但新的密钥又要被贴回 config.js 了。把它移到机密保存库，避免重蹈覆辙。'; return; }
+  if (flags.moved) { st.className = 'status bad'; st.textContent = '✕ 代码里已经没有密钥了，但旧密钥还能用。任何在 git 历史里看过它的人，仍然可以刷卡。轮替它。'; return; }
+  if (flags.deleted) { st.className = 'status bad'; st.textContent = '✕ 仍然外泄。最新版本里没有密钥了，但它还在 git 历史里、在每一份 clone 和 fork 里，可能也在扫描机器人的数据库里。机器人在密钥被推到公开 repo 后几分钟内就会找到它。'; return; }
+  st.className = 'status bad'; st.textContent = '✕ 找到了：config.js 里有一把可用的金流密钥。任何现在或过去能读这个 repo 的人都能使用它。选一个修法。';
+}
+$('#grep').addEventListener('input', drawHits);
+$('#fDelete').addEventListener('click', () => { flags.deleted = true; drawFix(); });
+$('#fRotate').addEventListener('click', () => { flags.rotated = true; drawFix(); mis.update(flags); });
+$('#fMove').addEventListener('click', () => { flags.moved = true; FILES['config.js'][1] = 'export const STRIPE_KEY = process.env.STRIPE_SECRET_KEY;'; drawHits(); mis.update(flags); });
+
+const mis = X.missions($('#missions'), [
+  { text: '在 <b>HTTP</b> 下送出登录数据。', hint: '看看攻击者截取到了什么。', check: f => f.http },
+  { text: '切换到 <b>HTTPS</b>，再送一次。', hint: '同样的请求、同样的网络。比较看看。', check: f => f.https },
+  { text: '用<b>攻击者的假凭证</b>走一遍交握。', hint: '一直按到浏览器检查凭证那一步。', check: f => f.fake },
+  { text: '实验室 2：在 repo 里<b>找出外泄的密钥</b>。', hint: '搜索「key」或「sk_」。', check: f => f.found },
+  { text: '正确地修好它：<b>轮替</b>密钥，并<b>移到机密保存库</b>。', hint: '先试试「删掉那一行」，看看为什么那样不够。', check: f => f.rotated && f.moved },
+]);
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="c"># nginx：以 TLS 提供 Encore 服务</span>', null],
+  ['<span class="key">listen</span> 443 ssl;', 'listen'],
+  ['<span class="key">ssl_certificate</span>     /etc/letsencrypt/live/encore.example/fullchain.pem;', 'cert'],
+  ['<span class="key">ssl_certificate_key</span> /etc/letsencrypt/live/encore.example/privkey.pem;', 'privkey'],
+  ['<span class="key">ssl_protocols</span> TLSv1.2 TLSv1.3;', 'proto'],
+  ['<span class="key">add_header</span> Strict-Transport-Security <span class="s">"max-age=31536000"</span> always;', 'hsts'],
+  ['', null],
+  ['<span class="c"># 数据中心内部也要传输中加密</span>', null],
+  ['DATABASE_URL=<span class="s">postgres://app@db:5432/encore?sslmode=verify-full</span>', 'db'],
+  ['', null],
+  ['<span class="c">// 机密来自环境变量，绝不来自代码</span>', null],
+  ['<span class="key">const</span> stripe = <span class="key">new</span> Stripe(process.env.STRIPE_SECRET_KEY);', 'env'],
+], {
+  listen: ['443 端口', 'HTTPS 的端口号。80 端口通常只负责转址到这里。'],
+  cert: ['凭证', '公开的部分：「这台服务器是 encore.example」，由凭证机构签署。Let\'s Encrypt 免费核发，certbot 等工具会自动更新。'],
+  privkey: ['私钥', '证明服务器拥有这张凭证。如果它外泄，任何人都能冒充 Encore。它跟其他机密一样是机密。'],
+  proto: ['协定版本', '只允许现代的 TLS。旧版本（SSL、TLS 1.0 和 1.1）有已知的弱点。'],
+  hsts: ['HSTS', '告诉浏览器：「这个网站永远只用 HTTPS」。它能阻止攻击者悄悄把歌迷降级成一般的 HTTP。'],
+  db: ['数据库走 TLS', '<code>verify-full</code> 会加密数据库连接并检查数据库的凭证。这就是服务之间的传输中加密，而不只是给浏览器用的。'],
+  env: ['来自环境的机密', '密钥在部署时从机密保存库注入（Vault、AWS Secrets Manager、Doppler、GitHub Actions secrets）。代码和 repo 里永远不会有它。'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: 'Encore 使用 HTTPS。同一个咖啡厅 Wi-Fi 上的人还能知道什么？', opts: [
+    ['歌迷的密码', false, '它在加密通道里面。'],
+    ['歌迷连到了 encore.example，以及大概送了多少数据', true, 'TLS 隐藏的是内容，而不是「有连接发生」这件事。主机名称在交握中是看得到的（SNI）。'],
+    ['什么都不知道', false, '目的地 IP、主机名称、时间点和大小都还是看得到。'],
+  ] },
+  { q: 'Ben 不小心把 API 密钥推到公开 repo，2 分钟后发现并用 force-push 移除。现在安全了吗？', opts: [
+    ['安全了，它已经从 GitHub 上消失', false, '机器人会在几秒内扫描新的公开提交。fork、clone 和缓存里也可能有它。'],
+    ['不安全：把它当成已外泄，撤销它并发一把新的', true, '机密一旦曝光，轮替是唯一真正的修法。然后把它移到机密保存库。'],
+    ['只要把 repo 改成私有就行', false, '现在改成私有，也收不回已经被拷贝走的东西。'],
+  ] },
+  { q: 'Encore 的 App 和数据库在同一个云端网络里。那里需要 TLS 吗？', opts: [
+    ['不需要，内部网络是可信任的', false, '被入侵的机器、设置错误的网络和内部人员都是存在的。「内部」不是安全边界。'],
+    ['需要：服务之间也要传输中加密，并验证凭证', true, '零信任网络假设任何网络都可能被监看。大多数数据库只要一个设置就能激活 TLS。'],
+    ['只有数据库在另一个区域时才需要', false, '这跟距离无关。任何看得到流量的人都可能读取它。'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'tls-secrets');
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="See what an eavesdropper on café Wi-Fi sees with and without TLS, then find a leaked (fake) API key in a repo and fix it properly.">
+<title>TLS and Secrets · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/explainer.css">
+</head>
+<body>
+<!-- Plan. Stuck point: "HTTPS = the padlock" without knowing what it protects; secrets "deleted from the code" are still leaked.
+     Lab 1: café Wi-Fi eavesdropper, HTTP vs HTTPS, handshake with real vs fake certificate.
+     Lab 2: fake repo with a committed (fake) key: find it, then delete vs rotate + move to a secret store. -->
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="Sections"><a href="#lab">TLS</a><a href="#secrets">Secrets</a><a href="#real">The config</a><a href="#recap">Recap</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>page 19 · stage 5 · ship and operate it</span><span class="hot">67 · 71 · 73</span></div>
+  <div class="eyebrow">TLS, encryption in transit, secrets management</div>
+  <h1>Someone on the café Wi-Fi <em>can read everything you send. Unless…</em></h1>
+  <div class="scenario"><b>Encore</b>A fan logs in to Encore from a café. A stranger at the next table runs a packet sniffer on the same Wi-Fi. Meanwhile, a payment API key has been sitting in Encore's repo for three months. Nothing here is real: the network, the attacker and the key are all simulated.</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">Open the lab ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>lab 1 · the eavesdropper</span><span class="hot" id="tag">http</span></div>
+  <h2>What the stranger sees</h2>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">The site uses</span><div id="protoSeg"></div></div>
+      <div class="ctl"><span class="lab-k">&nbsp;</span><div><button class="btn primary" id="send" type="button">Send the login</button></div></div>
+    </div>
+    <div class="compare" style="margin:0">
+      <div><h3>What the fan's browser sends</h3><pre class="sqlbox" id="plain"></pre></div>
+      <div><h3>What the attacker captures 👀</h3><pre class="sqlbox" id="wire">(nothing yet)</pre></div>
+    </div>
+    <div class="status" id="st1" role="status">Press “Send the login”.</div>
+  </div>
+  <h3 style="margin-top:20px">How HTTPS sets up the secret channel</h3>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">The certificate the server presents</span><div id="certSeg"></div></div>
+      <div class="ctl"><span class="lab-k">Handshake</span><div class="presets"><button class="btn sm" id="hsStep" type="button">Next step →</button><button class="btn sm" id="hsReset" type="button">↺ Restart</button></div></div>
+    </div>
+    <div class="pipe" id="hs" style="margin:0"></div>
+    <div class="status" id="hsTxt" role="status">Press “Next step” to walk through the TLS handshake.</div>
+  </div>
+</section>
+
+<section class="panel" id="secrets">
+  <div class="panel-label"><span>lab 2 · the leaked key</span><span class="hot" id="tag2">leaked</span></div>
+  <h2>Find the secret in Encore's repo</h2>
+  <p>This is a pretend copy of Encore's repository. Somewhere in it is a payment API key. (It's obviously fake: <code>EXAMPLE-not-a-real-key</code>.) Search like a bot scanning public repos would.</p>
+  <div class="lab">
+    <div class="ctl" style="max-width:420px"><label for="grep">Search all files</label><input class="input" id="grep" placeholder="try: key, secret, sk_" autocomplete="off" spellcheck="false"></div>
+    <ul class="log" id="hits" aria-label="Search results"><li class="mut">Type to search 5 files.</li></ul>
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">Fix it</span>
+        <div class="presets"><button class="btn sm" id="fDelete" type="button">Delete the line and commit</button><button class="btn sm" id="fRotate" type="button">Rotate the key</button><button class="btn sm" id="fMove" type="button">Move it to a secret store</button></div></div>
+    </div>
+    <div class="status" id="st2" role="status">First, find the key.</div>
+  </div>
+  <h3>Try this</h3>
+  <ol class="missions" id="missions"></ol>
+  <div class="compare">
+    <div><h3>TLS (encryption in transit)</h3><p style="margin:0">Encrypts data between two machines and proves the server is who it claims to be, using a <b>certificate</b> signed by an authority the browser trusts. Use it everywhere data travels: browser to site, and service to service.</p></div>
+    <div><h3>Secrets management</h3><p style="margin:0">Keys, passwords and tokens live in a secret store (or environment variables injected at deploy time), never in code or git. Every secret can be <b>rotated</b>: replaced with a new one while the old one is revoked.</p></div>
+  </div>
+  <div class="takeaway"><div class="t">The one difference</div><p>Encryption only helps if the <b>key stays secret</b>. TLS keeps attackers from reading data in transit; a leaked key lets them walk in through the front door. Once a secret has been exposed, deleting it doesn't un-expose it. You must <b>rotate</b> it.</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>act 3 · the real thing</span><span class="hot">config</span></div>
+  <h2>TLS in a web server, and secrets in the app</h2>
+  <p><b>Hover or tap a line.</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="Example TLS configuration and secret usage"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 pick a line</div><p id="exP">Each highlighted line maps to the labs.</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>recap · keep this</span><span class="hot">♥</span></div>
+  <h2>The whole page on one screen</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">Private + authentic</div><div class="t">TLS</div><p>Encrypts the connection and verifies the server's certificate. The attacker sees where you connect, not what you send.</p></div>
+    <div class="card"><div class="sub">Everywhere</div><div class="t">Encryption in transit</div><p>Not just the browser: databases, queues and internal APIs too. Networks inside a data center aren't automatically safe.</p></div>
+    <div class="card"><div class="sub">Out of the code</div><div class="t">Secrets management</div><p>Store secrets in a secret manager, give each service only what it needs, and rotate on any leak.</p></div>
+  </div>
+  <div class="takeaway"><div class="t">The tradeoff</div><p>TLS costs a little setup and almost nothing in speed today, so there's no reason to skip it. Secret managers add a dependency and some process, but a single leaked key can cost far more. Automate certificate renewal and secret rotation so they don't depend on someone remembering.</p></div>
+  <h3 style="margin-top:26px">Check it <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="Pages"></nav>
+</main>
+
+<script src="../assets/explainer.js"></script>
+<script>
+(() => {
+const { $, el, esc } = X;
+const flags = { http: false, https: false, fake: false, found: false, rotated: false, moved: false, deleted: false };
+
+/* ---------- lab 1: eavesdropper ---------- */
+const REQ = 'POST /login HTTP/1.1\nHost: encore.example\nCookie: session=8f2c41aa\nContent-Type: application/x-www-form-urlencoded\n\nemail=ana%40encore.example&password=tickets123';
+let https = false;
+$('#plain').textContent = REQ;
+function gibberish(seed, n) { const s = { r: seed }, h = '0123456789abcdef'; let out = ''; for (let i = 0; i < n; i++) { out += h[Math.floor(X.rnd(s) * 16)]; if (i % 32 === 31) out += '\n'; else if (i % 4 === 3) out += ' '; } return out; }
+X.seg($('#protoSeg'), ['HTTP', 'HTTPS (TLS)'], i => { https = i === 1; $('#tag').textContent = https ? 'https' : 'http'; $('#wire').textContent = '(nothing yet)'; $('#st1').className = 'status'; $('#st1').textContent = 'Press “Send the login”.'; }, 0);
+$('#send').addEventListener('click', () => {
+  const st = $('#st1');
+  if (!https) {
+    $('#wire').textContent = REQ;
+    st.className = 'status bad'; st.textContent = '✕ Everything is readable: the email, the password and the session cookie. With the cookie alone the attacker can act as this fan without even knowing the password.';
+    flags.http = true;
+  } else {
+    $('#wire').textContent = 'to: 203.0.113.7:443   SNI: encore.example   size: 612 bytes\n\n' + gibberish(19, 256);
+    st.className = 'status ok'; st.textContent = '✓ The attacker sees which site the fan connected to and roughly how much data was sent. The request, the password and the cookie are unreadable.';
+    flags.https = true;
+  }
+  mis.update(flags);
+});
+const HS = [
+  ['ClientHello', 'browser → server', 'Hi, I want encore.example. Here are the ciphers I support and my half of a key exchange.'],
+  ['ServerHello', 'server → browser', 'Let\'s use TLS 1.3 with this cipher. Here\'s my half of the key exchange, and my certificate.'],
+  ['Check certificate', 'in the browser', ''],
+  ['Shared key', 'both sides', 'Each side combines the two halves (ECDHE) into the same secret key. It never travelled over the network, so the attacker can\'t compute it.'],
+  ['Encrypted data', 'both ways', 'From here on, every byte is encrypted with that key. That\'s the gibberish the attacker saw.'],
+];
+let fake = false, hsAt = -1;
+function drawHS() {
+  const p = $('#hs'); p.innerHTML = '';
+  HS.forEach(([name, who], i) => {
+    const st = el('div', 'stage'); const c = el('div', 'chip', `${name}<small>${who}</small>`);
+    st.append(c); p.append(st);
+    if (i < hsAt || (i === hsAt && !(fake && i === 2))) X.chip(c, 'ok', '✓');
+    if (fake && i === 2 && hsAt >= 2) X.chip(c, 'fail', '✕ rejected');
+    if (i === hsAt + 1 && !(fake && hsAt >= 2)) X.chip(c, '', '');
+  });
+  const t = $('#hsTxt');
+  if (hsAt < 0) { t.className = 'status'; t.textContent = 'Press “Next step” to walk through the TLS handshake.'; return; }
+  if (hsAt === 2) {
+    if (fake) { t.className = 'status bad'; t.textContent = '✕ “Your connection is not private” (NET::ERR_CERT_AUTHORITY_INVALID). The attacker\'s certificate claims to be encore.example, but no authority the browser trusts signed it. The browser stops before sending anything.'; flags.fake = true; mis.update(flags); }
+    else { t.className = 'status ok'; t.textContent = '✓ The certificate is for encore.example, it hasn\'t expired, and it\'s signed by an authority the browser trusts (here, Let\'s Encrypt). So this really is Encore\'s server.'; }
+    return;
+  }
+  t.className = 'status ok'; t.textContent = HS[hsAt][2];
+}
+X.seg($('#certSeg'), ['Encore\'s real certificate', 'Attacker\'s fake certificate'], i => { fake = i === 1; hsAt = -1; drawHS(); }, 0);
+$('#hsStep').addEventListener('click', () => { if (fake && hsAt >= 2) return; hsAt = Math.min(HS.length - 1, hsAt + 1); drawHS(); });
+$('#hsReset').addEventListener('click', () => { hsAt = -1; drawHS(); });
+drawHS();
+
+/* ---------- lab 2: leaked key ---------- */
+const FILES = {
+  'README.md': ['# Encore', 'Ticketing for live music.', 'Run `npm start` and open http://localhost:3000'],
+  'src/payments.js': ['import Stripe from "stripe";', 'import { STRIPE_KEY } from "../config.js";', 'export const stripe = new Stripe(STRIPE_KEY);'],
+  'config.js': ['// TODO: move this somewhere safer', 'export const STRIPE_KEY = "sk_live_EXAMPLE-not-a-real-key-4f9a";', 'export const PORT = 3000;'],
+  '.env.example': ['STRIPE_SECRET_KEY=', 'DATABASE_URL='],
+  '.github/workflows/deploy.yml': ['- run: npm ci && npm test', '- run: ./deploy.sh'],
+};
+function drawHits() {
+  const q = $('#grep').value.trim().toLowerCase();
+  const ul = $('#hits'); ul.innerHTML = '';
+  if (!q) { ul.append(el('li', 'mut', 'Type to search 5 files.')); return; }
+  let n = 0;
+  Object.entries(FILES).forEach(([f, lines]) => lines.forEach((l, i) => {
+    if (!l.toLowerCase().includes(q)) return;
+    n++;
+    const live = l.includes('sk_live_') && !flags.moved;
+    ul.append(el('li', live ? 'bad' : '', esc(`${f}:${i + 1}  ${l}`) + (live ? esc('   ← committed 3 months ago, in every clone and fork') : '')));
+    if (l.includes('sk_live_')) { flags.found = true; }
+  }));
+  if (!n) ul.append(el('li', 'mut', 'No matches.'));
+  mis.update(flags); drawFix();
+}
+function drawFix() {
+  const st = $('#st2');
+  $('#tag2').textContent = flags.rotated && flags.moved ? 'fixed' : 'leaked';
+  if (!flags.found) { st.className = 'status'; st.textContent = 'First, find the key.'; return; }
+  if (flags.rotated && flags.moved) { st.className = 'status ok'; st.textContent = '✓ Fixed. The leaked key is revoked, so it\'s worthless to anyone who copied it. The new key lives in a secret store and reaches the app as STRIPE_SECRET_KEY at deploy time. It never appears in git again.'; return; }
+  if (flags.rotated) { st.className = 'status wait'; st.textContent = '⚠ The old key is revoked: good. But the new one is about to be pasted into config.js again. Move it to a secret store so this doesn\'t repeat.'; return; }
+  if (flags.moved) { st.className = 'status bad'; st.textContent = '✕ The code no longer contains the key, but the old key still works. Anyone who saw it in git history can still charge cards. Rotate it.'; return; }
+  if (flags.deleted) { st.className = 'status bad'; st.textContent = '✕ Still leaked. The key is gone from the latest version, but it\'s still in git history, in every clone and fork, and possibly in a scanner bot\'s database. Bots find keys pushed to public repos within minutes.'; return; }
+  st.className = 'status bad'; st.textContent = '✕ Found it: a live payment key in config.js. Anyone with read access to the repo, now or in the past, can use it. Pick a fix.';
+}
+$('#grep').addEventListener('input', drawHits);
+$('#fDelete').addEventListener('click', () => { flags.deleted = true; drawFix(); });
+$('#fRotate').addEventListener('click', () => { flags.rotated = true; drawFix(); mis.update(flags); });
+$('#fMove').addEventListener('click', () => { flags.moved = true; FILES['config.js'][1] = 'export const STRIPE_KEY = process.env.STRIPE_SECRET_KEY;'; drawHits(); mis.update(flags); });
+
+const mis = X.missions($('#missions'), [
+  { text: 'With <b>HTTP</b>, send the login.', hint: 'Look at what the attacker captured.', check: f => f.http },
+  { text: 'Switch to <b>HTTPS</b> and send it again.', hint: 'Same request, same network. Now compare.', check: f => f.https },
+  { text: 'Walk through the handshake with the <b>attacker\'s fake certificate</b>.', hint: 'Step until the browser checks the certificate.', check: f => f.fake },
+  { text: 'Lab 2: <b>find the leaked key</b> in the repo.', hint: 'Search for “key” or “sk_”.', check: f => f.found },
+  { text: 'Fix it properly: <b>rotate</b> the key and <b>move it to a secret store</b>.', hint: 'Try “Delete the line” first to see why that isn\'t enough.', check: f => f.rotated && f.moved },
+]);
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="c"># nginx: serve Encore over TLS</span>', null],
+  ['<span class="key">listen</span> 443 ssl;', 'listen'],
+  ['<span class="key">ssl_certificate</span>     /etc/letsencrypt/live/encore.example/fullchain.pem;', 'cert'],
+  ['<span class="key">ssl_certificate_key</span> /etc/letsencrypt/live/encore.example/privkey.pem;', 'privkey'],
+  ['<span class="key">ssl_protocols</span> TLSv1.2 TLSv1.3;', 'proto'],
+  ['<span class="key">add_header</span> Strict-Transport-Security <span class="s">"max-age=31536000"</span> always;', 'hsts'],
+  ['', null],
+  ['<span class="c"># encryption in transit inside the data center too</span>', null],
+  ['DATABASE_URL=<span class="s">postgres://app@db:5432/encore?sslmode=verify-full</span>', 'db'],
+  ['', null],
+  ['<span class="c">// secrets come from the environment, never from the code</span>', null],
+  ['<span class="key">const</span> stripe = <span class="key">new</span> Stripe(process.env.STRIPE_SECRET_KEY);', 'env'],
+], {
+  listen: ['Port 443', 'The HTTPS port. Usually port 80 just redirects here.'],
+  cert: ['Certificate', 'The public part: “this server is encore.example”, signed by a certificate authority. Let\'s Encrypt issues them for free and tools like certbot renew them automatically.'],
+  privkey: ['Private key', 'Proves the server owns the certificate. If it leaks, anyone can impersonate Encore. It\'s a secret like any other.'],
+  proto: ['Protocol versions', 'Allow only modern TLS. Old versions (SSL, TLS 1.0 and 1.1) have known weaknesses.'],
+  hsts: ['HSTS', 'Tells browsers: “only ever use HTTPS for this site”. It stops an attacker from quietly downgrading a fan to plain HTTP.'],
+  db: ['Database over TLS', '<code>verify-full</code> encrypts the database connection and checks the database\'s certificate. That\'s encryption in transit between services, not just for browsers.'],
+  env: ['Secret from the environment', 'The key is injected at deploy time from a secret store (Vault, AWS Secrets Manager, Doppler, GitHub Actions secrets). The code and the repo never contain it.'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: 'Encore uses HTTPS. What can someone on the same café Wi-Fi still learn?', opts: [
+    ['The fan\'s password', false, 'It\'s inside the encrypted channel.'],
+    ['That the fan connected to encore.example, and roughly how much data was sent', true, 'TLS hides the content, not the fact that a connection happened. The hostname is visible in the handshake (SNI).'],
+    ['Nothing at all', false, 'The destination IP, hostname, timing and size are still visible.'],
+  ] },
+  { q: 'Ben accidentally pushed an API key to a public repo, noticed 2 minutes later and force-pushed to remove it. Is it safe now?', opts: [
+    ['Yes, it\'s gone from GitHub', false, 'Bots scan new public commits within seconds. Forks, clones and caches may also have it.'],
+    ['No: treat it as leaked, revoke it and issue a new one', true, 'Once a secret has been exposed, rotation is the only real fix. Then move it to a secret store.'],
+    ['Only if the repo is made private', false, 'Making it private now doesn\'t un-share what was already copied.'],
+  ] },
+  { q: 'Encore\'s app talks to its database inside the same cloud network. Is TLS needed there?', opts: [
+    ['No, internal networks are trusted', false, 'Compromised machines, misconfigured networks and insiders all exist. “Inside” isn\'t a security boundary.'],
+    ['Yes: encrypt in transit between services too, and verify certificates', true, 'Zero-trust networking assumes any network can be watched. Most databases support TLS with one setting.'],
+    ['Only if the database is in another region', false, 'Distance doesn\'t decide it. Anyone who can see the traffic could read it.'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'tls-secrets');
+})();
+</script>
+</body>
+</html>

@@ -127,6 +127,13 @@ const FLOWS = {
     ['click', seg('toolSeg', 3), 100], ['click', '#trace button:nth-child(4)', 100], ['click', '#trace button:nth-child(5)', 200],
     ['click', seg('toolSeg', 4), 100], ['fill', ['#thr', '300'], 100], ['fill', ['#thr', '1000'], 200],
   ],
+  'tls-secrets': [
+    ['click', '#send', 200],
+    ['click', seg('protoSeg', 2), 100], ['click', '#send', 200],
+    ['click', seg('certSeg', 2), 100], ['click', '#hsStep', 100], ['click', '#hsStep', 100], ['click', '#hsStep', 200],
+    ['fill', ['#grep', 'sk_'], 200],
+    ['click', '#fDelete', 100], ['click', '#fRotate', 100], ['click', '#fMove', 200],
+  ],
 };
 
 (async () => {
