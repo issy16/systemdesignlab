@@ -1,5 +1,6 @@
 // Regenerates docs/CONCEPTS.md and docs/TOPICS.md from the catalog in assets/explainer.js.
 global.window = {}; global.matchMedia = () => ({ matches: false });
+global.document = { documentElement: { dataset: {} }, querySelector: () => null }; // minimal stub: explainer.js reads the page language
 require(require('path').join(__dirname, '..', 'assets', 'explainer.js'));
 const X = window.X, fs = require('fs');
 let c = '# The 111 concepts\n\nConcept ids used everywhere in this repo (`X.CATALOG` in `assets/explainer.js`, page labels, `docs/TOPICS.md`). The page column shows where each one is taught.\n\n| # | Concept | Page |\n| --- | --- | --- |\n';

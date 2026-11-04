@@ -90,15 +90,15 @@ The random generator state lives inside the simulation state (`s.r`), so a given
 | Milestone | Scope | Gate to move on |
 | --- | --- | --- |
 | **M0** ✅ | Audit, shared CSS/JS, roadmap, tests, pages 1–8 | All 8 pass smoke and mission tests |
-| **M1** | Learner review of pages 1–8 with 3–5 real people, then fix what confused them | Every page completed without help by at least 3 testers |
-| **M2** | Stage 3–4 pages (9–16), and migrate the CI/CD page to the shared assets | Same gates as M0 |
-| **M3** | Stage 5 (17–20): extend page 17 with deploy strategies and rollbacks | Same gates, plus page 17 shows all 6 concepts |
-| **M4** | Stages 6–11 (pages 21–56), in batches of about 6 | Same gates per batch |
+| **M1** | Learner review with 3–5 real people, then fix what confused them | Every page completed without help by at least 3 testers |
+| **M2** ✅ | Stage 3–4 pages (9–16) | Same gates as M0 |
+| **M3** | Stage 5 (17–20) ✅ except page 17: extend it with deploy strategies and rollbacks, and migrate it to the shared assets | Same gates, plus page 17 shows all 6 concepts |
+| **M4** | Stages 6–11 (pages 21–56), in batches. Pages 21–24 ✅ | Same gates per batch |
 
 ## Known gaps
 
 - The CI/CD page still uses its own inline CSS, has no pager, and its quiz is 5 myth/fact questions instead of 3 scenario questions.
 - Simulation functions live inside each page's script, so they're covered by browser tests but not by unit tests. Moving them to `topic/sim.js` files would allow unit tests without a build step.
-- Accuracy review of pages 1–8 by a person hasn't happened yet.
+- Accuracy review by a person hasn't happened yet for any page (1–24).
 - The Chinese translations were written by Claude and haven't been reviewed by a native speaker. Simplified is machine-converted from Traditional, plus fix-ups for terms OpenCC misses.
 - A few labels stay in English on purpose: machine sizes (medium, large, x-large), code, and HTTP status text.

@@ -2,7 +2,7 @@
 
 Generated from `X.CATALOG` in `assets/explainer.js`, which is the source of truth. Edit the catalog, not this file, then regenerate with `node tests/gen-docs.js`.
 
-**56 pages** cover all 111 concepts. **9** are live (one of them partial).
+**56 pages** cover all 111 concepts. **24** are live (one of them partial).
 
 ## Stage 1: Make one server work well
 
@@ -26,37 +26,37 @@ Generated from `X.CATALOG` in `assets/explainer.js`, which is the source of trut
 
 | Page | Topic | Concepts | Status | Folder |
 | --- | --- | --- | --- | --- |
-| 9 | Timeouts, retries and backoff | 11 Timeouts, 12 Retries, 13 Exponential Backoff | planned | `timeouts-retries-backoff/` |
-| 10 | Idempotency | 14 Idempotency | planned | `idempotency/` |
-| 11 | Circuit breakers and health checks | 10 Circuit Breakers, 56 Health Checks, 57 Liveness & Readiness Probes | planned | `circuit-breakers-health-checks/` |
+| 9 | Timeouts, retries and backoff | 11 Timeouts, 12 Retries, 13 Exponential Backoff | built | `timeouts-retries-backoff/` |
+| 10 | Idempotency | 14 Idempotency | built | `idempotency/` |
+| 11 | Circuit breakers and health checks | 10 Circuit Breakers, 56 Health Checks, 57 Liveness & Readiness Probes | built | `circuit-breakers-health-checks/` |
 
 ## Stage 4: Keep data correct
 
 | Page | Topic | Concepts | Status | Folder |
 | --- | --- | --- | --- | --- |
-| 12 | Race conditions | 39 Race Conditions, 43 Thread Safety | planned | `race-conditions/` |
-| 13 | Locking and deadlocks | 36 Optimistic Locking, 37 Pessimistic Locking, 40 Deadlocks | planned | `locking-deadlocks/` |
-| 14 | Replication and failover | 29 Read Replicas, 32 Replication, 35 Eventual Consistency, 85 Failover | planned | `replication-failover/` |
-| 15 | Sharding and partitioning | 30 Sharding, 31 Partitioning | planned | `sharding/` |
-| 16 | CAP theorem | 34 CAP Theorem, 95 Network Partitions | planned | `cap-theorem/` |
+| 12 | Race conditions | 39 Race Conditions, 43 Thread Safety | built | `race-conditions/` |
+| 13 | Locking and deadlocks | 36 Optimistic Locking, 37 Pessimistic Locking, 40 Deadlocks | built | `locking-deadlocks/` |
+| 14 | Replication and failover | 29 Read Replicas, 32 Replication, 35 Eventual Consistency, 85 Failover | built | `replication-failover/` |
+| 15 | Sharding and partitioning | 30 Sharding, 31 Partitioning | built | `sharding/` |
+| 16 | CAP theorem | 34 CAP Theorem, 95 Network Partitions | built | `cap-theorem/` |
 
 ## Stage 5: Ship and operate it
 
 | Page | Topic | Concepts | Status | Folder |
 | --- | --- | --- | --- | --- |
 | 17 | CI/CD and safe deployments | 6 CI/CD, 51 Feature Flags, 52 Blue-Green Deployment, 53 Canary Releases, 54 Rolling Deployments, 55 Rollbacks | partial | `ci-cd/` |
-| 18 | Observability | 58 Monitoring, 59 Logging, 60 Distributed Tracing, 61 Metrics, 62 Alerts, 66 Observability | planned | `observability/` |
-| 19 | TLS and secrets | 67 Secrets Management, 71 TLS, 73 Encryption in Transit | planned | `tls-secrets/` |
-| 20 | Final incident simulator | 83 Disaster Recovery, 84 Backups, 109 Production Incidents, 111 Postmortems | planned | `incident-simulator/` |
+| 18 | Observability | 58 Monitoring, 59 Logging, 60 Distributed Tracing, 61 Metrics, 62 Alerts, 66 Observability | built | `observability/` |
+| 19 | TLS and secrets | 67 Secrets Management, 71 TLS, 73 Encryption in Transit | built | `tls-secrets/` |
+| 20 | Final incident simulator | 83 Disaster Recovery, 84 Backups, 109 Production Incidents, 111 Postmortems | built | `incident-simulator/` |
 
 ## Stage 6: Talk to the world
 
 | Page | Topic | Concepts | Status | Folder |
 | --- | --- | --- | --- | --- |
-| 21 | DNS | 97 DNS | planned | `dns/` |
-| 22 | TCP vs UDP | 98 TCP vs UDP | planned | `tcp-vs-udp/` |
-| 23 | HTTP/2 and HTTP/3 | 99 HTTP/2 & HTTP/3 | planned | `http2-http3/` |
-| 24 | WebSockets, long polling and SSE | 22 WebSockets, 23 Long Polling, 24 Server-Sent Events | planned | `realtime/` |
+| 21 | DNS | 97 DNS | built | `dns/` |
+| 22 | TCP vs UDP | 98 TCP vs UDP | built | `tcp-vs-udp/` |
+| 23 | HTTP/2 and HTTP/3 | 99 HTTP/2 & HTTP/3 | built | `http2-http3/` |
+| 24 | WebSockets, long polling and SSE | 22 WebSockets, 23 Long Polling, 24 Server-Sent Events | built | `realtime/` |
 | 25 | gRPC | 100 gRPC | planned | `grpc/` |
 | 26 | Webhooks | 101 Webhooks | planned | `webhooks/` |
 | 27 | API versioning and semver | 102 API Versioning, 103 Semantic Versioning | planned | `api-versioning/` |

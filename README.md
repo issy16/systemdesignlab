@@ -4,7 +4,7 @@ Learn system design by breaking a simulated concert ticket app, then fixing it.
 
 Each page is a small in-browser simulation of **Encore**, a fictional ticket app, as it grows from one server into a production system. Push traffic, cause the failure, apply the fix, and see why it works. 56 pages are planned, covering 111 production engineering concepts. See [`docs/TOPICS.md`](docs/TOPICS.md).
 
-**Live pages:** latency and throughput, database indexing, N+1 and connection pools, SQL injection and XSS, caching, load balancing and scaling, rate limiting, message queues, and CI/CD (partial).
+**Live pages (23 of 56):** stages 1–5 (pages 1–20: from latency and caching through race conditions, replication, CAP, observability, TLS and a full incident simulator; CI/CD is partial) and the first part of stage 6 (DNS, TCP vs UDP, HTTP/2 and HTTP/3, real-time updates). See [`docs/TOPICS.md`](docs/TOPICS.md).
 
 **Languages:** English, [繁體中文](https://issy16.github.io/systemdesignlab/zh-tw/), [简体中文](https://issy16.github.io/systemdesignlab/zh-cn/). The Chinese pages are generated from the English ones; see `CLAUDE.md` → Translations.
 
