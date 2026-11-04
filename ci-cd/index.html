@@ -204,6 +204,10 @@ p{margin:0 0 12px;max-width:68ch}
   .env .v{font-size:18px}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}html{scroll-behavior:auto}}
+/* Large headings: readable mono instead of the pixel face (pixel stays for small labels) */
+h1,h2,.mode{font-family:var(--mono);font-weight:600;letter-spacing:-.01em}
+h1{font-size:clamp(28px,4.4vw,42px);line-height:1.15}
+h2{font-size:clamp(20px,3vw,26px);line-height:1.25}
 </style>
 </head>
 <body>
