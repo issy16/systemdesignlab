@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW" data-lang="zh-tw" data-slug="idempotency">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="連點兩下付款、弄丟一個回應，看歌迷被扣款兩次。再用冪等鍵把它修好。">
+<title>冪等性 · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/explainer.css">
+</head>
+<body>
+<!-- Plan. Stuck point: people think "retry = same request", but the server can't tell a retry from a new purchase.
+     Lab: Pay / Double-click Pay, a network that can drop responses (client then retries). Ledger shows charges.
+     One difference: no key (every request is new) vs idempotency key (repeats return the saved answer). Artifact: Idempotency-Key header + server code. -->
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="章節"><a href="#lab">實驗室</a><a href="#real">程式碼</a><a href="#recap">重點整理</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>第 10 頁 · 階段 3 · 在故障中存活</span><span class="hot">14</span></div>
+  <div class="eyebrow">冪等性（Idempotency）</div>
+  <h1>歌迷只按了一次付款。<em>銀行說是兩次。</em></h1>
+  <div class="scenario"><b>Encore</b>今天結帳很慢，有些歌迷連點了兩下「付款」。有些人在火車上，付款成功了，回應卻一直沒送到，App 又試了一次。Ben 收到一堆客服信：「你們扣了我兩次錢。」</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">打開實驗室 ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>實驗室 · 先弄壞，再修好</span><span class="hot" id="tag">沒有冪等鍵</span></div>
+  <h2>買一張 $120 的票</h2>
+  <p>下面每一次購買都是一筆新訂單。App 把付款請求送到 Encore 的伺服器，伺服器向卡片扣款，再把回應傳回來。如果 2 秒內沒有收到回應，App 會重試一次。</p>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">網路</span><div id="netSeg"></div></div>
+      <div class="ctl"><span class="lab-k">冪等鍵</span><div id="keySeg"></div></div>
+      <div class="ctl"><span class="lab-k">購買</span>
+        <div class="presets"><button class="btn primary" id="pay" type="button">付款 $120</button><button class="btn" id="dbl" type="button">連點兩下付款</button></div></div>
+    </div>
+    <div class="compare" style="margin:0">
+      <div><h3>發生了什麼</h3><ul class="log" id="log" aria-label="請求紀錄" style="max-height:230px"><li class="mut">按「付款」開始。</li></ul></div>
+      <div>
+        <h3>歌迷的銀行帳單</h3>
+        <ul class="log" id="bank" aria-label="歌迷卡片上的扣款"><li class="mut">還沒有扣款。</li></ul>
+        <h3 style="margin-top:12px">伺服器的鍵值表</h3>
+        <ul class="log" id="keys" aria-label="已儲存的冪等鍵"><li class="mut">關閉：伺服器不保留任何請求紀錄。</li></ul>
+      </div>
+    </div>
+    <div class="status" id="status" role="status">選好設定，買一張票。</div>
+  </div>
+
+  <h3>試試看</h3>
+  <ol class="missions" id="missions"></ol>
+
+  <div class="takeaway"><div class="t">關鍵差別</div><p>沒有冪等鍵時，每個請求看起來都是<b>一筆新的購買</b>，因為伺服器分不出重試和第二筆訂單。有了<b>冪等鍵（idempotency key）</b>，App 對同一筆訂單的每次嘗試都送出同一個唯一的鍵。伺服器第一次扣款、存下結果，之後的重複請求都回傳那份存下的結果。</p></div>
+  <div class="takeaway"><div class="t">一句話說清楚冪等性</div><p>做兩次和做一次效果相同的操作，就是<b>冪等的（idempotent）</b>。付款本身不是冪等的，所以要用一個鍵讓它變成冪等。</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>第 2 幕 · 真實世界</span><span class="hot">HTTP＋程式碼</span></div>
+  <h2>一個標頭，一張表</h2>
+  <p>Stripe、Adyen、PayPal 和許多其他 API 都接受 <code>Idempotency-Key</code> 標頭。這是「開啟」設定背後的請求與伺服器邏輯。<b>把滑鼠移到某一行上，或點一下。</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="冪等付款請求與伺服器程式碼範例"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 選一行</div><p id="exP">每一行反白後，都會對應到實驗室。</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>重點整理 · 帶走這些</span><span class="hot">♥</span></div>
+  <h2>整頁濃縮在一個畫面</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">為什麼</div><div class="t">重複一定會發生</div><p>連點、逾時後重試、遺失的回應、佇列重新投遞。你的伺服器一定會看到同一個請求兩次。</p></div>
+    <div class="card"><div class="sub">怎麼做</div><div class="t">冪等鍵</div><p>每個操作一個唯一的鍵，每次嘗試都帶上。伺服器儲存「鍵 → 結果」，遇到重複就回放結果。</p></div>
+    <div class="card"><div class="sub">用在哪裡</div><div class="t">任何有副作用的操作</div><p>付款、訂單、email、座位保留、webhook。GET、PUT、DELETE 本來就該是冪等的；POST 不是。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">取捨</div><p>代價是一點儲存空間（一張會過期的鍵值表，通常 24 小時），以及每個請求多一次查詢。換來的是重試變得安全，而沒有它，你就做不出可靠的重試（第 9 頁）或佇列（第 8 頁）。</p></div>
+  <h3 style="margin-top:26px">考考自己 <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="頁面"></nav>
+</main>
+
+<script src="../../assets/explainer.js"></script>
+<script src="../../assets/i18n.zh-tw.js"></script>
+<script>
+(() => {
+const { $, el } = X;
+
+/* ---------- the payment server: pure-ish state + handler ---------- */
+// keys: key -> { status: 'processing' | 'done', response }
+function initServer() { return { keys: new Map(), charges: [], order: 0 }; }
+function handle(srv, req, keyOn) {
+  if (keyOn) {
+    const saved = srv.keys.get(req.key);
+    if (saved && saved.status === 'done') return { code: 200, replay: true, response: saved.response };
+    if (saved) return { code: 409, msg: '處理中' };
+    srv.keys.set(req.key, { status: 'processing' });
+  }
+  const charge = { id: 'ch_' + (srv.charges.length + 101), order: req.order, amount: 120 };
+  srv.charges.push(charge);
+  if (keyOn) srv.keys.set(req.key, { status: 'done', response: charge });
+  return { code: 200, response: charge };
+}
+
+/* ---------- UI ---------- */
+let srv = initServer(), lossy = false, keyOn = false, busy = false;
+const runs = [];
+const log = (cls, text) => { const l = $('#log'); if (l.querySelector('.mut')) l.innerHTML = ''; l.append(el('li', cls, X.esc(text))); l.scrollTop = l.scrollHeight; };
+function drawBank() {
+  const b = $('#bank'); b.innerHTML = '';
+  if (!srv.charges.length) { b.append(el('li', 'mut', '還沒有扣款。')); return; }
+  const per = {};
+  srv.charges.forEach(c => (per[c.order] = (per[c.order] || 0) + 1));
+  srv.charges.forEach(c => b.append(el('li', per[c.order] > 1 ? 'bad' : 'ok', `${c.id}  ENCORE 票券  $${c.amount}.00（訂單 ${c.order}）`)));
+  const k = $('#keys'); k.innerHTML = '';
+  if (!keyOn) k.append(el('li', 'mut', '關閉：伺服器不保留任何請求紀錄。'));
+  else if (!srv.keys.size) k.append(el('li', 'mut', '空的。'));
+  else srv.keys.forEach((v, key) => k.append(el('li', '', `${key} → ${v.status === 'done' ? '完成' : '處理中'}${v.response ? ' · ' + v.response.id : ''}`)));
+}
+async function buy(double) {
+  if (busy) return; busy = true; $('#pay').disabled = $('#dbl').disabled = true;
+  const order = 'ord_' + (7000 + ++srv.order);
+  const before = srv.charges.length;
+  const req = { order, key: order };
+  log('mut', `— 訂單 ${order}${keyOn ? `，Idempotency-Key: ${order}` : ''} —`);
+  const send = async (label, dropResponse) => {
+    log('', `${label}: POST /payments ($120)`);
+    await X.sleep(300);
+    const r = handle(srv, req, keyOn); drawBank();
+    if (r.code === 409) { log('wait', `   伺服器：409 Conflict，這個鍵正在${r.msg}`); return false; }
+    log(r.replay ? 'ok' : '', r.replay ? `   伺服器：看過這個鍵了，回傳存下的結果（${r.response.id}）。沒有新的扣款。` : `   伺服器：已向卡片扣款（${r.response.id}）`);
+    await X.sleep(250);
+    if (dropResponse) { log('bad', '   網路：回應在回程途中遺失了'); return false; }
+    log('ok', `   App：收到回應：付款成功（${r.response.id}）`);
+    return true;
+  };
+  if (double) {
+    log('', '歌迷連點兩下：兩個請求相隔 50 毫秒送出');
+    const a = send('第 1 下', lossy), b = (async () => { await X.sleep(60); return send('第 2 下', lossy); })();
+    await Promise.all([a, b]);
+  } else {
+    const ok = await send('第 1 次嘗試', lossy);
+    if (!ok) { log('wait', '   App：2 秒都沒有回應，重試中…'); await X.sleep(500); await send('retry', false); }
+  }
+  const charges = srv.charges.length - before;
+  runs.push({ double, lossy, keyOn, charges });
+  const st = $('#status');
+  if (charges > 1) { st.className = 'status bad'; st.textContent = `✕ 一筆訂單，扣款 ${charges} 次。歌迷為一張 $120 的票付了 $${charges * 120}。伺服器把每個請求都當成新的購買。`; }
+  else if (charges === 1) { st.className = 'status ok'; st.textContent = keyOn && (double || lossy) ? '✓ 一筆訂單，扣款一次。重複的請求帶著同一個鍵，所以伺服器認出了它，並回放存下的結果。' : '✓ 一筆訂單，扣款一次。'; }
+  busy = false; $('#pay').disabled = $('#dbl').disabled = false;
+  mis.update(runs);
+}
+const last = r => r[r.length - 1] || {};
+const mis = X.missions($('#missions'), [
+  { text: '在網路可靠、沒有冪等鍵的情況下，按<b>付款 $120</b>。', hint: '一個請求，一次扣款。到目前為止都很好。', check: r => r.some(x => !x.double && !x.lossy && !x.keyOn && x.charges === 1) },
+  { text: '按<b>連點兩下付款</b>。', hint: '兩個請求，兩次扣款。伺服器沒辦法知道第二個是誤點。', check: r => r.some(x => x.double && !x.keyOn && x.charges === 2) },
+  { text: '把網路設成<b>回應會遺失</b>，按一次付款。', hint: '扣款成功了，但 App 一直沒收到回應，所以它重試了。又是兩次扣款。', check: r => r.some(x => !x.double && x.lossy && !x.keyOn && x.charges === 2) },
+  { text: '把<b>冪等鍵開啟</b>，兩種情況再試一次。', hint: '先連點兩下，再試回應遺失。每筆訂單最後都剛好扣款一次。', check: r => r.some(x => x.keyOn && x.double && x.charges === 1) && r.some(x => x.keyOn && x.lossy && !x.double && x.charges === 1) },
+]);
+X.seg($('#netSeg'), ['可靠', '回應會遺失'], i => { lossy = i === 1; }, 0);
+X.seg($('#keySeg'), ['關閉', '開啟'], i => { keyOn = i === 1; $('#tag').textContent = keyOn ? '有冪等鍵' : '沒有冪等鍵'; drawBank(); }, 0);
+$('#pay').addEventListener('click', () => buy(false));
+$('#dbl').addEventListener('click', () => buy(true));
+drawBank();
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="key">POST</span> /payments', null],
+  ['<span class="key">Idempotency-Key</span>: <span class="s">ord_7042</span>', 'header'],
+  ['{ <span class="s">"amount"</span>: 12000, <span class="s">"currency"</span>: <span class="s">"usd"</span> }', null],
+  ['', null],
+  ['<span class="c">// 伺服器</span>', null],
+  ['<span class="key">const</span> saved = <span class="key">await</span> db.idempotency.find(key);', 'lookup'],
+  ['<span class="key">if</span> (saved?.status === <span class="s">"done"</span>) <span class="key">return</span> saved.response;', 'replay'],
+  ['<span class="key">if</span> (saved) <span class="key">return</span> conflict(<span class="s">"already in progress"</span>);', 'race'],
+  ['<span class="key">await</span> db.idempotency.insert({ key, status: <span class="s">"processing"</span> });', 'reserve'],
+  ['<span class="key">const</span> charge = <span class="key">await</span> bank.charge(amount);', 'charge'],
+  ['<span class="key">await</span> db.idempotency.update(key, { status: <span class="s">"done"</span>, response: charge });', 'save'],
+  ['<span class="key">return</span> charge;', null],
+], {
+  header: ['冪等鍵', '由客戶端為每筆訂單產生一次，並在這筆訂單的<b>每一次</b>嘗試中送出。實驗室裡用的是訂單 id。隨機 UUID 也可以，只要重試時沿用同一個。'],
+  lookup: ['看過了嗎？', '在做任何有副作用的事之前，先查這個鍵。'],
+  replay: ['回放', '已完成請求的重複會拿到存下的結果：同一個扣款 id，沒有新的扣款。這就是實驗室裡那行綠色的紀錄。'],
+  race: ['同時兩個', '連點兩下可能讓兩個請求在第一個完成前就都送到。第二個會看到「處理中」，拿到 409，而不是第二次扣款。'],
+  reserve: ['先保留這個鍵', '在 <code>key</code> 上建立唯一索引後，兩個同時進行的新增只有一個能成功。這讓「先檢查再新增」變得安全（見第 12 頁〈競態條件〉）。'],
+  charge: ['副作用', '真正的扣款，每個鍵只會發生一次。'],
+  save: ['記住結果', '把結果存起來，重複的請求就能不扣款直接回應。鍵通常在大約 24 小時後過期。'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: 'Cai 讓付款按鈕在第一次點擊後失效。這樣能解決重複扣款嗎？', opts: [
+    ['可以，完全解決', false, '它能擋住連點，但擋不住回應遺失後的重試、重新整理頁面，或是佇列、負載平衡器的重試。'],
+    ['有幫助，但伺服器仍然需要冪等鍵', true, '能預防的重複就預防，預防不了的，就讓伺服器能安全應對。'],
+    ['不行，讓按鈕失效反而更糟', false, '它是很好的額外防護，只是單靠它還不夠。'],
+  ] },
+  { q: 'Ben 每次重試都產生一個新的隨機冪等鍵。會發生什麼事？', opts: [
+    ['重試變安全了', false, '現在每次嘗試看起來都是不同的操作，這正是冪等鍵原本要防止的事。'],
+    ['什麼都沒保護到：伺服器每次看到新的鍵，每次都扣款', true, '每個操作（每筆訂單）只產生一次鍵，並在每次嘗試時沿用。'],
+    ['伺服器會拒絕這次重試', false, '新的鍵完全合法。問題就在這裡：它被當成一筆新的付款。'],
+  ] },
+  { q: '下列哪一個不需要冪等鍵，本身就是冪等的？', opts: [
+    ['POST /orders（建立訂單）', false, '每次呼叫都會再建立一筆訂單。它需要冪等鍵。'],
+    ['PUT /users/42/email（把 email 設成 ana@encore.example）', true, '把一個值設成同樣的東西兩次，結果還是一樣。它在設計上就是冪等的。'],
+    ['POST /emails（寄出票券 email）', false, '每次呼叫都會再寄一封 email。要用冪等鍵或「已寄出」標記。'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'idempotency');
+})();
+</script>
+</body>
+</html>

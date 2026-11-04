@@ -1,0 +1,700 @@
+{
+ "page": "idempotency",
+ "segments": [
+  {
+   "kind": "attr",
+   "en": "width=device-width, initial-scale=1, viewport-fit=cover",
+   "zh": "="
+  },
+  {
+   "kind": "attr",
+   "en": "Double-click Pay, lose a response, and watch a fan get charged twice. Then fix it with an idempotency key.",
+   "zh": "連點兩下付款、弄丟一個回應，看歌迷被扣款兩次。再用冪等鍵把它修好。"
+  },
+  {
+   "kind": "attr",
+   "en": "Sections",
+   "zh": "章節"
+  },
+  {
+   "kind": "attr",
+   "en": "Request log",
+   "zh": "請求紀錄"
+  },
+  {
+   "kind": "attr",
+   "en": "Charges on the fan's card",
+   "zh": "歌迷卡片上的扣款"
+  },
+  {
+   "kind": "attr",
+   "en": "Stored idempotency keys",
+   "zh": "已儲存的冪等鍵"
+  },
+  {
+   "kind": "attr",
+   "en": "Example idempotent payment request and server code",
+   "zh": "冪等付款請求與伺服器程式碼範例"
+  },
+  {
+   "kind": "attr",
+   "en": "Pages",
+   "zh": "頁面"
+  },
+  {
+   "kind": "html",
+   "en": "Idempotency · System Design Lab",
+   "zh": "冪等性 · System Design Lab"
+  },
+  {
+   "kind": "html",
+   "en": "system<b>.design.lab</b>",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "Lab",
+   "zh": "實驗室"
+  },
+  {
+   "kind": "html",
+   "en": "The code",
+   "zh": "程式碼"
+  },
+  {
+   "kind": "html",
+   "en": "Recap",
+   "zh": "重點整理"
+  },
+  {
+   "kind": "html",
+   "en": "page 10 · stage 3 · survive failures",
+   "zh": "第 10 頁 · 階段 3 · 在故障中存活"
+  },
+  {
+   "kind": "html",
+   "en": "Idempotency",
+   "zh": "冪等性（Idempotency）"
+  },
+  {
+   "kind": "html",
+   "en": "The fan clicked Pay once. <em>The bank says twice.</em>",
+   "zh": "歌迷只按了一次付款。<em>銀行說是兩次。</em>"
+  },
+  {
+   "kind": "html",
+   "en": "<b>Encore</b>Checkout is slow today, so some fans double-click “Pay”. Others are on a train, where the payment goes through but the answer never arrives, and the app tries again. Ben gets the support emails: “You charged me twice.”",
+   "zh": "<b>Encore</b>今天結帳很慢，有些歌迷連點了兩下「付款」。有些人在火車上，付款成功了，回應卻一直沒送到，App 又試了一次。Ben 收到一堆客服信：「你們扣了我兩次錢。」"
+  },
+  {
+   "kind": "html",
+   "en": "Open the lab ↓",
+   "zh": "打開實驗室 ↓"
+  },
+  {
+   "kind": "html",
+   "en": "lab · break it, then fix it",
+   "zh": "實驗室 · 先弄壞，再修好"
+  },
+  {
+   "kind": "html",
+   "en": "no key",
+   "zh": "沒有冪等鍵"
+  },
+  {
+   "kind": "html",
+   "en": "Buy one $120 ticket",
+   "zh": "買一張 $120 的票"
+  },
+  {
+   "kind": "html",
+   "en": "Each purchase below is a new order. The app sends the payment request to Encore's server, the server charges the card, and the answer travels back. If no answer arrives within 2 seconds, the app retries once.",
+   "zh": "下面每一次購買都是一筆新訂單。App 把付款請求送到 Encore 的伺服器，伺服器向卡片扣款，再把回應傳回來。如果 2 秒內沒有收到回應，App 會重試一次。"
+  },
+  {
+   "kind": "html",
+   "en": "Network",
+   "zh": "網路"
+  },
+  {
+   "kind": "html",
+   "en": "Idempotency key",
+   "zh": "冪等鍵"
+  },
+  {
+   "kind": "html",
+   "en": "Buy",
+   "zh": "購買"
+  },
+  {
+   "kind": "html",
+   "en": "Pay $120",
+   "zh": "付款 $120"
+  },
+  {
+   "kind": "html",
+   "en": "Double-click Pay",
+   "zh": "連點兩下付款"
+  },
+  {
+   "kind": "html",
+   "en": "What happened",
+   "zh": "發生了什麼"
+  },
+  {
+   "kind": "html",
+   "en": "Press Pay to start.",
+   "zh": "按「付款」開始。"
+  },
+  {
+   "kind": "html",
+   "en": "Fan's bank statement",
+   "zh": "歌迷的銀行帳單"
+  },
+  {
+   "kind": "html",
+   "en": "No charges yet.",
+   "zh": "還沒有扣款。"
+  },
+  {
+   "kind": "html",
+   "en": "Server's key table",
+   "zh": "伺服器的鍵值表"
+  },
+  {
+   "kind": "html",
+   "en": "Off: the server keeps no record of requests.",
+   "zh": "關閉：伺服器不保留任何請求紀錄。"
+  },
+  {
+   "kind": "html",
+   "en": "Pick a setting and buy a ticket.",
+   "zh": "選好設定，買一張票。"
+  },
+  {
+   "kind": "html",
+   "en": "Try this",
+   "zh": "試試看"
+  },
+  {
+   "kind": "html",
+   "en": "The one difference",
+   "zh": "關鍵差別"
+  },
+  {
+   "kind": "html",
+   "en": "Without a key, every request looks like a <b>new purchase</b>, because the server can't tell a retry from a second order. With an <b>idempotency key</b>, the app sends the same unique key with every attempt for one order. The server charges the first time, saves the answer, and returns that saved answer for any repeat.",
+   "zh": "沒有冪等鍵時，每個請求看起來都是<b>一筆新的購買</b>，因為伺服器分不出重試和第二筆訂單。有了<b>冪等鍵（idempotency key）</b>，App 對同一筆訂單的每次嘗試都送出同一個唯一的鍵。伺服器第一次扣款、存下結果，之後的重複請求都回傳那份存下的結果。"
+  },
+  {
+   "kind": "html",
+   "en": "Idempotency in one line",
+   "zh": "一句話說清楚冪等性"
+  },
+  {
+   "kind": "html",
+   "en": "An operation is <b>idempotent</b> if doing it twice has the same effect as doing it once. Payments aren't idempotent on their own, so you make them idempotent with a key.",
+   "zh": "做兩次和做一次效果相同的操作，就是<b>冪等的（idempotent）</b>。付款本身不是冪等的，所以要用一個鍵讓它變成冪等。"
+  },
+  {
+   "kind": "html",
+   "en": "act 2 · the real thing",
+   "zh": "第 2 幕 · 真實世界"
+  },
+  {
+   "kind": "html",
+   "en": "http + code",
+   "zh": "HTTP＋程式碼"
+  },
+  {
+   "kind": "html",
+   "en": "One header, one table",
+   "zh": "一個標頭，一張表"
+  },
+  {
+   "kind": "html",
+   "en": "Stripe, Adyen, PayPal and many other APIs accept an <code>Idempotency-Key</code> header. This is the request and the server logic behind the “On” setting. <b>Hover or tap a line.</b>",
+   "zh": "Stripe、Adyen、PayPal 和許多其他 API 都接受 <code>Idempotency-Key</code> 標頭。這是「開啟」設定背後的請求與伺服器邏輯。<b>把滑鼠移到某一行上，或點一下。</b>"
+  },
+  {
+   "kind": "html",
+   "en": "👆 pick a line",
+   "zh": "👆 選一行"
+  },
+  {
+   "kind": "html",
+   "en": "Each highlighted line maps to the lab.",
+   "zh": "每一行反白後，都會對應到實驗室。"
+  },
+  {
+   "kind": "html",
+   "en": "recap · keep this",
+   "zh": "重點整理 · 帶走這些"
+  },
+  {
+   "kind": "html",
+   "en": "The whole page on one screen",
+   "zh": "整頁濃縮在一個畫面"
+  },
+  {
+   "kind": "html",
+   "en": "Why",
+   "zh": "為什麼"
+  },
+  {
+   "kind": "html",
+   "en": "Repeats happen",
+   "zh": "重複一定會發生"
+  },
+  {
+   "kind": "html",
+   "en": "Double-clicks, retries after timeouts, lost responses, queue redeliveries. Your server will see the same request twice.",
+   "zh": "連點、逾時後重試、遺失的回應、佇列重新投遞。你的伺服器一定會看到同一個請求兩次。"
+  },
+  {
+   "kind": "html",
+   "en": "How",
+   "zh": "怎麼做"
+  },
+  {
+   "kind": "html",
+   "en": "One unique key per operation, sent with every attempt. The server stores key → result and replays the result for repeats.",
+   "zh": "每個操作一個唯一的鍵，每次嘗試都帶上。伺服器儲存「鍵 → 結果」，遇到重複就回放結果。"
+  },
+  {
+   "kind": "html",
+   "en": "Where",
+   "zh": "用在哪裡"
+  },
+  {
+   "kind": "html",
+   "en": "Anything with side effects",
+   "zh": "任何有副作用的操作"
+  },
+  {
+   "kind": "html",
+   "en": "Payments, orders, emails, seat reservations, webhooks. GET, PUT and DELETE are meant to be idempotent already; POST is not.",
+   "zh": "付款、訂單、email、座位保留、webhook。GET、PUT、DELETE 本來就該是冪等的；POST 不是。"
+  },
+  {
+   "kind": "html",
+   "en": "The tradeoff",
+   "zh": "取捨"
+  },
+  {
+   "kind": "html",
+   "en": "You pay with a little storage (a key table with an expiry, often 24 hours) and an extra lookup per request. In return, retries become safe, and you can't build reliable retries (page 9) or queues (page 8) without that.",
+   "zh": "代價是一點儲存空間（一張會過期的鍵值表，通常 24 小時），以及每個請求多一次查詢。換來的是重試變得安全，而沒有它，你就做不出可靠的重試（第 9 頁）或佇列（第 8 頁）。"
+  },
+  {
+   "kind": "html",
+   "en": "Check it",
+   "zh": "考考自己"
+  },
+  {
+   "kind": "js",
+   "en": "'already in progress'",
+   "zh": "'處理中'"
+  },
+  {
+   "kind": "js",
+   "en": "'No charges yet.'",
+   "zh": "'還沒有扣款。'"
+  },
+  {
+   "kind": "js",
+   "en": "`${c.id}  ENCORE TICKETS  $${c.amount}.00  (order ${c.order})`",
+   "zh": "`${c.id}  ENCORE 票券  $${c.amount}.00（訂單 ${c.order}）`"
+  },
+  {
+   "kind": "js",
+   "en": "'Off: the server keeps no record of requests.'",
+   "zh": "'關閉：伺服器不保留任何請求紀錄。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Empty.'",
+   "zh": "'空的。'"
+  },
+  {
+   "kind": "js",
+   "en": "`${key} → ${v.status}${v.response ? ' · ' + v.response.id : ''}`",
+   "zh": "`${key} → ${v.status === 'done' ? '完成' : '處理中'}${v.response ? ' · ' + v.response.id : ''}`"
+  },
+  {
+   "kind": "js",
+   "en": "`— Order ${order}${keyOn ? `, Idempotency-Key: ${order}` : ''} —`",
+   "zh": "`— 訂單 ${order}${keyOn ? `，Idempotency-Key: ${order}` : ''} —`"
+  },
+  {
+   "kind": "js",
+   "en": "`${label}: POST /payments ($120)`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "`   server: 409 Conflict, this key is ${r.msg}`",
+   "zh": "`   伺服器：409 Conflict，這個鍵正在${r.msg}`"
+  },
+  {
+   "kind": "js",
+   "en": "`   server: seen this key, returning the saved answer (${r.response.id}). No new charge.`",
+   "zh": "`   伺服器：看過這個鍵了，回傳存下的結果（${r.response.id}）。沒有新的扣款。`"
+  },
+  {
+   "kind": "js",
+   "en": "`   server: charged the card (${r.response.id})`",
+   "zh": "`   伺服器：已向卡片扣款（${r.response.id}）`"
+  },
+  {
+   "kind": "js",
+   "en": "'   network: the answer was lost on the way back'",
+   "zh": "'   網路：回應在回程途中遺失了'"
+  },
+  {
+   "kind": "js",
+   "en": "`   app: got the answer: paid (${r.response.id})`",
+   "zh": "`   App：收到回應：付款成功（${r.response.id}）`"
+  },
+  {
+   "kind": "js",
+   "en": "'Fan double-clicks: two requests leave 50 ms apart'",
+   "zh": "'歌迷連點兩下：兩個請求相隔 50 毫秒送出'"
+  },
+  {
+   "kind": "js",
+   "en": "'click 1'",
+   "zh": "'第 1 下'"
+  },
+  {
+   "kind": "js",
+   "en": "'click 2'",
+   "zh": "'第 2 下'"
+  },
+  {
+   "kind": "js",
+   "en": "'try 1'",
+   "zh": "'第 1 次嘗試'"
+  },
+  {
+   "kind": "js",
+   "en": "'   app: no answer after 2 s, retrying…'",
+   "zh": "'   App：2 秒都沒有回應，重試中…'"
+  },
+  {
+   "kind": "js",
+   "en": "`✕ One order, ${charges} charges. The fan paid $${charges * 120} for a $120 ticket. The server treated every request as a new purchase.`",
+   "zh": "`✕ 一筆訂單，扣款 ${charges} 次。歌迷為一張 $120 的票付了 $${charges * 120}。伺服器把每個請求都當成新的購買。`"
+  },
+  {
+   "kind": "js",
+   "en": "'✓ One order, one charge. The repeat carried the same key, so the server recognized it and replayed the saved answer.'",
+   "zh": "'✓ 一筆訂單，扣款一次。重複的請求帶著同一個鍵，所以伺服器認出了它，並回放存下的結果。'"
+  },
+  {
+   "kind": "js",
+   "en": "'✓ One order, one charge.'",
+   "zh": "'✓ 一筆訂單，扣款一次。'"
+  },
+  {
+   "kind": "js",
+   "en": "'With a reliable network and no key, press <b>Pay $120</b>.'",
+   "zh": "'在網路可靠、沒有冪等鍵的情況下，按<b>付款 $120</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'One request, one charge. So far so good.'",
+   "zh": "'一個請求，一次扣款。到目前為止都很好。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Press <b>Double-click Pay</b>.'",
+   "zh": "'按<b>連點兩下付款</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Two requests, two charges. The server has no way to know the second one is a mistake.'",
+   "zh": "'兩個請求，兩次扣款。伺服器沒辦法知道第二個是誤點。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Set the network to <b>Answer gets lost</b> and press Pay once.'",
+   "zh": "'把網路設成<b>回應會遺失</b>，按一次付款。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The charge worked, but the app never heard back, so it retried. Two charges again.'",
+   "zh": "'扣款成功了，但 App 一直沒收到回應，所以它重試了。又是兩次扣款。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Turn the <b>idempotency key On</b> and try both again.'",
+   "zh": "'把<b>冪等鍵開啟</b>，兩種情況再試一次。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Double-click, then a lost answer. Each order ends with exactly one charge.'",
+   "zh": "'先連點兩下，再試回應遺失。每筆訂單最後都剛好扣款一次。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Reliable'",
+   "zh": "'可靠'"
+  },
+  {
+   "kind": "js",
+   "en": "'Answer gets lost'",
+   "zh": "'回應會遺失'"
+  },
+  {
+   "kind": "js",
+   "en": "'Off'",
+   "zh": "'關閉'"
+  },
+  {
+   "kind": "js",
+   "en": "'On'",
+   "zh": "'開啟'"
+  },
+  {
+   "kind": "js",
+   "en": "'idempotency key'",
+   "zh": "'有冪等鍵'"
+  },
+  {
+   "kind": "js",
+   "en": "'no key'",
+   "zh": "'沒有冪等鍵'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">POST</span> /payments'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">Idempotency-Key</span>: <span class=\"s\">ord_7042</span>'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'{ <span class=\"s\">\"amount\"</span>: 12000, <span class=\"s\">\"currency\"</span>: <span class=\"s\">\"usd\"</span> }'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\">// server</span>'",
+   "zh": "'<span class=\"c\">// 伺服器</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">const</span> saved = <span class=\"key\">await</span> db.idempotency.find(key);'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">if</span> (saved?.status === <span class=\"s\">\"done\"</span>) <span class=\"key\">return</span> saved.response;'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">if</span> (saved) <span class=\"key\">return</span> conflict(<span class=\"s\">\"already in progress\"</span>);'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">await</span> db.idempotency.insert({ key, status: <span class=\"s\">\"processing\"</span> });'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">const</span> charge = <span class=\"key\">await</span> bank.charge(amount);'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">await</span> db.idempotency.update(key, { status: <span class=\"s\">\"done\"</span>, response: charge });'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">return</span> charge;'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'The key'",
+   "zh": "'冪等鍵'"
+  },
+  {
+   "kind": "js",
+   "en": "'Made by the client, once per order, and sent with <b>every</b> attempt for that order. In the lab it\\'s the order id. A random UUID works too, as long as retries reuse it.'",
+   "zh": "'由客戶端為每筆訂單產生一次，並在這筆訂單的<b>每一次</b>嘗試中送出。實驗室裡用的是訂單 id。隨機 UUID 也可以，只要重試時沿用同一個。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Have we seen it?'",
+   "zh": "'看過了嗎？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Look the key up before doing anything with side effects.'",
+   "zh": "'在做任何有副作用的事之前，先查這個鍵。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Replay'",
+   "zh": "'回放'"
+  },
+  {
+   "kind": "js",
+   "en": "'A repeat of a finished request gets the saved answer: same charge id, no new charge. That\\'s the green line in the lab.'",
+   "zh": "'已完成請求的重複會拿到存下的結果：同一個扣款 id，沒有新的扣款。這就是實驗室裡那行綠色的紀錄。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Two at once'",
+   "zh": "'同時兩個'"
+  },
+  {
+   "kind": "js",
+   "en": "'A double-click can deliver both requests before the first finishes. The second sees “processing” and gets a 409 instead of a second charge.'",
+   "zh": "'連點兩下可能讓兩個請求在第一個完成前就都送到。第二個會看到「處理中」，拿到 409，而不是第二次扣款。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Reserve the key first'",
+   "zh": "'先保留這個鍵'"
+  },
+  {
+   "kind": "js",
+   "en": "'With a unique index on <code>key</code>, only one of two simultaneous inserts can succeed. That makes the check-then-insert safe (see Race conditions, page 12).'",
+   "zh": "'在 <code>key</code> 上建立唯一索引後，兩個同時進行的新增只有一個能成功。這讓「先檢查再新增」變得安全（見第 12 頁〈競態條件〉）。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The side effect'",
+   "zh": "'副作用'"
+  },
+  {
+   "kind": "js",
+   "en": "'The actual charge happens once per key.'",
+   "zh": "'真正的扣款，每個鍵只會發生一次。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Remember the answer'",
+   "zh": "'記住結果'"
+  },
+  {
+   "kind": "js",
+   "en": "'Store the result so repeats can be answered without charging again. Keys usually expire after about 24 hours.'",
+   "zh": "'把結果存起來，重複的請求就能不扣款直接回應。鍵通常在大約 24 小時後過期。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Cai disables the Pay button after the first click. Does that solve double charges?'",
+   "zh": "'Cai 讓付款按鈕在第一次點擊後失效。這樣能解決重複扣款嗎？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Yes, completely'",
+   "zh": "'可以，完全解決'"
+  },
+  {
+   "kind": "js",
+   "en": "'It stops double-clicks, but not retries after a lost response, a refreshed page, or a retry by a queue or load balancer.'",
+   "zh": "'它能擋住連點，但擋不住回應遺失後的重試、重新整理頁面，或是佇列、負載平衡器的重試。'"
+  },
+  {
+   "kind": "js",
+   "en": "'It helps, but the server still needs an idempotency key'",
+   "zh": "'有幫助，但伺服器仍然需要冪等鍵'"
+  },
+  {
+   "kind": "js",
+   "en": "'Prevent repeats where you can, and make the server safe against the ones you can\\'t prevent.'",
+   "zh": "'能預防的重複就預防，預防不了的，就讓伺服器能安全應對。'"
+  },
+  {
+   "kind": "js",
+   "en": "'No, disabling buttons makes it worse'",
+   "zh": "'不行，讓按鈕失效反而更糟'"
+  },
+  {
+   "kind": "js",
+   "en": "'It\\'s a good extra layer. It just isn\\'t enough on its own.'",
+   "zh": "'它是很好的額外防護，只是單靠它還不夠。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Ben generates a new random idempotency key on every retry. What happens?'",
+   "zh": "'Ben 每次重試都產生一個新的隨機冪等鍵。會發生什麼事？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Retries become safe'",
+   "zh": "'重試變安全了'"
+  },
+  {
+   "kind": "js",
+   "en": "'Each attempt now looks like a different operation, which is exactly what the key was supposed to prevent.'",
+   "zh": "'現在每次嘗試看起來都是不同的操作，這正是冪等鍵原本要防止的事。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Nothing is protected: the server sees a new key each time and charges each time'",
+   "zh": "'什麼都沒保護到：伺服器每次看到新的鍵，每次都扣款'"
+  },
+  {
+   "kind": "js",
+   "en": "'Make the key once per operation (per order) and reuse it for every attempt.'",
+   "zh": "'每個操作（每筆訂單）只產生一次鍵，並在每次嘗試時沿用。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The server rejects the retry'",
+   "zh": "'伺服器會拒絕這次重試'"
+  },
+  {
+   "kind": "js",
+   "en": "'A new key is perfectly valid. That\\'s the problem: it\\'s treated as a new payment.'",
+   "zh": "'新的鍵完全合法。問題就在這裡：它被當成一筆新的付款。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Which of these is already idempotent without a key?'",
+   "zh": "'下列哪一個不需要冪等鍵，本身就是冪等的？'"
+  },
+  {
+   "kind": "js",
+   "en": "'POST /orders (create an order)'",
+   "zh": "'POST /orders（建立訂單）'"
+  },
+  {
+   "kind": "js",
+   "en": "'Each call creates another order. It needs a key.'",
+   "zh": "'每次呼叫都會再建立一筆訂單。它需要冪等鍵。'"
+  },
+  {
+   "kind": "js",
+   "en": "'PUT /users/42/email (set the email to ana@encore.example)'",
+   "zh": "'PUT /users/42/email（把 email 設成 ana@encore.example）'"
+  },
+  {
+   "kind": "js",
+   "en": "'Setting a value to the same thing twice leaves the same result. That\\'s idempotent by design.'",
+   "zh": "'把一個值設成同樣的東西兩次，結果還是一樣。它在設計上就是冪等的。'"
+  },
+  {
+   "kind": "js",
+   "en": "'POST /emails (send a ticket email)'",
+   "zh": "'POST /emails（寄出票券 email）'"
+  },
+  {
+   "kind": "js",
+   "en": "'Each call sends another email. Use a key or a “sent” flag.'",
+   "zh": "'每次呼叫都會再寄一封 email。要用冪等鍵或「已寄出」標記。'"
+  }
+ ]
+}

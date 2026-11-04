@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Double-click Pay, lose a response, and watch a fan get charged twice. Then fix it with an idempotency key.">
+<title>Idempotency · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/explainer.css">
+</head>
+<body>
+<!-- Plan. Stuck point: people think "retry = same request", but the server can't tell a retry from a new purchase.
+     Lab: Pay / Double-click Pay, a network that can drop responses (client then retries). Ledger shows charges.
+     One difference: no key (every request is new) vs idempotency key (repeats return the saved answer). Artifact: Idempotency-Key header + server code. -->
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="Sections"><a href="#lab">Lab</a><a href="#real">The code</a><a href="#recap">Recap</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>page 10 · stage 3 · survive failures</span><span class="hot">14</span></div>
+  <div class="eyebrow">Idempotency</div>
+  <h1>The fan clicked Pay once. <em>The bank says twice.</em></h1>
+  <div class="scenario"><b>Encore</b>Checkout is slow today, so some fans double-click “Pay”. Others are on a train, where the payment goes through but the answer never arrives, and the app tries again. Ben gets the support emails: “You charged me twice.”</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">Open the lab ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>lab · break it, then fix it</span><span class="hot" id="tag">no key</span></div>
+  <h2>Buy one $120 ticket</h2>
+  <p>Each purchase below is a new order. The app sends the payment request to Encore's server, the server charges the card, and the answer travels back. If no answer arrives within 2 seconds, the app retries once.</p>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">Network</span><div id="netSeg"></div></div>
+      <div class="ctl"><span class="lab-k">Idempotency key</span><div id="keySeg"></div></div>
+      <div class="ctl"><span class="lab-k">Buy</span>
+        <div class="presets"><button class="btn primary" id="pay" type="button">Pay $120</button><button class="btn" id="dbl" type="button">Double-click Pay</button></div></div>
+    </div>
+    <div class="compare" style="margin:0">
+      <div><h3>What happened</h3><ul class="log" id="log" aria-label="Request log" style="max-height:230px"><li class="mut">Press Pay to start.</li></ul></div>
+      <div>
+        <h3>Fan's bank statement</h3>
+        <ul class="log" id="bank" aria-label="Charges on the fan's card"><li class="mut">No charges yet.</li></ul>
+        <h3 style="margin-top:12px">Server's key table</h3>
+        <ul class="log" id="keys" aria-label="Stored idempotency keys"><li class="mut">Off: the server keeps no record of requests.</li></ul>
+      </div>
+    </div>
+    <div class="status" id="status" role="status">Pick a setting and buy a ticket.</div>
+  </div>
+
+  <h3>Try this</h3>
+  <ol class="missions" id="missions"></ol>
+
+  <div class="takeaway"><div class="t">The one difference</div><p>Without a key, every request looks like a <b>new purchase</b>, because the server can't tell a retry from a second order. With an <b>idempotency key</b>, the app sends the same unique key with every attempt for one order. The server charges the first time, saves the answer, and returns that saved answer for any repeat.</p></div>
+  <div class="takeaway"><div class="t">Idempotency in one line</div><p>An operation is <b>idempotent</b> if doing it twice has the same effect as doing it once. Payments aren't idempotent on their own, so you make them idempotent with a key.</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>act 2 · the real thing</span><span class="hot">http + code</span></div>
+  <h2>One header, one table</h2>
+  <p>Stripe, Adyen, PayPal and many other APIs accept an <code>Idempotency-Key</code> header. This is the request and the server logic behind the “On” setting. <b>Hover or tap a line.</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="Example idempotent payment request and server code"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 pick a line</div><p id="exP">Each highlighted line maps to the lab.</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>recap · keep this</span><span class="hot">♥</span></div>
+  <h2>The whole page on one screen</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">Why</div><div class="t">Repeats happen</div><p>Double-clicks, retries after timeouts, lost responses, queue redeliveries. Your server will see the same request twice.</p></div>
+    <div class="card"><div class="sub">How</div><div class="t">Idempotency key</div><p>One unique key per operation, sent with every attempt. The server stores key → result and replays the result for repeats.</p></div>
+    <div class="card"><div class="sub">Where</div><div class="t">Anything with side effects</div><p>Payments, orders, emails, seat reservations, webhooks. GET, PUT and DELETE are meant to be idempotent already; POST is not.</p></div>
+  </div>
+  <div class="takeaway"><div class="t">The tradeoff</div><p>You pay with a little storage (a key table with an expiry, often 24 hours) and an extra lookup per request. In return, retries become safe, and you can't build reliable retries (page 9) or queues (page 8) without that.</p></div>
+  <h3 style="margin-top:26px">Check it <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="Pages"></nav>
+</main>
+
+<script src="../assets/explainer.js"></script>
+<script>
+(() => {
+const { $, el } = X;
+
+/* ---------- the payment server: pure-ish state + handler ---------- */
+// keys: key -> { status: 'processing' | 'done', response }
+function initServer() { return { keys: new Map(), charges: [], order: 0 }; }
+function handle(srv, req, keyOn) {
+  if (keyOn) {
+    const saved = srv.keys.get(req.key);
+    if (saved && saved.status === 'done') return { code: 200, replay: true, response: saved.response };
+    if (saved) return { code: 409, msg: 'already in progress' };
+    srv.keys.set(req.key, { status: 'processing' });
+  }
+  const charge = { id: 'ch_' + (srv.charges.length + 101), order: req.order, amount: 120 };
+  srv.charges.push(charge);
+  if (keyOn) srv.keys.set(req.key, { status: 'done', response: charge });
+  return { code: 200, response: charge };
+}
+
+/* ---------- UI ---------- */
+let srv = initServer(), lossy = false, keyOn = false, busy = false;
+const runs = [];
+const log = (cls, text) => { const l = $('#log'); if (l.querySelector('.mut')) l.innerHTML = ''; l.append(el('li', cls, X.esc(text))); l.scrollTop = l.scrollHeight; };
+function drawBank() {
+  const b = $('#bank'); b.innerHTML = '';
+  if (!srv.charges.length) { b.append(el('li', 'mut', 'No charges yet.')); return; }
+  const per = {};
+  srv.charges.forEach(c => (per[c.order] = (per[c.order] || 0) + 1));
+  srv.charges.forEach(c => b.append(el('li', per[c.order] > 1 ? 'bad' : 'ok', `${c.id}  ENCORE TICKETS  $${c.amount}.00  (order ${c.order})`)));
+  const k = $('#keys'); k.innerHTML = '';
+  if (!keyOn) k.append(el('li', 'mut', 'Off: the server keeps no record of requests.'));
+  else if (!srv.keys.size) k.append(el('li', 'mut', 'Empty.'));
+  else srv.keys.forEach((v, key) => k.append(el('li', '', `${key} → ${v.status}${v.response ? ' · ' + v.response.id : ''}`)));
+}
+async function buy(double) {
+  if (busy) return; busy = true; $('#pay').disabled = $('#dbl').disabled = true;
+  const order = 'ord_' + (7000 + ++srv.order);
+  const before = srv.charges.length;
+  const req = { order, key: order };
+  log('mut', `— Order ${order}${keyOn ? `, Idempotency-Key: ${order}` : ''} —`);
+  const send = async (label, dropResponse) => {
+    log('', `${label}: POST /payments ($120)`);
+    await X.sleep(300);
+    const r = handle(srv, req, keyOn); drawBank();
+    if (r.code === 409) { log('wait', `   server: 409 Conflict, this key is ${r.msg}`); return false; }
+    log(r.replay ? 'ok' : '', r.replay ? `   server: seen this key, returning the saved answer (${r.response.id}). No new charge.` : `   server: charged the card (${r.response.id})`);
+    await X.sleep(250);
+    if (dropResponse) { log('bad', '   network: the answer was lost on the way back'); return false; }
+    log('ok', `   app: got the answer: paid (${r.response.id})`);
+    return true;
+  };
+  if (double) {
+    log('', 'Fan double-clicks: two requests leave 50 ms apart');
+    const a = send('click 1', lossy), b = (async () => { await X.sleep(60); return send('click 2', lossy); })();
+    await Promise.all([a, b]);
+  } else {
+    const ok = await send('try 1', lossy);
+    if (!ok) { log('wait', '   app: no answer after 2 s, retrying…'); await X.sleep(500); await send('retry', false); }
+  }
+  const charges = srv.charges.length - before;
+  runs.push({ double, lossy, keyOn, charges });
+  const st = $('#status');
+  if (charges > 1) { st.className = 'status bad'; st.textContent = `✕ One order, ${charges} charges. The fan paid $${charges * 120} for a $120 ticket. The server treated every request as a new purchase.`; }
+  else if (charges === 1) { st.className = 'status ok'; st.textContent = keyOn && (double || lossy) ? '✓ One order, one charge. The repeat carried the same key, so the server recognized it and replayed the saved answer.' : '✓ One order, one charge.'; }
+  busy = false; $('#pay').disabled = $('#dbl').disabled = false;
+  mis.update(runs);
+}
+const last = r => r[r.length - 1] || {};
+const mis = X.missions($('#missions'), [
+  { text: 'With a reliable network and no key, press <b>Pay $120</b>.', hint: 'One request, one charge. So far so good.', check: r => r.some(x => !x.double && !x.lossy && !x.keyOn && x.charges === 1) },
+  { text: 'Press <b>Double-click Pay</b>.', hint: 'Two requests, two charges. The server has no way to know the second one is a mistake.', check: r => r.some(x => x.double && !x.keyOn && x.charges === 2) },
+  { text: 'Set the network to <b>Answer gets lost</b> and press Pay once.', hint: 'The charge worked, but the app never heard back, so it retried. Two charges again.', check: r => r.some(x => !x.double && x.lossy && !x.keyOn && x.charges === 2) },
+  { text: 'Turn the <b>idempotency key On</b> and try both again.', hint: 'Double-click, then a lost answer. Each order ends with exactly one charge.', check: r => r.some(x => x.keyOn && x.double && x.charges === 1) && r.some(x => x.keyOn && x.lossy && !x.double && x.charges === 1) },
+]);
+X.seg($('#netSeg'), ['Reliable', 'Answer gets lost'], i => { lossy = i === 1; }, 0);
+X.seg($('#keySeg'), ['Off', 'On'], i => { keyOn = i === 1; $('#tag').textContent = keyOn ? 'idempotency key' : 'no key'; drawBank(); }, 0);
+$('#pay').addEventListener('click', () => buy(false));
+$('#dbl').addEventListener('click', () => buy(true));
+drawBank();
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="key">POST</span> /payments', null],
+  ['<span class="key">Idempotency-Key</span>: <span class="s">ord_7042</span>', 'header'],
+  ['{ <span class="s">"amount"</span>: 12000, <span class="s">"currency"</span>: <span class="s">"usd"</span> }', null],
+  ['', null],
+  ['<span class="c">// server</span>', null],
+  ['<span class="key">const</span> saved = <span class="key">await</span> db.idempotency.find(key);', 'lookup'],
+  ['<span class="key">if</span> (saved?.status === <span class="s">"done"</span>) <span class="key">return</span> saved.response;', 'replay'],
+  ['<span class="key">if</span> (saved) <span class="key">return</span> conflict(<span class="s">"already in progress"</span>);', 'race'],
+  ['<span class="key">await</span> db.idempotency.insert({ key, status: <span class="s">"processing"</span> });', 'reserve'],
+  ['<span class="key">const</span> charge = <span class="key">await</span> bank.charge(amount);', 'charge'],
+  ['<span class="key">await</span> db.idempotency.update(key, { status: <span class="s">"done"</span>, response: charge });', 'save'],
+  ['<span class="key">return</span> charge;', null],
+], {
+  header: ['The key', 'Made by the client, once per order, and sent with <b>every</b> attempt for that order. In the lab it\'s the order id. A random UUID works too, as long as retries reuse it.'],
+  lookup: ['Have we seen it?', 'Look the key up before doing anything with side effects.'],
+  replay: ['Replay', 'A repeat of a finished request gets the saved answer: same charge id, no new charge. That\'s the green line in the lab.'],
+  race: ['Two at once', 'A double-click can deliver both requests before the first finishes. The second sees “processing” and gets a 409 instead of a second charge.'],
+  reserve: ['Reserve the key first', 'With a unique index on <code>key</code>, only one of two simultaneous inserts can succeed. That makes the check-then-insert safe (see Race conditions, page 12).'],
+  charge: ['The side effect', 'The actual charge happens once per key.'],
+  save: ['Remember the answer', 'Store the result so repeats can be answered without charging again. Keys usually expire after about 24 hours.'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: 'Cai disables the Pay button after the first click. Does that solve double charges?', opts: [
+    ['Yes, completely', false, 'It stops double-clicks, but not retries after a lost response, a refreshed page, or a retry by a queue or load balancer.'],
+    ['It helps, but the server still needs an idempotency key', true, 'Prevent repeats where you can, and make the server safe against the ones you can\'t prevent.'],
+    ['No, disabling buttons makes it worse', false, 'It\'s a good extra layer. It just isn\'t enough on its own.'],
+  ] },
+  { q: 'Ben generates a new random idempotency key on every retry. What happens?', opts: [
+    ['Retries become safe', false, 'Each attempt now looks like a different operation, which is exactly what the key was supposed to prevent.'],
+    ['Nothing is protected: the server sees a new key each time and charges each time', true, 'Make the key once per operation (per order) and reuse it for every attempt.'],
+    ['The server rejects the retry', false, 'A new key is perfectly valid. That\'s the problem: it\'s treated as a new payment.'],
+  ] },
+  { q: 'Which of these is already idempotent without a key?', opts: [
+    ['POST /orders (create an order)', false, 'Each call creates another order. It needs a key.'],
+    ['PUT /users/42/email (set the email to ana@encore.example)', true, 'Setting a value to the same thing twice leaves the same result. That\'s idempotent by design.'],
+    ['POST /emails (send a ticket email)', false, 'Each call sends another email. Use a key or a “sent” flag.'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'idempotency');
+})();
+</script>
+</body>
+</html>

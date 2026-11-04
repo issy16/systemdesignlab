@@ -72,6 +72,13 @@ const FLOWS = {
     ['click', seg('toSeg', 2), 100], ['fill', ['#retries', '3'], 100], ['click', seg('bkSeg', 1), 100], ['click', '#hiccup', 6500],
     ['click', seg('bkSeg', 3), 100], ['wait', null, 3000], ['click', '#hiccup', 11000],
   ],
+  idempotency: [
+    ['click', '#pay', 1500],
+    ['click', '#dbl', 1700],
+    ['click', seg('netSeg', 2), 100], ['click', '#pay', 2800],
+    ['click', seg('keySeg', 2), 100], ['click', seg('netSeg', 1), 100], ['click', '#dbl', 1700],
+    ['click', seg('netSeg', 2), 100], ['click', '#pay', 2800],
+  ],
 };
 
 (async () => {
