@@ -266,7 +266,7 @@
     [21, 6, 'dns', 'DNS', [97], 'built'],
     [22, 6, 'tcp-vs-udp', 'TCP vs UDP', [98], 'built'],
     [23, 6, 'http2-http3', 'HTTP/2 and HTTP/3', [99], 'built'],
-    [24, 6, 'realtime', 'WebSockets, long polling and SSE', [22, 23, 24], 'planned'],
+    [24, 6, 'realtime', 'WebSockets, long polling and SSE', [22, 23, 24], 'built'],
     [25, 6, 'grpc', 'gRPC', [100], 'planned'],
     [26, 6, 'webhooks', 'Webhooks', [101], 'planned'],
     [27, 6, 'api-versioning', 'API versioning and semver', [102, 103], 'planned'],

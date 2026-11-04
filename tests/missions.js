@@ -160,6 +160,12 @@ const FLOWS = {
     ['click', seg('lossSeg', 2), 100], ['click', '#load', 200],
     ['click', seg('protoSeg', 3), 100], ['click', '#load', 200],
   ],
+  realtime: [
+    ['click', '#player .btn.primary', 8800],
+    ['click', seg('mSeg', 2), 300],
+    ['click', seg('mSeg', 3), 300],
+    ['click', seg('fSeg', 2), 300], ['click', seg('mSeg', 4), 300],
+  ],
 };
 
 (async () => {

@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Keep a live seat map up to date with polling, long polling, Server-Sent Events and WebSockets, and compare delay, wasted requests and two-way messaging.">
+<title>WebSockets, Long Polling and SSE · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/explainer.css">
+</head>
+<body>
+<!-- Plan. Stuck point: "use WebSockets for real-time" without knowing the cheaper options or when two-way matters.
+     Lab: seats sell on a schedule; the fan's seat map updates via polling / long polling / SSE / WebSocket. Delay, requests per minute, two-way.
+     One difference: who starts each message — client asks repeatedly (polling), server answers a waiting request (long polling), server pushes (SSE, one-way), or both push (WebSocket). -->
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="Sections"><a href="#lab">Lab</a><a href="#real">The code</a><a href="#recap">Recap</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>page 24 · stage 6 · talk to the world</span><span class="hot">22 · 23 · 24</span></div>
+  <div class="eyebrow">WebSockets, long polling, Server-Sent Events (SSE)</div>
+  <h1>The seat you're about to click <em>sold five seconds ago.</em></h1>
+  <div class="scenario"><b>Encore</b>During an on-sale, seats disappear every second. HTTP normally only lets the browser ask; the server can't speak first. Cai has four ways to keep 10,000 fans' seat maps fresh, and later, a fan chat that needs messages in both directions.</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">Open the lab ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>lab · keep the seat map fresh</span><span class="hot" id="tag">polling</span></div>
+  <h2>Server vs the fan's screen</h2>
+  <p>A seat sells about every 1.2 seconds. A one-way trip between the fan and Encore takes 50 ms. Numbers are simulated.</p>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">How the page gets updates</span><div id="mSeg"></div></div>
+      <div class="ctl"><span class="lab-k">Feature</span><div id="fSeg"></div></div>
+      <div class="ctl"><span class="lab-k">Simulation</span><div id="player"></div></div>
+    </div>
+    <div class="compare" style="margin:0">
+      <div><h3>Seats on the server (the truth)</h3><div class="cells" id="srv" style="--cols:12" aria-hidden="true"></div></div>
+      <div><h3>Seats on the fan's screen</h3><div class="cells" id="fan" style="--cols:12" aria-hidden="true"></div></div>
+    </div>
+    <div class="meters" style="margin:0">
+      <div class="meter"><div class="k">Update delay</div><div class="v" id="mDelay">–</div><div class="d">average, sale → screen</div></div>
+      <div class="meter"><div class="k">Requests per fan</div><div class="v" id="mReq">–</div><div class="d" id="mReqD">per minute</div></div>
+      <div class="meter"><div class="k">With 10,000 fans</div><div class="v" id="mLoad">–</div><div class="d">requests/s to Encore</div></div>
+      <div class="meter"><div class="k">Browser can send on it</div><div class="v" id="mTwo">–</div><div class="d">needed for chat</div></div>
+    </div>
+    <ul class="log" id="log" aria-label="Recent updates"><li class="mut">Updates appear here.</li></ul>
+    <div class="status" id="status" role="status">Press Play.</div>
+  </div>
+  <h3>Try this</h3>
+  <ol class="missions" id="missions"></ol>
+  <div class="cards">
+    <div class="card"><div class="sub">Ask again and again</div><div class="t">Polling</div><p>The browser asks every few seconds. Simple and works everywhere, but updates wait for the next poll, and most answers are “nothing new”.</p></div>
+    <div class="card"><div class="sub">Ask and wait</div><div class="t">Long polling</div><p>The browser asks, and the server holds the request open until there's news, then the browser asks again. Near-instant, with plain HTTP.</p></div>
+    <div class="card"><div class="sub">Server talks</div><div class="t">Server-Sent Events</div><p>One HTTP response that never ends; the server writes events into it as they happen. Server → browser only, reconnects automatically.</p></div>
+    <div class="card"><div class="sub">Both talk</div><div class="t">WebSocket</div><p>An HTTP connection upgraded into a two-way channel. Either side can send at any time. Best for chat, games and collaboration.</p></div>
+  </div>
+  <div class="takeaway"><div class="t">The one difference</div><p>It's about <b>who can start a message</b>. With polling, only the browser does, so news waits for the next question. Long polling and <b>SSE</b> let the server answer the moment something happens, in one direction. A <b>WebSocket</b> lets both sides send whenever they want. Pick the simplest one that covers your direction of traffic.</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>act 2 · the real thing</span><span class="hot">browser code</span></div>
+  <h2>All four, in a few lines each</h2>
+  <p><b>Hover or tap a line.</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="Example browser code for polling, long polling, SSE and WebSocket"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 pick a line</div><p id="exP">Each highlighted block maps to a method in the lab.</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>recap · keep this</span><span class="hot">♥</span></div>
+  <h2>The whole page on one screen</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">Server → browser, simply</div><div class="t">SSE</div><p>Live feeds, notifications, progress, seat maps. Plain HTTP, automatic reconnects, works with HTTP/2.</p></div>
+    <div class="card"><div class="sub">Both ways</div><div class="t">WebSocket</div><p>Chat, multiplayer, collaborative editing: anything where the browser sends often too.</p></div>
+    <div class="card"><div class="sub">Fallback</div><div class="t">Long polling</div><p>Works through the strictest proxies. Slower and heavier, but almost never blocked.</p></div>
+  </div>
+  <div class="takeaway"><div class="t">The tradeoff</div><p>Open connections aren't free: 10,000 fans means 10,000 connections held by your servers and load balancers, and they need care during deploys (reconnect storms). Polling is wasteful but stateless and easy to scale. Use push when freshness matters, and keep polling for things that can be a few seconds old.</p></div>
+  <h3 style="margin-top:26px">Check it <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="Pages"></nav>
+</main>
+
+<script src="../assets/explainer.js"></script>
+<script>
+(() => {
+const { $, el, esc } = X;
+const SEATS = 60, ONE_WAY = 50, POLL = 5000, RECONNECT = 2 * ONE_WAY, LP_TIMEOUT = 30000, DT = 100;
+const METHODS = ['polling', 'long polling', 'SSE', 'WebSocket'];
+
+/* ---------- schedule (pure, deterministic) ---------- */
+const s0 = { r: 24 };
+const SALES = []; { let t = 600; for (let i = 0; i < SEATS; i++) { t += 700 + Math.floor(X.rnd(s0) * 1000); SALES.push({ t, seat: Math.floor(X.rnd(s0) * SEATS) }); } }
+function deliveries(m) {
+  if (m === 0) return SALES.map(e => { const nextPoll = Math.ceil((e.t + ONE_WAY) / POLL) * POLL; return nextPoll + 2 * ONE_WAY; });
+  if (m === 1) { let openAt = 0; return SALES.map(e => { const at = Math.max(e.t, openAt) + ONE_WAY; if (e.t >= openAt) openAt = at + RECONNECT; return at; }); }
+  return SALES.map(e => e.t + ONE_WAY);
+}
+const REQ_PER_MIN = m => (m === 0 ? 60000 / POLL : m === 1 ? 60 / 1.2 + 60000 / LP_TIMEOUT : 0);
+
+/* ---------- UI ---------- */
+let m = 0, chat = false, t = 0, D = deliveries(0);
+const runs = {};
+const mk = id => { const g = $('#' + id); for (let i = 0; i < SEATS; i++) g.append(el('div', 'cell')); return [...g.children]; };
+const srv = mk('srv'), fan = mk('fan');
+function render() {
+  const sold = new Set(), seen = new Set();
+  SALES.forEach((e, i) => { if (e.t <= t) sold.add(e.seat); if (D[i] <= t) seen.add(e.seat); });
+  srv.forEach((c, i) => (c.className = 'cell ' + (sold.has(i) ? 'bad' : 'hit')));
+  fan.forEach((c, i) => (c.className = 'cell ' + (seen.has(i) ? 'bad' : sold.has(i) ? 'wait' : 'hit')));
+  const done = SALES.map((e, i) => [e, D[i]]).filter(([e, d]) => d <= t);
+  const delay = done.length ? X.avg(done.map(([e, d]) => d - e.t)) : null;
+  const rpm = REQ_PER_MIN(m);
+  $('#tag').textContent = METHODS[m];
+  $('#mDelay').textContent = delay == null ? '–' : (delay >= 1000 ? (delay / 1000).toFixed(1) + ' s' : Math.round(delay) + ' ms');
+  $('#mDelay').parentElement.className = 'meter' + (delay == null ? '' : delay > 1000 ? ' bad' : ' ok');
+  $('#mReq').textContent = rpm ? Math.round(rpm) : '0';
+  $('#mReqD').textContent = rpm ? 'per minute' : 'after opening 1 connection';
+  $('#mLoad').textContent = X.fmt((rpm * 10000) / 60);
+  $('#mLoad').parentElement.className = 'meter' + (rpm > 20 ? ' bad' : rpm ? ' wait' : ' ok');
+  const two = m === 3;
+  $('#mTwo').textContent = two ? 'yes' : 'no';
+  $('#mTwo').parentElement.className = 'meter' + (chat ? (two ? ' ok' : ' bad') : '');
+  const ul = $('#log'); ul.innerHTML = '';
+  done.slice(-5).reverse().forEach(([e, d]) => ul.append(el('li', d - e.t > 1000 ? 'wait' : 'ok', esc(`seat ${String(e.seat + 1).padStart(2)} sold at ${(e.t / 1000).toFixed(1)} s → on screen at ${(d / 1000).toFixed(1)} s (+${d - e.t} ms)`))));
+  if (!done.length) ul.append(el('li', 'mut', 'Updates appear here.'));
+  const st = $('#status');
+  const stale = [...sold].filter(x => !seen.has(x)).length;
+  if (!t) { st.className = 'status'; st.textContent = 'Press Play.'; }
+  else if (chat && !two) { st.className = 'status bad'; st.textContent = `✕ The seat map works, but the fan chat needs the browser to send messages too. ${m === 2 ? 'SSE is one-way (server → browser), so every chat message would need a separate request.' : 'With polling, each message is a separate request, and replies wait for the next poll.'} Use a WebSocket.`; }
+  else if (m === 0) { st.className = 'status bad'; st.textContent = `✕ ${stale} seat${stale === 1 ? '' : 's'} already sold still look${stale === 1 ? 's' : ''} free (yellow). Updates wait for the next poll, up to 5 s, and most of the ${Math.round(rpm)} requests a minute come back empty.`; }
+  else if (m === 1) { st.className = 'status ok'; st.textContent = '✓ Long polling: the server answers as soon as a seat sells, so updates arrive in about 50 ms. Each update costs a new request, though.'; }
+  else { st.className = 'status ok'; st.textContent = `✓ ${m === 2 ? 'SSE' : 'WebSocket'}: one open connection, and every sale reaches the screen in about 50 ms. No repeated requests.${chat ? ' And the browser can send chat messages on the same connection.' : ''}`; }
+  player.clock(`t = ${(t / 1000).toFixed(1)} s`);
+  if (t >= 8000) runs[`${m}-${chat}`] = { delay, rpm };
+  mis.update({ m, chat, t, runs });
+}
+const player = X.player($('#player'), {
+  step: () => { t += DT; if (t > SALES[SALES.length - 1].t + 6000) player.pause(); render(); }, stepTicks: 5,
+  reset: () => { t = 0; render(); },
+});
+X.seg($('#mSeg'), ['Polling (every 5 s)', 'Long polling', 'Server-Sent Events', 'WebSocket'], i => { m = i; D = deliveries(m); render(); }, 0);
+X.seg($('#fSeg'), ['Live seat map', 'Fan chat (send + receive)'], i => { chat = i === 1; render(); }, 0);
+const has = (s, k) => !!s.runs[k];
+const mis = X.missions($('#missions'), [
+  { text: 'Press <b>Play</b> with <b>Polling (every 5 s)</b>.', hint: 'Yellow seats are sold on the server but still look free to the fan. That\'s how two fans click the same seat.', check: s => has(s, '0-false') },
+  { text: 'Switch to <b>Long polling</b>.', hint: 'Updates now arrive about 50 ms after each sale. Look at the request count, though.', check: s => has(s, '1-false') },
+  { text: 'Switch to <b>Server-Sent Events</b>.', hint: 'Just as fast, and after one connection there are no more requests at all.', check: s => has(s, '2-false') },
+  { text: 'Switch the feature to <b>Fan chat</b>, then find the method that supports it.', hint: 'Chat needs the browser to send too. Only one of the four is two-way.', check: s => has(s, '3-true') },
+]);
+render();
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="c">// polling: ask every 5 seconds</span>', null],
+  ['setInterval(<span class="key">async</span> () =&gt; render(<span class="key">await</span> (<span class="key">await</span> fetch(<span class="s">"/seats"</span>)).json()), <span class="s">5000</span>);', 'poll'],
+  ['', null],
+  ['<span class="c">// long polling: ask, wait for the answer, ask again</span>', null],
+  ['<span class="key">while</span> (<span class="s">true</span>) render(<span class="key">await</span> (<span class="key">await</span> fetch(<span class="s">"/seats/changes?wait=30"</span>)).json());', 'long'],
+  ['', null],
+  ['<span class="c">// Server-Sent Events: one response that keeps streaming</span>', null],
+  ['<span class="key">const</span> es = <span class="key">new</span> EventSource(<span class="s">"/seats/stream"</span>);', 'sse'],
+  ['es.onmessage = (e) =&gt; markSold(JSON.parse(e.data));', 'sse'],
+  ['', null],
+  ['<span class="c">// WebSocket: a two-way channel</span>', null],
+  ['<span class="key">const</span> ws = <span class="key">new</span> WebSocket(<span class="s">"wss://encore.example/live"</span>);', 'ws'],
+  ['ws.onmessage = (e) =&gt; handle(JSON.parse(e.data));', 'ws'],
+  ['ws.send(JSON.stringify({ type: <span class="s">"chat"</span>, text: <span class="s">"See you at the front!"</span> }));', 'wssend'],
+], {
+  poll: ['Polling', 'Simplest possible code, and any server can handle it. The cost is the 5-second delay and a request every 5 s from every open tab, even when nothing changed.'],
+  long: ['Long polling', 'The server doesn\'t answer until there\'s a change (or 30 s pass). The loop asks again immediately after each answer. Still plain HTTP, so it passes through any proxy.'],
+  sse: ['SSE', 'The browser\'s built-in <code>EventSource</code> keeps one response open and reconnects on its own if it drops. The server sends <code>Content-Type: text/event-stream</code> and writes <code>data: …</code> lines.'],
+  ws: ['WebSocket', 'Starts as an HTTP request with <code>Upgrade: websocket</code>, then becomes a raw two-way connection. <code>wss://</code> means it\'s encrypted with TLS.'],
+  wssend: ['Sending from the browser', 'This is what SSE can\'t do: the browser pushes a message on the same connection, any time. That\'s why chat needs a WebSocket.'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: 'Encore wants live “3 seats left!” badges on concert pages. The browser never needs to send anything back. What\'s the simplest good fit?', opts: [
+    ['A WebSocket', false, 'It works, but two-way is more than this needs, and WebSockets take more care to scale and proxy.'],
+    ['Server-Sent Events', true, 'One-way server push over plain HTTP, with automatic reconnects. Exactly this use case.'],
+    ['Polling every 100 ms', false, 'Near-real-time, but 10 requests a second per fan would crush the servers.'],
+  ] },
+  { q: 'The fan chat must work for fans behind a strict corporate proxy that only allows ordinary HTTP requests. What still works there?', opts: [
+    ['WebSockets', false, 'Some strict proxies block the Upgrade and drop the connection.'],
+    ['Long polling (with regular POSTs for sending)', true, 'It\'s just ordinary requests, so it passes everywhere. Many real-time libraries fall back to it automatically.'],
+    ['Nothing: real-time is impossible there', false, 'It\'s slower and heavier, but long polling works through almost anything.'],
+  ] },
+  { q: 'Encore deploys a new version, restarting every server at once. 10,000 fans have WebSocket connections open. What should worry Dee?', opts: [
+    ['Nothing: WebSockets reconnect for free', false, 'Every client reconnects at the same moment: a thundering herd.'],
+    ['All 10,000 clients reconnect at once and hammer the servers; reconnect with backoff and jitter, and restart servers gradually', true, 'Same lesson as page 9: spread out retries, and drain connections gradually during deploys.'],
+    ['The messages will be encrypted twice', false, 'Encryption isn\'t affected by restarts.'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'realtime');
+})();
+</script>
+</body>
+</html>

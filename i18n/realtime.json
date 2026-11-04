@@ -1,0 +1,675 @@
+{
+ "page": "realtime",
+ "segments": [
+  {
+   "kind": "attr",
+   "en": "width=device-width, initial-scale=1, viewport-fit=cover",
+   "zh": "="
+  },
+  {
+   "kind": "attr",
+   "en": "Keep a live seat map up to date with polling, long polling, Server-Sent Events and WebSockets, and compare delay, wasted requests and two-way messaging.",
+   "zh": "用輪詢、長輪詢、伺服器推送事件和 WebSocket 讓即時座位圖保持最新，並比較延遲、浪費的請求和雙向訊息。"
+  },
+  {
+   "kind": "attr",
+   "en": "Sections",
+   "zh": "章節"
+  },
+  {
+   "kind": "attr",
+   "en": "Recent updates",
+   "zh": "最近的更新"
+  },
+  {
+   "kind": "attr",
+   "en": "Example browser code for polling, long polling, SSE and WebSocket",
+   "zh": "輪詢、長輪詢、SSE 與 WebSocket 的瀏覽器程式碼範例"
+  },
+  {
+   "kind": "attr",
+   "en": "Pages",
+   "zh": "頁面"
+  },
+  {
+   "kind": "html",
+   "en": "WebSockets, Long Polling and SSE · System Design Lab",
+   "zh": "WebSocket、長輪詢與 SSE · System Design Lab"
+  },
+  {
+   "kind": "html",
+   "en": "system<b>.design.lab</b>",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "Lab",
+   "zh": "實驗室"
+  },
+  {
+   "kind": "html",
+   "en": "The code",
+   "zh": "程式碼"
+  },
+  {
+   "kind": "html",
+   "en": "Recap",
+   "zh": "重點整理"
+  },
+  {
+   "kind": "html",
+   "en": "page 24 · stage 6 · talk to the world",
+   "zh": "第 24 頁 · 階段 6 · 與外界溝通"
+  },
+  {
+   "kind": "html",
+   "en": "WebSockets, long polling, Server-Sent Events (SSE)",
+   "zh": "WebSocket、長輪詢、伺服器推送事件（SSE）"
+  },
+  {
+   "kind": "html",
+   "en": "The seat you're about to click <em>sold five seconds ago.</em>",
+   "zh": "你正要點的那個座位，<em>五秒前就賣掉了。</em>"
+  },
+  {
+   "kind": "html",
+   "en": "<b>Encore</b>During an on-sale, seats disappear every second. HTTP normally only lets the browser ask; the server can't speak first. Cai has four ways to keep 10,000 fans' seat maps fresh, and later, a fan chat that needs messages in both directions.",
+   "zh": "<b>Encore</b>開賣期間，座位每秒都在消失。HTTP 平常只讓瀏覽器發問；伺服器不能先開口。Cai 有四種方法能讓 10,000 位歌迷的座位圖保持最新，之後還要做一個需要雙向訊息的歌迷聊天室。"
+  },
+  {
+   "kind": "html",
+   "en": "Open the lab ↓",
+   "zh": "打開實驗室 ↓"
+  },
+  {
+   "kind": "html",
+   "en": "lab · keep the seat map fresh",
+   "zh": "實驗室 · 讓座位圖保持最新"
+  },
+  {
+   "kind": "html",
+   "en": "polling",
+   "zh": "輪詢"
+  },
+  {
+   "kind": "html",
+   "en": "Server vs the fan's screen",
+   "zh": "伺服器 vs 歌迷的螢幕"
+  },
+  {
+   "kind": "html",
+   "en": "A seat sells about every 1.2 seconds. A one-way trip between the fan and Encore takes 50 ms. Numbers are simulated.",
+   "zh": "大約每 1.2 秒賣出一個座位。歌迷和 Encore 之間的單程傳輸要 50 毫秒。數字是模擬的。"
+  },
+  {
+   "kind": "html",
+   "en": "How the page gets updates",
+   "zh": "頁面怎麼取得更新"
+  },
+  {
+   "kind": "html",
+   "en": "Feature",
+   "zh": "功能"
+  },
+  {
+   "kind": "html",
+   "en": "Simulation",
+   "zh": "模擬"
+  },
+  {
+   "kind": "html",
+   "en": "Seats on the server (the truth)",
+   "zh": "伺服器上的座位（真實情況）"
+  },
+  {
+   "kind": "html",
+   "en": "Seats on the fan's screen",
+   "zh": "歌迷螢幕上的座位"
+  },
+  {
+   "kind": "html",
+   "en": "Update delay",
+   "zh": "更新延遲"
+  },
+  {
+   "kind": "html",
+   "en": "average, sale → screen",
+   "zh": "平均，從售出到顯示"
+  },
+  {
+   "kind": "html",
+   "en": "Requests per fan",
+   "zh": "每位歌迷的請求數"
+  },
+  {
+   "kind": "html",
+   "en": "per minute",
+   "zh": "每分鐘"
+  },
+  {
+   "kind": "html",
+   "en": "With 10,000 fans",
+   "zh": "10,000 位歌迷時"
+  },
+  {
+   "kind": "html",
+   "en": "requests/s to Encore",
+   "zh": "每秒打到 Encore 的請求數"
+  },
+  {
+   "kind": "html",
+   "en": "Browser can send on it",
+   "zh": "瀏覽器能在上面傳送"
+  },
+  {
+   "kind": "html",
+   "en": "needed for chat",
+   "zh": "聊天室需要"
+  },
+  {
+   "kind": "html",
+   "en": "Updates appear here.",
+   "zh": "更新會顯示在這裡。"
+  },
+  {
+   "kind": "html",
+   "en": "Press Play.",
+   "zh": "按「播放」。"
+  },
+  {
+   "kind": "html",
+   "en": "Try this",
+   "zh": "試試看"
+  },
+  {
+   "kind": "html",
+   "en": "Ask again and again",
+   "zh": "一問再問"
+  },
+  {
+   "kind": "html",
+   "en": "Polling",
+   "zh": "輪詢（Polling）"
+  },
+  {
+   "kind": "html",
+   "en": "The browser asks every few seconds. Simple and works everywhere, but updates wait for the next poll, and most answers are “nothing new”.",
+   "zh": "瀏覽器每隔幾秒問一次。簡單、到處都能用，但更新要等下一次輪詢，而大部分的回答都是「沒有新消息」。"
+  },
+  {
+   "kind": "html",
+   "en": "Ask and wait",
+   "zh": "問了就等"
+  },
+  {
+   "kind": "html",
+   "en": "Long polling",
+   "zh": "長輪詢（Long polling）"
+  },
+  {
+   "kind": "html",
+   "en": "The browser asks, and the server holds the request open until there's news, then the browser asks again. Near-instant, with plain HTTP.",
+   "zh": "瀏覽器發問，伺服器把請求保持開啟，直到有新消息才回應，接著瀏覽器再問一次。幾乎即時，用的是一般的 HTTP。"
+  },
+  {
+   "kind": "html",
+   "en": "Server talks",
+   "zh": "伺服器說話"
+  },
+  {
+   "kind": "html",
+   "en": "Server-Sent Events",
+   "zh": "伺服器推送事件（SSE）"
+  },
+  {
+   "kind": "html",
+   "en": "One HTTP response that never ends; the server writes events into it as they happen. Server → browser only, reconnects automatically.",
+   "zh": "一個永遠不結束的 HTTP 回應；事件發生時，伺服器就把它寫進去。只有伺服器 → 瀏覽器，而且會自動重新連線。"
+  },
+  {
+   "kind": "html",
+   "en": "Both talk",
+   "zh": "雙方都說話"
+  },
+  {
+   "kind": "html",
+   "en": "WebSocket",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "An HTTP connection upgraded into a two-way channel. Either side can send at any time. Best for chat, games and collaboration.",
+   "zh": "一條升級成雙向通道的 HTTP 連線。任何一方隨時都能傳送。最適合聊天、遊戲和協作。"
+  },
+  {
+   "kind": "html",
+   "en": "The one difference",
+   "zh": "關鍵差別"
+  },
+  {
+   "kind": "html",
+   "en": "It's about <b>who can start a message</b>. With polling, only the browser does, so news waits for the next question. Long polling and <b>SSE</b> let the server answer the moment something happens, in one direction. A <b>WebSocket</b> lets both sides send whenever they want. Pick the simplest one that covers your direction of traffic.",
+   "zh": "重點在於<b>誰能發起訊息</b>。輪詢時只有瀏覽器能發起，所以新消息要等下一次發問。長輪詢和 <b>SSE</b> 讓伺服器在事情發生的那一刻就能回應，但只有一個方向。<b>WebSocket</b> 讓雙方隨時都能傳送。選擇能涵蓋你流量方向的最簡單方案。"
+  },
+  {
+   "kind": "html",
+   "en": "act 2 · the real thing",
+   "zh": "第 2 幕 · 真實世界"
+  },
+  {
+   "kind": "html",
+   "en": "browser code",
+   "zh": "瀏覽器程式碼"
+  },
+  {
+   "kind": "html",
+   "en": "All four, in a few lines each",
+   "zh": "四種方法，各只要幾行"
+  },
+  {
+   "kind": "html",
+   "en": "<b>Hover or tap a line.</b>",
+   "zh": "<b>把滑鼠移到某一行上，或點一下。</b>"
+  },
+  {
+   "kind": "html",
+   "en": "👆 pick a line",
+   "zh": "👆 選一行"
+  },
+  {
+   "kind": "html",
+   "en": "Each highlighted block maps to a method in the lab.",
+   "zh": "每一段反白後，都會對應到實驗室裡的一種方法。"
+  },
+  {
+   "kind": "html",
+   "en": "recap · keep this",
+   "zh": "重點整理 · 帶走這些"
+  },
+  {
+   "kind": "html",
+   "en": "The whole page on one screen",
+   "zh": "整頁濃縮在一個畫面"
+  },
+  {
+   "kind": "html",
+   "en": "Server → browser, simply",
+   "zh": "伺服器 → 瀏覽器，簡單版"
+  },
+  {
+   "kind": "html",
+   "en": "SSE",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "Live feeds, notifications, progress, seat maps. Plain HTTP, automatic reconnects, works with HTTP/2.",
+   "zh": "即時動態、通知、進度、座位圖。一般的 HTTP、自動重新連線，也能搭配 HTTP/2。"
+  },
+  {
+   "kind": "html",
+   "en": "Both ways",
+   "zh": "雙向"
+  },
+  {
+   "kind": "html",
+   "en": "Chat, multiplayer, collaborative editing: anything where the browser sends often too.",
+   "zh": "聊天、多人遊戲、協作編輯：任何瀏覽器也需要經常傳送的情境。"
+  },
+  {
+   "kind": "html",
+   "en": "Fallback",
+   "zh": "後備方案"
+  },
+  {
+   "kind": "html",
+   "en": "Works through the strictest proxies. Slower and heavier, but almost never blocked.",
+   "zh": "能穿過最嚴格的代理伺服器。比較慢、比較重，但幾乎不會被擋。"
+  },
+  {
+   "kind": "html",
+   "en": "The tradeoff",
+   "zh": "取捨"
+  },
+  {
+   "kind": "html",
+   "en": "Open connections aren't free: 10,000 fans means 10,000 connections held by your servers and load balancers, and they need care during deploys (reconnect storms). Polling is wasteful but stateless and easy to scale. Use push when freshness matters, and keep polling for things that can be a few seconds old.",
+   "zh": "開著的連線不是免費的：10,000 位歌迷就代表你的伺服器和負載平衡器要撐住 10,000 條連線，部署時還要小心處理（重新連線風暴）。輪詢很浪費，但它是無狀態的，容易擴展。在新鮮度很重要時用推送，可以晚幾秒的東西就繼續用輪詢。"
+  },
+  {
+   "kind": "html",
+   "en": "Check it",
+   "zh": "考考自己"
+  },
+  {
+   "kind": "js",
+   "en": "'long polling'",
+   "zh": "'長輪詢'"
+  },
+  {
+   "kind": "js",
+   "en": "'SSE'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'WebSocket'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "' ms'",
+   "zh": "' 毫秒'"
+  },
+  {
+   "kind": "js",
+   "en": "'per minute'",
+   "zh": "'每分鐘'"
+  },
+  {
+   "kind": "js",
+   "en": "'after opening 1 connection'",
+   "zh": "'開啟 1 條連線之後'"
+  },
+  {
+   "kind": "js",
+   "en": "`seat ${String(e.seat + 1).padStart(2)} sold at ${(e.t / 1000).toFixed(1)} s → on screen at ${(d / 1000).toFixed(1)} s (+${d - e.t} ms)`",
+   "zh": "`座位 ${String(e.seat + 1).padStart(2)} 在 ${(e.t / 1000).toFixed(1)} 秒售出 → ${(d / 1000).toFixed(1)} 秒顯示在螢幕上（+${d - e.t} 毫秒）`"
+  },
+  {
+   "kind": "js",
+   "en": "'Updates appear here.'",
+   "zh": "'更新會顯示在這裡。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Press Play.'",
+   "zh": "'按「播放」。'"
+  },
+  {
+   "kind": "js",
+   "en": "`✕ The seat map works, but the fan chat needs the browser to send messages too. ${m === 2 ? 'SSE is one-way (server → browser), so every chat message would need a separate request.' : 'With polling, each message is a separate request, and replies wait for the next poll.'} Use a WebSocket.`",
+   "zh": "`✕ 座位圖可以用，但歌迷聊天室也需要瀏覽器傳送訊息。${m === 2 ? 'SSE 是單向的（伺服器 → 瀏覽器），所以每則聊天訊息都要另外發一個請求。' : '用輪詢的話，每則訊息都是一個獨立的請求，回覆也要等下一次輪詢。'}請使用 WebSocket。`"
+  },
+  {
+   "kind": "js",
+   "en": "`✕ ${stale} seat${stale === 1 ? '' : 's'} already sold still look${stale === 1 ? 's' : ''} free (yellow). Updates wait for the next poll, up to 5 s, and most of the ${Math.round(rpm)} requests a minute come back empty.`",
+   "zh": "`✕ 有 ${stale} 個已售出的座位看起來還是空的（黃色）。更新要等下一次輪詢，最久 5 秒，而每分鐘 ${Math.round(rpm)} 個請求大部分都空手而回。`"
+  },
+  {
+   "kind": "js",
+   "en": "'✓ Long polling: the server answers as soon as a seat sells, so updates arrive in about 50 ms. Each update costs a new request, though.'",
+   "zh": "'✓ 長輪詢：座位一賣出，伺服器就回應，所以更新大約 50 毫秒就到了。不過每次更新都要花一個新的請求。'"
+  },
+  {
+   "kind": "js",
+   "en": "`✓ ${m === 2 ? 'SSE' : 'WebSocket'}: one open connection, and every sale reaches the screen in about 50 ms. No repeated requests.${chat ? ' And the browser can send chat messages on the same connection.' : ''}`",
+   "zh": "`✓ ${m === 2 ? 'SSE' : 'WebSocket'}：一條開著的連線，每次售出大約 50 毫秒就出現在螢幕上。沒有重複的請求。${chat ? '而且瀏覽器能在同一條連線上傳送聊天訊息。' : ''}`"
+  },
+  {
+   "kind": "js",
+   "en": "`t = ${(t / 1000).toFixed(1)} s`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "`${m}-${chat}`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Polling (every 5 s)'",
+   "zh": "'輪詢（每 5 秒）'"
+  },
+  {
+   "kind": "js",
+   "en": "'Long polling'",
+   "zh": "'長輪詢'"
+  },
+  {
+   "kind": "js",
+   "en": "'Server-Sent Events'",
+   "zh": "'伺服器推送事件'"
+  },
+  {
+   "kind": "js",
+   "en": "'Live seat map'",
+   "zh": "'即時座位圖'"
+  },
+  {
+   "kind": "js",
+   "en": "'Fan chat (send + receive)'",
+   "zh": "'歌迷聊天室（傳送＋接收）'"
+  },
+  {
+   "kind": "js",
+   "en": "'Press <b>Play</b> with <b>Polling (every 5 s)</b>.'",
+   "zh": "'在<b>輪詢（每 5 秒）</b>的設定下按<b>播放</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Yellow seats are sold on the server but still look free to the fan. That\\'s how two fans click the same seat.'",
+   "zh": "'黃色座位在伺服器上已經賣出，但歌迷看起來還是空的。兩位歌迷就是這樣點到同一個座位的。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Switch to <b>Long polling</b>.'",
+   "zh": "'切換到<b>長輪詢</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Updates now arrive about 50 ms after each sale. Look at the request count, though.'",
+   "zh": "'現在更新大約在每次售出後 50 毫秒就到了。不過看看請求數。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Switch to <b>Server-Sent Events</b>.'",
+   "zh": "'切換到<b>伺服器推送事件</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Just as fast, and after one connection there are no more requests at all.'",
+   "zh": "'一樣快，而且建立一條連線之後就完全沒有其他請求了。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Switch the feature to <b>Fan chat</b>, then find the method that supports it.'",
+   "zh": "'把功能切換成<b>歌迷聊天室</b>，再找出支援它的方法。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Chat needs the browser to send too. Only one of the four is two-way.'",
+   "zh": "'聊天室需要瀏覽器也能傳送。四種方法裡只有一種是雙向的。'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\">// polling: ask every 5 seconds</span>'",
+   "zh": "'<span class=\"c\">// 輪詢：每 5 秒問一次</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'setInterval(<span class=\"key\">async</span> () =&gt; render(<span class=\"key\">await</span> (<span class=\"key\">await</span> fetch(<span class=\"s\">\"/seats\"</span>)).json()), <span class=\"s\">5000</span>);'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\">// long polling: ask, wait for the answer, ask again</span>'",
+   "zh": "'<span class=\"c\">// 長輪詢：發問、等待回答、再問一次</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">while</span> (<span class=\"s\">true</span>) render(<span class=\"key\">await</span> (<span class=\"key\">await</span> fetch(<span class=\"s\">\"/seats/changes?wait=30\"</span>)).json());'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\">// Server-Sent Events: one response that keeps streaming</span>'",
+   "zh": "'<span class=\"c\">// 伺服器推送事件：一個持續串流的回應</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">const</span> es = <span class=\"key\">new</span> EventSource(<span class=\"s\">\"/seats/stream\"</span>);'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'es.onmessage = (e) =&gt; markSold(JSON.parse(e.data));'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\">// WebSocket: a two-way channel</span>'",
+   "zh": "'<span class=\"c\">// WebSocket：雙向通道</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">const</span> ws = <span class=\"key\">new</span> WebSocket(<span class=\"s\">\"wss://encore.example/live\"</span>);'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'ws.onmessage = (e) =&gt; handle(JSON.parse(e.data));'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'ws.send(JSON.stringify({ type: <span class=\"s\">\"chat\"</span>, text: <span class=\"s\">\"See you at the front!\"</span> }));'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'Polling'",
+   "zh": "'輪詢'"
+  },
+  {
+   "kind": "js",
+   "en": "'Simplest possible code, and any server can handle it. The cost is the 5-second delay and a request every 5 s from every open tab, even when nothing changed.'",
+   "zh": "'最簡單的程式碼，任何伺服器都能處理。代價是 5 秒的延遲，以及每個開著的分頁每 5 秒一個請求，就算什麼都沒變也一樣。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The server doesn\\'t answer until there\\'s a change (or 30 s pass). The loop asks again immediately after each answer. Still plain HTTP, so it passes through any proxy.'",
+   "zh": "'伺服器在有變化之前（或 30 秒過去之前）都不回應。每收到一次回答，迴圈就立刻再問一次。仍然是一般的 HTTP，所以能穿過任何代理伺服器。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The browser\\'s built-in <code>EventSource</code> keeps one response open and reconnects on its own if it drops. The server sends <code>Content-Type: text/event-stream</code> and writes <code>data: …</code> lines.'",
+   "zh": "'瀏覽器內建的 <code>EventSource</code> 會保持一個回應開著，斷線時會自己重新連線。伺服器送出 <code>Content-Type: text/event-stream</code>，並寫入 <code>data: …</code> 行。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Starts as an HTTP request with <code>Upgrade: websocket</code>, then becomes a raw two-way connection. <code>wss://</code> means it\\'s encrypted with TLS.'",
+   "zh": "'一開始是帶有 <code>Upgrade: websocket</code> 的 HTTP 請求，接著變成一條原始的雙向連線。<code>wss://</code> 代表它有用 TLS 加密。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Sending from the browser'",
+   "zh": "'從瀏覽器傳送'"
+  },
+  {
+   "kind": "js",
+   "en": "'This is what SSE can\\'t do: the browser pushes a message on the same connection, any time. That\\'s why chat needs a WebSocket.'",
+   "zh": "'這就是 SSE 做不到的事：瀏覽器能隨時在同一條連線上推送訊息。這就是聊天室需要 WebSocket 的原因。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Encore wants live “3 seats left!” badges on concert pages. The browser never needs to send anything back. What\\'s the simplest good fit?'",
+   "zh": "'Encore 想在演唱會頁面上放即時的「只剩 3 個座位！」標籤。瀏覽器完全不需要回傳任何東西。最簡單又合適的是什麼？'"
+  },
+  {
+   "kind": "js",
+   "en": "'A WebSocket'",
+   "zh": "'WebSocket'"
+  },
+  {
+   "kind": "js",
+   "en": "'It works, but two-way is more than this needs, and WebSockets take more care to scale and proxy.'",
+   "zh": "'它可以用，但雙向超出了需求，而且 WebSocket 在擴展和代理上需要更多照顧。'"
+  },
+  {
+   "kind": "js",
+   "en": "'One-way server push over plain HTTP, with automatic reconnects. Exactly this use case.'",
+   "zh": "'透過一般 HTTP 的單向伺服器推送，還會自動重新連線。正好就是這個使用情境。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Polling every 100 ms'",
+   "zh": "'每 100 毫秒輪詢一次'"
+  },
+  {
+   "kind": "js",
+   "en": "'Near-real-time, but 10 requests a second per fan would crush the servers.'",
+   "zh": "'接近即時，但每位歌迷每秒 10 個請求會把伺服器壓垮。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The fan chat must work for fans behind a strict corporate proxy that only allows ordinary HTTP requests. What still works there?'",
+   "zh": "'歌迷聊天室必須能讓躲在嚴格企業代理伺服器後面的歌迷使用，那裡只允許一般的 HTTP 請求。哪一種還能運作？'"
+  },
+  {
+   "kind": "js",
+   "en": "'WebSockets'",
+   "zh": "'WebSocket'"
+  },
+  {
+   "kind": "js",
+   "en": "'Some strict proxies block the Upgrade and drop the connection.'",
+   "zh": "'有些嚴格的代理伺服器會擋下 Upgrade，把連線切斷。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Long polling (with regular POSTs for sending)'",
+   "zh": "'長輪詢（傳送時用一般的 POST）'"
+  },
+  {
+   "kind": "js",
+   "en": "'It\\'s just ordinary requests, so it passes everywhere. Many real-time libraries fall back to it automatically.'",
+   "zh": "'它就只是一般的請求，所以到處都能通過。很多即時通訊函式庫會自動退回使用它。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Nothing: real-time is impossible there'",
+   "zh": "'沒辦法：那裡不可能做到即時'"
+  },
+  {
+   "kind": "js",
+   "en": "'It\\'s slower and heavier, but long polling works through almost anything.'",
+   "zh": "'它比較慢、比較重，但長輪詢幾乎在任何環境都能運作。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Encore deploys a new version, restarting every server at once. 10,000 fans have WebSocket connections open. What should worry Dee?'",
+   "zh": "'Encore 部署新版本，同時重新啟動所有伺服器。10,000 位歌迷開著 WebSocket 連線。Dee 該擔心什麼？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Nothing: WebSockets reconnect for free'",
+   "zh": "'沒什麼：WebSocket 會免費重新連線'"
+  },
+  {
+   "kind": "js",
+   "en": "'Every client reconnects at the same moment: a thundering herd.'",
+   "zh": "'每個客戶端都在同一時刻重新連線：驚群效應（thundering herd）。'"
+  },
+  {
+   "kind": "js",
+   "en": "'All 10,000 clients reconnect at once and hammer the servers; reconnect with backoff and jitter, and restart servers gradually'",
+   "zh": "'10,000 個客戶端同時重新連線，猛打伺服器；要用退避與抖動來重新連線，並逐步重新啟動伺服器'"
+  },
+  {
+   "kind": "js",
+   "en": "'Same lesson as page 9: spread out retries, and drain connections gradually during deploys.'",
+   "zh": "'跟第 9 頁學到的一樣：把重試分散開來，部署時逐步排空連線。'"
+  },
+  {
+   "kind": "js",
+   "en": "'The messages will be encrypted twice'",
+   "zh": "'訊息會被加密兩次'"
+  },
+  {
+   "kind": "js",
+   "en": "'Encryption isn\\'t affected by restarts.'",
+   "zh": "'重新啟動不會影響加密。'"
+  }
+ ]
+}

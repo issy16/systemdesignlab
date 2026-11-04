@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-Hans-CN" data-lang="zh-cn" data-slug="realtime">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="用轮询、长轮询、服务器推送事件和 WebSocket 让实时座位图保持最新，并比较延迟、浪费的请求和双向消息。">
+<title>WebSocket、长轮询与 SSE · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/explainer.css">
+</head>
+<body>
+<!-- Plan. Stuck point: "use WebSockets for real-time" without knowing the cheaper options or when two-way matters.
+     Lab: seats sell on a schedule; the fan's seat map updates via polling / long polling / SSE / WebSocket. Delay, requests per minute, two-way.
+     One difference: who starts each message — client asks repeatedly (polling), server answers a waiting request (long polling), server pushes (SSE, one-way), or both push (WebSocket). -->
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="章节"><a href="#lab">实验室</a><a href="#real">代码</a><a href="#recap">重点整理</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>第 24 页 · 阶段 6 · 与外界沟通</span><span class="hot">22 · 23 · 24</span></div>
+  <div class="eyebrow">WebSocket、长轮询、服务器推送事件（SSE）</div>
+  <h1>你正要点的那个座位，<em>五秒前就卖掉了。</em></h1>
+  <div class="scenario"><b>Encore</b>开卖期间，座位每秒都在消失。HTTP 平常只让浏览器发问；服务器不能先开口。Cai 有四种方法能让 10,000 位歌迷的座位图保持最新，之后还要做一个需要双向消息的歌迷聊天室。</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">打开实验室 ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>实验室 · 让座位图保持最新</span><span class="hot" id="tag">轮询</span></div>
+  <h2>服务器 vs 歌迷的屏幕</h2>
+  <p>大约每 1.2 秒卖出一个座位。歌迷和 Encore 之间的单程传输要 50 毫秒。数字是模拟的。</p>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><span class="lab-k">页面怎么取得更新</span><div id="mSeg"></div></div>
+      <div class="ctl"><span class="lab-k">功能</span><div id="fSeg"></div></div>
+      <div class="ctl"><span class="lab-k">模拟</span><div id="player"></div></div>
+    </div>
+    <div class="compare" style="margin:0">
+      <div><h3>服务器上的座位（真实情况）</h3><div class="cells" id="srv" style="--cols:12" aria-hidden="true"></div></div>
+      <div><h3>歌迷屏幕上的座位</h3><div class="cells" id="fan" style="--cols:12" aria-hidden="true"></div></div>
+    </div>
+    <div class="meters" style="margin:0">
+      <div class="meter"><div class="k">更新延迟</div><div class="v" id="mDelay">–</div><div class="d">平均，从售出到显示</div></div>
+      <div class="meter"><div class="k">每位歌迷的请求数</div><div class="v" id="mReq">–</div><div class="d" id="mReqD">每分钟</div></div>
+      <div class="meter"><div class="k">10,000 位歌迷时</div><div class="v" id="mLoad">–</div><div class="d">每秒打到 Encore 的请求数</div></div>
+      <div class="meter"><div class="k">浏览器能在上面发送</div><div class="v" id="mTwo">–</div><div class="d">聊天室需要</div></div>
+    </div>
+    <ul class="log" id="log" aria-label="最近的更新"><li class="mut">更新会显示在这里。</li></ul>
+    <div class="status" id="status" role="status">按「播放」。</div>
+  </div>
+  <h3>试试看</h3>
+  <ol class="missions" id="missions"></ol>
+  <div class="cards">
+    <div class="card"><div class="sub">一问再问</div><div class="t">轮询（Polling）</div><p>浏览器每隔几秒问一次。简单、到处都能用，但更新要等下一次轮询，而大部分的回答都是「没有新消息」。</p></div>
+    <div class="card"><div class="sub">问了就等</div><div class="t">长轮询（Long polling）</div><p>浏览器发问，服务器把请求保持打开，直到有新消息才响应，接着浏览器再问一次。几乎实时，用的是一般的 HTTP。</p></div>
+    <div class="card"><div class="sub">服务器说话</div><div class="t">服务器推送事件（SSE）</div><p>一个永远不结束的 HTTP 响应；事件发生时，服务器就把它写进去。只有服务器 → 浏览器，而且会自动重新连接。</p></div>
+    <div class="card"><div class="sub">双方都说话</div><div class="t">WebSocket</div><p>一条升级成双向通道的 HTTP 连接。任何一方随时都能发送。最适合聊天、游戏和协作。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">关键差别</div><p>重点在于<b>谁能发起消息</b>。轮询时只有浏览器能发起，所以新消息要等下一次发问。长轮询和 <b>SSE</b> 让服务器在事情发生的那一刻就能响应，但只有一个方向。<b>WebSocket</b> 让双方随时都能发送。选择能涵盖你流量方向的最简单方案。</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>第 2 幕 · 真实世界</span><span class="hot">浏览器代码</span></div>
+  <h2>四种方法，各只要几行</h2>
+  <p><b>把鼠标移到某一行上，或点一下。</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="轮询、长轮询、SSE 与 WebSocket 的浏览器代码范例"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 选一行</div><p id="exP">每一段反白后，都会对应到实验室里的一种方法。</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>重点整理 · 带走这些</span><span class="hot">♥</span></div>
+  <h2>整页浓缩在一个画面</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">服务器 → 浏览器，简单版</div><div class="t">SSE</div><p>实时动态、通知、进度、座位图。一般的 HTTP、自动重新连接，也能搭配 HTTP/2。</p></div>
+    <div class="card"><div class="sub">双向</div><div class="t">WebSocket</div><p>聊天、多人游戏、协作编辑：任何浏览器也需要经常发送的情境。</p></div>
+    <div class="card"><div class="sub">后备方案</div><div class="t">长轮询（Long polling）</div><p>能穿过最严格的代理服务器。比较慢、比较重，但几乎不会被挡。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">取舍</div><p>开着的连接不是免费的：10,000 位歌迷就代表你的服务器和负载平衡器要撑住 10,000 条连接，部署时还要小心处理（重新连接风暴）。轮询很浪费，但它是无状态的，容易扩展。在新鲜度很重要时用推送，可以晚几秒的东西就继续用轮询。</p></div>
+  <h3 style="margin-top:26px">考考自己 <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="页面"></nav>
+</main>
+
+<script src="../../assets/explainer.js"></script>
+<script src="../../assets/i18n.zh-cn.js"></script>
+<script>
+(() => {
+const { $, el, esc } = X;
+const SEATS = 60, ONE_WAY = 50, POLL = 5000, RECONNECT = 2 * ONE_WAY, LP_TIMEOUT = 30000, DT = 100;
+const METHODS = ['polling', '长轮询', 'SSE', 'WebSocket'];
+
+/* ---------- schedule (pure, deterministic) ---------- */
+const s0 = { r: 24 };
+const SALES = []; { let t = 600; for (let i = 0; i < SEATS; i++) { t += 700 + Math.floor(X.rnd(s0) * 1000); SALES.push({ t, seat: Math.floor(X.rnd(s0) * SEATS) }); } }
+function deliveries(m) {
+  if (m === 0) return SALES.map(e => { const nextPoll = Math.ceil((e.t + ONE_WAY) / POLL) * POLL; return nextPoll + 2 * ONE_WAY; });
+  if (m === 1) { let openAt = 0; return SALES.map(e => { const at = Math.max(e.t, openAt) + ONE_WAY; if (e.t >= openAt) openAt = at + RECONNECT; return at; }); }
+  return SALES.map(e => e.t + ONE_WAY);
+}
+const REQ_PER_MIN = m => (m === 0 ? 60000 / POLL : m === 1 ? 60 / 1.2 + 60000 / LP_TIMEOUT : 0);
+
+/* ---------- UI ---------- */
+let m = 0, chat = false, t = 0, D = deliveries(0);
+const runs = {};
+const mk = id => { const g = $('#' + id); for (let i = 0; i < SEATS; i++) g.append(el('div', 'cell')); return [...g.children]; };
+const srv = mk('srv'), fan = mk('fan');
+function render() {
+  const sold = new Set(), seen = new Set();
+  SALES.forEach((e, i) => { if (e.t <= t) sold.add(e.seat); if (D[i] <= t) seen.add(e.seat); });
+  srv.forEach((c, i) => (c.className = 'cell ' + (sold.has(i) ? 'bad' : 'hit')));
+  fan.forEach((c, i) => (c.className = 'cell ' + (seen.has(i) ? 'bad' : sold.has(i) ? 'wait' : 'hit')));
+  const done = SALES.map((e, i) => [e, D[i]]).filter(([e, d]) => d <= t);
+  const delay = done.length ? X.avg(done.map(([e, d]) => d - e.t)) : null;
+  const rpm = REQ_PER_MIN(m);
+  $('#tag').textContent = METHODS[m];
+  $('#mDelay').textContent = delay == null ? '–' : (delay >= 1000 ? (delay / 1000).toFixed(1) + ' s' : Math.round(delay) + ' 毫秒');
+  $('#mDelay').parentElement.className = 'meter' + (delay == null ? '' : delay > 1000 ? ' bad' : ' ok');
+  $('#mReq').textContent = rpm ? Math.round(rpm) : '0';
+  $('#mReqD').textContent = rpm ? '每分钟' : '打开 1 条连接之后';
+  $('#mLoad').textContent = X.fmt((rpm * 10000) / 60);
+  $('#mLoad').parentElement.className = 'meter' + (rpm > 20 ? ' bad' : rpm ? ' wait' : ' ok');
+  const two = m === 3;
+  $('#mTwo').textContent = two ? 'yes' : 'no';
+  $('#mTwo').parentElement.className = 'meter' + (chat ? (two ? ' ok' : ' bad') : '');
+  const ul = $('#log'); ul.innerHTML = '';
+  done.slice(-5).reverse().forEach(([e, d]) => ul.append(el('li', d - e.t > 1000 ? 'wait' : 'ok', esc(`座位 ${String(e.seat + 1).padStart(2)} 在 ${(e.t / 1000).toFixed(1)} 秒售出 → ${(d / 1000).toFixed(1)} 秒显示在屏幕上（+${d - e.t} 毫秒）`))));
+  if (!done.length) ul.append(el('li', 'mut', '更新会显示在这里。'));
+  const st = $('#status');
+  const stale = [...sold].filter(x => !seen.has(x)).length;
+  if (!t) { st.className = 'status'; st.textContent = '按「播放」。'; }
+  else if (chat && !two) { st.className = 'status bad'; st.textContent = `✕ 座位图可以用，但歌迷聊天室也需要浏览器发送消息。${m === 2 ? 'SSE 是单向的（服务器 → 浏览器），所以每则聊天消息都要另外发一个请求。' : '用轮询的话，每则消息都是一个独立的请求，回复也要等下一次轮询。'}请使用 WebSocket。`; }
+  else if (m === 0) { st.className = 'status bad'; st.textContent = `✕ 有 ${stale} 个已售出的座位看起来还是空的（黄色）。更新要等下一次轮询，最久 5 秒，而每分钟 ${Math.round(rpm)} 个请求大部分都空手而回。`; }
+  else if (m === 1) { st.className = 'status ok'; st.textContent = '✓ 长轮询：座位一卖出，服务器就响应，所以更新大约 50 毫秒就到了。不过每次更新都要花一个新的请求。'; }
+  else { st.className = 'status ok'; st.textContent = `✓ ${m === 2 ? 'SSE' : 'WebSocket'}：一条开着的连接，每次售出大约 50 毫秒就出现在屏幕上。没有重复的请求。${chat ? '而且浏览器能在同一条连接上发送聊天消息。' : ''}`; }
+  player.clock(`t = ${(t / 1000).toFixed(1)} s`);
+  if (t >= 8000) runs[`${m}-${chat}`] = { delay, rpm };
+  mis.update({ m, chat, t, runs });
+}
+const player = X.player($('#player'), {
+  step: () => { t += DT; if (t > SALES[SALES.length - 1].t + 6000) player.pause(); render(); }, stepTicks: 5,
+  reset: () => { t = 0; render(); },
+});
+X.seg($('#mSeg'), ['轮询（每 5 秒）', '长轮询', '服务器推送事件', 'WebSocket'], i => { m = i; D = deliveries(m); render(); }, 0);
+X.seg($('#fSeg'), ['实时座位图', '歌迷聊天室（发送＋接收）'], i => { chat = i === 1; render(); }, 0);
+const has = (s, k) => !!s.runs[k];
+const mis = X.missions($('#missions'), [
+  { text: '在<b>轮询（每 5 秒）</b>的设置下按<b>播放</b>。', hint: '黄色座位在服务器上已经卖出，但歌迷看起来还是空的。两位歌迷就是这样点到同一个座位的。', check: s => has(s, '0-false') },
+  { text: '切换到<b>长轮询</b>。', hint: '现在更新大约在每次售出后 50 毫秒就到了。不过看看请求数。', check: s => has(s, '1-false') },
+  { text: '切换到<b>服务器推送事件</b>。', hint: '一样快，而且创建一条连接之后就完全没有其他请求了。', check: s => has(s, '2-false') },
+  { text: '把功能切换成<b>歌迷聊天室</b>，再找出支持它的方法。', hint: '聊天室需要浏览器也能发送。四种方法里只有一种是双向的。', check: s => has(s, '3-true') },
+]);
+render();
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="c">// 轮询：每 5 秒问一次</span>', null],
+  ['setInterval(<span class="key">async</span> () =&gt; render(<span class="key">await</span> (<span class="key">await</span> fetch(<span class="s">"/seats"</span>)).json()), <span class="s">5000</span>);', 'poll'],
+  ['', null],
+  ['<span class="c">// 长轮询：发问、等待回答、再问一次</span>', null],
+  ['<span class="key">while</span> (<span class="s">true</span>) render(<span class="key">await</span> (<span class="key">await</span> fetch(<span class="s">"/seats/changes?wait=30"</span>)).json());', 'long'],
+  ['', null],
+  ['<span class="c">// 服务器推送事件：一个持续串流的响应</span>', null],
+  ['<span class="key">const</span> es = <span class="key">new</span> EventSource(<span class="s">"/seats/stream"</span>);', 'sse'],
+  ['es.onmessage = (e) =&gt; markSold(JSON.parse(e.data));', 'sse'],
+  ['', null],
+  ['<span class="c">// WebSocket：双向通道</span>', null],
+  ['<span class="key">const</span> ws = <span class="key">new</span> WebSocket(<span class="s">"wss://encore.example/live"</span>);', 'ws'],
+  ['ws.onmessage = (e) =&gt; handle(JSON.parse(e.data));', 'ws'],
+  ['ws.send(JSON.stringify({ type: <span class="s">"chat"</span>, text: <span class="s">"See you at the front!"</span> }));', 'wssend'],
+], {
+  poll: ['轮询', '最简单的代码，任何服务器都能处理。代价是 5 秒的延迟，以及每个开着的分页每 5 秒一个请求，就算什么都没变也一样。'],
+  long: ['长轮询', '服务器在有变化之前（或 30 秒过去之前）都不响应。每收到一次回答，循环就立刻再问一次。仍然是一般的 HTTP，所以能穿过任何代理服务器。'],
+  sse: ['SSE', '浏览器内置的 <code>EventSource</code> 会保持一个响应开着，断线时会自己重新连接。服务器送出 <code>Content-Type: text/event-stream</code>，并写入 <code>data: …</code> 行。'],
+  ws: ['WebSocket', '一开始是带有 <code>Upgrade: websocket</code> 的 HTTP 请求，接着变成一条原始的双向连接。<code>wss://</code> 代表它有用 TLS 加密。'],
+  wssend: ['从浏览器发送', '这就是 SSE 做不到的事：浏览器能随时在同一条连接上推送消息。这就是聊天室需要 WebSocket 的原因。'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: 'Encore 想在演唱会页面上放实时的「只剩 3 个座位！」标签。浏览器完全不需要返回任何东西。最简单又合适的是什么？', opts: [
+    ['WebSocket', false, '它可以用，但双向超出了需求，而且 WebSocket 在扩展和代理上需要更多照顾。'],
+    ['服务器推送事件', true, '通过一般 HTTP 的单向服务器推送，还会自动重新连接。正好就是这个使用情境。'],
+    ['每 100 毫秒轮询一次', false, '接近实时，但每位歌迷每秒 10 个请求会把服务器压垮。'],
+  ] },
+  { q: '歌迷聊天室必须能让躲在严格企业代理服务器后面的歌迷使用，那里只允许一般的 HTTP 请求。哪一种还能运作？', opts: [
+    ['WebSocket', false, '有些严格的代理服务器会挡下 Upgrade，把连接切断。'],
+    ['长轮询（发送时用一般的 POST）', true, '它就只是一般的请求，所以到处都能通过。很多实时通信函数库会自动退回使用它。'],
+    ['没办法：那里不可能做到实时', false, '它比较慢、比较重，但长轮询几乎在任何环境都能运作。'],
+  ] },
+  { q: 'Encore 部署新版本，同时重新启动所有服务器。10,000 位歌迷开着 WebSocket 连接。Dee 该担心什么？', opts: [
+    ['没什么：WebSocket 会免费重新连接', false, '每个客户端都在同一时刻重新连接：惊群效应（thundering herd）。'],
+    ['10,000 个客户端同时重新连接，猛打服务器；要用退避与抖动来重新连接，并逐步重新启动服务器', true, '跟第 9 页学到的一样：把重试分散开来，部署时逐步排空连接。'],
+    ['消息会被加密两次', false, '重新启动不会影响加密。'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'realtime');
+})();
+</script>
+</body>
+</html>
