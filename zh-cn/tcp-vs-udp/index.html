@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-Hans-CN" data-lang="zh-cn" data-slug="tcp-vs-udp">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="在会掉封包的网络上，用 TCP 和 UDP 并排发送同样的封包，再替文件下载和视频通话选出合适的协定。">
+<title>TCP 与 UDP · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/explainer.css">
+</head>
+<body>
+<!-- Plan. Stuck point: "TCP reliable, UDP unreliable" makes UDP sound simply worse; people miss that TCP's reliability costs waiting.
+     Lab: 20 packets, adjustable loss, TCP and UDP side by side; file download vs video call. One difference: wait for every packet in order, or take what arrives now. -->
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="章节"><a href="#lab">实验室</a><a href="#real">代码</a><a href="#recap">重点整理</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>第 22 页 · 阶段 6 · 与外界沟通</span><span class="hot">98</span></div>
+  <div class="eyebrow">TCP 与 UDP</div>
+  <h1>「可靠」是有代价的。<em>有时候代价是一个卡住的视频通话。</em></h1>
+  <div class="scenario"><b>Encore</b>Encore 会寄出必须完整无缺的票券 PDF，现在也开始直播演唱会，而直播中晚到的画面毫无用处。在信号不好的移动网络上，有些封包会遗失。TCP 和 UDP 处理遗失的方式恰恰相反。</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">打开实验室 ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>实验室 · 同样的网络，两种协定</span><span class="hot" id="tag">文件下载</span></div>
+  <h2>20 个封包，一条会掉封包的网络</h2>
+  <p>每个方块是一个封包。每 0.1 秒送出一个，穿越网络要 0.3 秒。TCP 封包遗失时，发送端大约 0.6 秒后会发现，并重新发送。数字是模拟的。</p>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><label for="loss">封包遗失率：<b id="lossV">0%</b></label><input type="range" id="loss" min="0" max="30" step="5" value="0"></div>
+      <div class="ctl"><span class="lab-k">发送的内容</span><div id="useSeg"></div></div>
+      <div class="ctl"><span class="lab-k">模拟</span><div id="player"></div></div>
+    </div>
+    <div>
+      <h3>TCP <span class="muted" style="font-family:var(--body);text-transform:none;font-size:13px">每个封包都送达，而且照顺序</span></h3>
+      <div class="cells" id="tcp" style="--cols:20" aria-hidden="true"></div>
+      <p class="mono" id="tcpTxt" style="font-size:13px;margin:6px 0 0"></p>
+    </div>
+    <div>
+      <h3>UDP <span class="muted" style="font-family:var(--body);text-transform:none;font-size:13px">收到什么就交出什么，到了就交</span></h3>
+      <div class="cells" id="udp" style="--cols:20" aria-hidden="true"></div>
+      <p class="mono" id="udpTxt" style="font-size:13px;margin:6px 0 0"></p>
+    </div>
+    <div class="legend"><span><i style="background:var(--wait)"></i>发送中 / 重送中</span><span><i style="background:var(--accent-2)"></i>已到达，正在等更早的封包</span><span><i style="background:var(--ok)"></i>已交给 App</span><span><i style="background:var(--bad)"></i>遗失或太晚</span></div>
+    <div class="status" id="status" role="status">按「播放」送出封包。</div>
+  </div>
+  <h3>试试看</h3>
+  <ol class="missions" id="missions"></ol>
+  <div class="compare">
+    <div><h3>TCP</h3><p style="margin:0">一条有交握、确认、重送与排序的连接。App 拿到的是一串完美的字节。封包遗失时，后面的一切都要<b>等待</b>（队头阻塞，head-of-line blocking）。</p></div>
+    <div><h3>UDP</h3><p style="margin:0">送出就不管的封包：没有交握、不重试、不排序。遗失的就遗失了，晚到的也不会等。由 App 自己决定怎么处理，在旧数据毫无价值时非常好用。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">关键差别</div><p>TCP 会<b>等</b>到拿齐所有依序的字节；UDP 则把<b>此刻已经到达的东西</b>交出去。文件、网页和付款要用 TCP。直播视频、语音和游戏中，晚到的封包跟遗失的一样糟，所以 UDP（由 App 自己补洞）胜出。</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>第 2 幕 · 真实世界</span><span class="hot">node.js</span></div>
+  <h2>同样的概念，两种 socket</h2>
+  <p><b>把鼠标移到某一行上，或点一下。</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="TCP 与 UDP 代码范例"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 选一行</div><p id="exP">每一行反白后，都会对应到实验室。</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>重点整理 · 带走这些</span><span class="hot">♥</span></div>
+  <h2>整页浓缩在一个画面</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">完整＋有序</div><div class="t">TCP</div><p>交握、确认、重送、排序、壅塞控制。HTTP/1 和 HTTP/2、数据库、SSH 和 email 都使用它。</p></div>
+    <div class="card"><div class="sub">快速＋会掉</div><div class="t">UDP</div><p>就只是封包。DNS、视频通话、游戏和直播都使用它，QUIC 也是：它在 UDP 之上创建自己的可靠机制（第 23 页）。</p></div>
+    <div class="card"><div class="sub">代价</div><div class="t">队头阻塞</div><p>一个遗失的 TCP 封包会拖延它后面的所有东西，连已经到达的数据也一样。</p></div>
+  </div>
+  <div class="takeaway"><div class="t">取舍</div><p>TCP 免费给你正确性，代价是网络差时的延迟。UDP 给你低延迟，但要你自己处理遗失、排序和壅塞。这就是为什么大多数 App 用 TCP，而需要实时性的 App 则在 UDP 之上加自己的协定。</p></div>
+  <h3 style="margin-top:26px">考考自己 <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="页面"></nav>
+</main>
+
+<script src="../../assets/explainer.js"></script>
+<script src="../../assets/i18n.zh-cn.js"></script>
+<script>
+(() => {
+const { $, el } = X;
+const N = 20, SEND = 100, ONE_WAY = 300, RTO = 600, DEADLINE = 500;
+
+/* ---------- schedule (pure, deterministic): when each packet reaches the app ---------- */
+const lost = (i, attempt, pct) => { let h = Math.imul((i + 1) * 2654435761 ^ (attempt + 1) * 40503, 0x9e3779b1) >>> 0; return h % 100 < pct; };
+function plan(pct) {
+  const tcp = [], udp = [];
+  for (let i = 0; i < N; i++) {
+    const sent = i * SEND;
+    udp.push({ sent, arrive: lost(i, 0, pct) ? null : sent + ONE_WAY });
+    let a = 0, t = sent, resends = 0;
+    while (lost(i, a, pct) && a < 6) { a++; t += RTO; resends++; }
+    tcp.push({ sent, arrive: t + ONE_WAY, resends, firstLostAt: resends ? sent + ONE_WAY : null });
+  }
+  let prev = 0;
+  tcp.forEach(p => { p.app = Math.max(p.arrive, prev); prev = p.app; });
+  udp.forEach(p => { p.app = p.arrive; });
+  return { tcp, udp, end: Math.max(...tcp.map(p => p.app)) + 200 };
+}
+function summarize(P, video) {
+  const late = arr => arr.filter(p => p.app == null || p.app - p.sent > DEADLINE).length;
+  return { tcpDone: Math.max(...P.tcp.map(p => p.app)), tcpStall: Math.max(...P.tcp.map(p => p.app - p.sent)) - ONE_WAY,
+    udpMissing: P.udp.filter(p => p.app == null).length, tcpLate: late(P.tcp), udpLate: late(P.udp), resends: P.tcp.reduce((a, p) => a + p.resends, 0), video };
+}
+
+/* ---------- UI ---------- */
+let loss = 0, video = false, P = plan(0), t = 0;
+const runs = [];
+const mk = id => { const g = $('#' + id); for (let i = 0; i < N; i++) g.append(el('div', 'cell')); return [...g.children]; };
+const tcpCells = mk('tcp'), udpCells = mk('udp');
+function cellState(p, now, isUdp) {
+  if (now < p.sent) return '';
+  if (p.app != null && now >= p.app) return video && p.app - p.sent > DEADLINE ? 'bad' : 'hit';
+  if (isUdp && p.arrive == null) return now >= p.sent + ONE_WAY ? 'bad' : 'wait';
+  if (!isUdp && now >= p.arrive) return 'on';
+  return 'wait';
+}
+function render() {
+  $('#lossV').textContent = loss + '%';
+  $('#tag').textContent = video ? '视频通话' : '文件下载';
+  P.tcp.forEach((p, i) => (tcpCells[i].className = 'cell ' + cellState(p, t, false)));
+  P.udp.forEach((p, i) => (udpCells[i].className = 'cell ' + cellState(p, t, true)));
+  const done = t >= P.end;
+  const sm = summarize(P, video);
+  const gotT = P.tcp.filter(p => t >= p.app).length, gotU = P.udp.filter(p => p.app != null && t >= p.app).length;
+  $('#tcpTxt').textContent = `已送达 ${gotT}/${N}${sm.resends ? ` · 重送 ${sm.resends} 次` : ''}${done ? ` · 在 ${(sm.tcpDone / 1000).toFixed(1)} 秒完成${video ? ` · ${sm.tcpLate} 个画面太晚` : ''}` : ''}`;
+  $('#udpTxt').textContent = `已送达 ${gotU}/${N}${done ? ` · ${sm.udpMissing} 个从未到达${video ? ` · 缺少 ${sm.udpLate} 个画面` : ''}` : ''}`;
+  const st = $('#status');
+  if (!t) { st.className = 'status'; st.textContent = '按「播放」送出封包。'; }
+  else if (!done) { st.className = 'status'; st.textContent = '发送中…'; }
+  else if (!loss) { st.className = 'status ok'; st.textContent = '✓ 没有遗失：两种协定都准时、依序送达全部 20 个封包。'; }
+  else if (video) { st.className = 'status ' + (sm.tcpLate > sm.udpLate ? 'wait' : 'ok'); st.textContent = `视频通话：TCP 有 ${sm.tcpLate} 个画面太晚（画面在等重送时冻结）。UDP 少了 ${sm.udpLate} 个，但其他都准时，所以通话只是短暂地闪一下。UDP 胜出。`; }
+  else { st.className = 'status ' + (sm.udpMissing ? 'wait' : 'ok'); st.textContent = `文件下载：TCP 花了 ${(sm.tcpDone / 1000).toFixed(1)} 秒而不是 2.2 秒，但文件是完整的。UDP 很快就结束了，却少了 ${sm.udpMissing} 个封包：一个损坏的 PDF。TCP 胜出。`; }
+  player.clock(`t = ${(t / 1000).toFixed(1)} s`);
+  if (done && !P.recorded) { P.recorded = true; runs.push({ loss, ...sm }); }
+  mis.update(runs);
+}
+const player = X.player($('#player'), {
+  step: () => { if (t >= P.end) { player.pause(); return; } t += 100; render(); }, stepTicks: 3,
+  reset: () => { P = plan(loss); t = 0; render(); },
+});
+$('#loss').addEventListener('input', e => { loss = +e.target.value; P = plan(loss); t = 0; player.pause(); render(); });
+X.seg($('#useSeg'), ['文件下载', '视频通话'], i => { video = i === 1; P = plan(loss); t = 0; player.pause(); render(); }, 0);
+const mis = X.missions($('#missions'), [
+  { text: '在 0% 遗失率下按<b>播放</b>。', hint: '网络完美时，TCP 和 UDP 看起来一模一样。', check: r => r.some(x => x.loss === 0) },
+  { text: '把遗失率设成 <b>15%</b>，再播放一次。', hint: 'TCP 会重送遗失的封包，并挡住它后面的一切。UDP 只会出现空缺。', check: r => r.some(x => x.loss >= 10 && !x.video) },
+  { text: '切换到<b>视频通话</b>并播放。', hint: '超过 0.5 秒的画面就没用了。哪种协定能准时呈现更多通话内容？', check: r => r.some(x => x.loss >= 10 && x.video && x.tcpLate > x.udpLate) },
+]);
+render();
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="c">// TCP：先创建连接，再发送可靠的字节串流</span>', null],
+  ['<span class="key">const</span> sock = net.createConnection({ host: <span class="s">"encore.example"</span>, port: 443 });', 'tcpconn'],
+  ['sock.write(pdfBytes);   <span class="c">// 会完整且依序到达，否则连接会失败</span>', 'tcpwrite'],
+  ['', null],
+  ['<span class="c">// UDP：没有连接，各自独立的封包</span>', null],
+  ['<span class="key">const</span> udp = dgram.createSocket(<span class="s">"udp4"</span>);', 'udp'],
+  ['udp.send(videoFrame, 5004, <span class="s">"stream.encore.example"</span>);  <span class="c">// 可能遗失、重复或乱序</span>', 'udpsend'],
+  ['', null],
+  ['<span class="c">// 接收端的 App 自己处理空缺</span>', null],
+  ['<span class="key">if</span> (frame.seq &lt; lastShown) <span class="key">return</span>;  <span class="c">// 太旧了：跳过，不要等</span>', 'skip'],
+], {
+  tcpconn: ['连接', '先进行三向交握（一次来回），之后由操作系统追踪每一个字节：确认、重送和排序全部内置。'],
+  tcpwrite: ['可靠的串流', '你的 App 永远不会看到遗失或乱序的封包，只会看到数据晚一点到。这就是实验室里 TCP 那一列卡住的原因。'],
+  udp: ['没有连接', '没有交握，也没有每条连接的状态。每次发送都是一个独立的封包（datagram）。'],
+  udpsend: ['送出就不管', '操作系统只送一次。遗失了就什么都不会发生。这就是 UDP 那一列的红色方块。'],
+  skip: ['App 层的选择', '视频和游戏协定会替封包编号，自己做决定：跳过晚到的画面、掩饰遗失的那一个，或只针对重要的东西重新要求。'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: 'Encore 的演唱会直播每次网络一抖，就会冻结一秒，然后跳到后面。它是跑在 TCP 上的。为什么？', opts: [
+    ['视频编码器太慢', false, '冻结的时间点和网络遗失吻合，而不是和编码有关。'],
+    ['TCP 在遗失的封包重送之前，会挡住后面的封包：队头阻塞', true, '对直播媒体来说，晚到的画面毫无用处。以 UDP 为基础的协定（例如 WebRTC）会跳过它，继续播放。'],
+    ['UDP 会冻结得更严重', false, 'UDP 会立刻交出已经到达的东西，所以是闪一下而不是冻结。'],
+  ] },
+  { q: '下列哪一个应该使用 TCP（或可靠的协定）？', opts: [
+    ['下载票券 PDF', true, '每个字节都重要，顺序也重要。少一个封包就代表文件坏掉。'],
+    ['歌迷之间的实时语音聊天', false, '晚到的声音比小小的空缺更糟。以 UDP 为基础的实时协定才是常态。'],
+    ['每秒发送 30 次玩家位置的多人游戏', false, '只有最新的位置才重要。等旧的被重送回来时，早就没有价值了。'],
+  ] },
+  { q: 'DNS 通常跑在 UDP 上。为什么这样没问题？', opts: [
+    ['DNS 的答案从来不会遗失', false, '它们会遗失。客户端只要在短暂超时后再问一次就好。'],
+    ['查找很小，遗失了就重试，比每次都做 TCP 交握便宜', true, '一个小问题配一个小答案，创建连接的成本会比偶尔重试还高。'],
+    ['UDP 是加密的', false, 'TCP 和 UDP 本身都没有加密。那是 TLS 的工作（第 19 页）。'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'tcp-vs-udp');
+})();
+</script>
+</body>
+</html>

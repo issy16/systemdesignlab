@@ -1,0 +1,560 @@
+{
+ "page": "tcp-vs-udp",
+ "segments": [
+  {
+   "kind": "attr",
+   "en": "width=device-width, initial-scale=1, viewport-fit=cover",
+   "zh": "="
+  },
+  {
+   "kind": "attr",
+   "en": "Send the same packets over a lossy network with TCP and UDP side by side, then pick the right one for a file download and a video call.",
+   "zh": "在會掉封包的網路上，用 TCP 和 UDP 並排傳送同樣的封包，再替檔案下載和視訊通話選出合適的協定。"
+  },
+  {
+   "kind": "attr",
+   "en": "Sections",
+   "zh": "章節"
+  },
+  {
+   "kind": "attr",
+   "en": "Example TCP and UDP code",
+   "zh": "TCP 與 UDP 程式碼範例"
+  },
+  {
+   "kind": "attr",
+   "en": "Pages",
+   "zh": "頁面"
+  },
+  {
+   "kind": "html",
+   "en": "TCP vs UDP · System Design Lab",
+   "zh": "TCP 與 UDP · System Design Lab"
+  },
+  {
+   "kind": "html",
+   "en": "system<b>.design.lab</b>",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "Lab",
+   "zh": "實驗室"
+  },
+  {
+   "kind": "html",
+   "en": "The code",
+   "zh": "程式碼"
+  },
+  {
+   "kind": "html",
+   "en": "Recap",
+   "zh": "重點整理"
+  },
+  {
+   "kind": "html",
+   "en": "page 22 · stage 6 · talk to the world",
+   "zh": "第 22 頁 · 階段 6 · 與外界溝通"
+  },
+  {
+   "kind": "html",
+   "en": "TCP vs UDP",
+   "zh": "TCP 與 UDP"
+  },
+  {
+   "kind": "html",
+   "en": "“Reliable” has a price. <em>Sometimes it's a frozen video call.</em>",
+   "zh": "「可靠」是有代價的。<em>有時候代價是一個卡住的視訊通話。</em>"
+  },
+  {
+   "kind": "html",
+   "en": "<b>Encore</b>Encore sends ticket PDFs that must arrive perfectly, and now streams live concerts where a frame that arrives late is useless. On a bad mobile connection some packets get lost. TCP and UDP handle that loss in opposite ways.",
+   "zh": "<b>Encore</b>Encore 會寄出必須完整無缺的票券 PDF，現在也開始直播演唱會，而直播中晚到的畫面毫無用處。在訊號不好的行動網路上，有些封包會遺失。TCP 和 UDP 處理遺失的方式恰恰相反。"
+  },
+  {
+   "kind": "html",
+   "en": "Open the lab ↓",
+   "zh": "打開實驗室 ↓"
+  },
+  {
+   "kind": "html",
+   "en": "lab · same network, two protocols",
+   "zh": "實驗室 · 同樣的網路，兩種協定"
+  },
+  {
+   "kind": "html",
+   "en": "file download",
+   "zh": "檔案下載"
+  },
+  {
+   "kind": "html",
+   "en": "20 packets over a lossy network",
+   "zh": "20 個封包，一條會掉封包的網路"
+  },
+  {
+   "kind": "html",
+   "en": "Each square is a packet. One is sent every 0.1 s and takes 0.3 s to cross the network. When a TCP packet is lost, the sender notices after about 0.6 s and sends it again. Simulated numbers.",
+   "zh": "每個方塊是一個封包。每 0.1 秒送出一個，穿越網路要 0.3 秒。TCP 封包遺失時，傳送端大約 0.6 秒後會發現，並重新傳送。數字是模擬的。"
+  },
+  {
+   "kind": "html",
+   "en": "Packet loss: <b id=\"lossV\">0%</b>",
+   "zh": "封包遺失率：<b id=\"lossV\">0%</b>"
+  },
+  {
+   "kind": "html",
+   "en": "What's being sent",
+   "zh": "傳送的內容"
+  },
+  {
+   "kind": "html",
+   "en": "Simulation",
+   "zh": "模擬"
+  },
+  {
+   "kind": "html",
+   "en": "TCP",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "delivers every packet, in order",
+   "zh": "每個封包都送達，而且照順序"
+  },
+  {
+   "kind": "html",
+   "en": "UDP",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "delivers whatever arrives, when it arrives",
+   "zh": "收到什麼就交出什麼，到了就交"
+  },
+  {
+   "kind": "html",
+   "en": "<i style=\"background:var(--wait)\"></i>in flight / resent",
+   "zh": "<i style=\"background:var(--wait)\"></i>傳送中 / 重送中"
+  },
+  {
+   "kind": "html",
+   "en": "<i style=\"background:var(--accent-2)\"></i>arrived, waiting for an earlier one",
+   "zh": "<i style=\"background:var(--accent-2)\"></i>已到達，正在等更早的封包"
+  },
+  {
+   "kind": "html",
+   "en": "<i style=\"background:var(--ok)\"></i>given to the app",
+   "zh": "<i style=\"background:var(--ok)\"></i>已交給 App"
+  },
+  {
+   "kind": "html",
+   "en": "<i style=\"background:var(--bad)\"></i>lost or too late",
+   "zh": "<i style=\"background:var(--bad)\"></i>遺失或太晚"
+  },
+  {
+   "kind": "html",
+   "en": "Press Play to send the packets.",
+   "zh": "按「播放」送出封包。"
+  },
+  {
+   "kind": "html",
+   "en": "Try this",
+   "zh": "試試看"
+  },
+  {
+   "kind": "html",
+   "en": "A connection with a handshake, acknowledgements, retransmission and ordering. The app gets a perfect stream of bytes. When a packet is lost, everything after it <b>waits</b> (head-of-line blocking).",
+   "zh": "一條有交握、確認、重送與排序的連線。App 拿到的是一串完美的位元組。封包遺失時，後面的一切都要<b>等待</b>（隊頭阻塞，head-of-line blocking）。"
+  },
+  {
+   "kind": "html",
+   "en": "Fire-and-forget packets: no handshake, no retries, no ordering. Lost packets stay lost, and late ones aren't waited for. The app decides what to do, which is great when old data is worthless.",
+   "zh": "送出就不管的封包：沒有交握、不重試、不排序。遺失的就遺失了，晚到的也不會等。由 App 自己決定怎麼處理，在舊資料毫無價值時非常好用。"
+  },
+  {
+   "kind": "html",
+   "en": "The one difference",
+   "zh": "關鍵差別"
+  },
+  {
+   "kind": "html",
+   "en": "TCP <b>waits</b> until it has every byte in order; UDP hands over <b>what arrived, right now</b>. For files, web pages and payments you want TCP. For live video, voice and games, a late packet is as bad as a lost one, so UDP (with the app filling the gaps) wins.",
+   "zh": "TCP 會<b>等</b>到拿齊所有依序的位元組；UDP 則把<b>此刻已經到達的東西</b>交出去。檔案、網頁和付款要用 TCP。直播視訊、語音和遊戲中，晚到的封包跟遺失的一樣糟，所以 UDP（由 App 自己補洞）勝出。"
+  },
+  {
+   "kind": "html",
+   "en": "act 2 · the real thing",
+   "zh": "第 2 幕 · 真實世界"
+  },
+  {
+   "kind": "html",
+   "en": "node.js",
+   "zh": "="
+  },
+  {
+   "kind": "html",
+   "en": "Same idea, two socket types",
+   "zh": "同樣的概念，兩種 socket"
+  },
+  {
+   "kind": "html",
+   "en": "<b>Hover or tap a line.</b>",
+   "zh": "<b>把滑鼠移到某一行上，或點一下。</b>"
+  },
+  {
+   "kind": "html",
+   "en": "👆 pick a line",
+   "zh": "👆 選一行"
+  },
+  {
+   "kind": "html",
+   "en": "Each highlighted line maps to the lab.",
+   "zh": "每一行反白後，都會對應到實驗室。"
+  },
+  {
+   "kind": "html",
+   "en": "recap · keep this",
+   "zh": "重點整理 · 帶走這些"
+  },
+  {
+   "kind": "html",
+   "en": "The whole page on one screen",
+   "zh": "整頁濃縮在一個畫面"
+  },
+  {
+   "kind": "html",
+   "en": "Complete + ordered",
+   "zh": "完整＋有序"
+  },
+  {
+   "kind": "html",
+   "en": "Handshake, acknowledgements, retransmission, ordering, congestion control. HTTP/1 and HTTP/2, databases, SSH and email all use it.",
+   "zh": "交握、確認、重送、排序、壅塞控制。HTTP/1 和 HTTP/2、資料庫、SSH 和 email 都使用它。"
+  },
+  {
+   "kind": "html",
+   "en": "Fast + lossy",
+   "zh": "快速＋會掉"
+  },
+  {
+   "kind": "html",
+   "en": "Just packets. Used by DNS, video calls, games and live streaming, and by QUIC, which builds its own reliability on top (page 23).",
+   "zh": "就只是封包。DNS、視訊通話、遊戲和直播都使用它，QUIC 也是：它在 UDP 之上建立自己的可靠機制（第 23 頁）。"
+  },
+  {
+   "kind": "html",
+   "en": "The cost",
+   "zh": "代價"
+  },
+  {
+   "kind": "html",
+   "en": "Head-of-line blocking",
+   "zh": "隊頭阻塞"
+  },
+  {
+   "kind": "html",
+   "en": "One lost TCP packet delays everything behind it, even data that already arrived.",
+   "zh": "一個遺失的 TCP 封包會拖延它後面的所有東西，連已經到達的資料也一樣。"
+  },
+  {
+   "kind": "html",
+   "en": "The tradeoff",
+   "zh": "取捨"
+  },
+  {
+   "kind": "html",
+   "en": "TCP gives you correctness for free and charges you in latency when the network is bad. UDP gives you low latency and makes you handle loss, ordering and congestion yourself. That's why most apps use TCP, and why the ones that need real-time behavior use UDP with their own protocol on top.",
+   "zh": "TCP 免費給你正確性，代價是網路差時的延遲。UDP 給你低延遲，但要你自己處理遺失、排序和壅塞。這就是為什麼大多數 App 用 TCP，而需要即時性的 App 則在 UDP 之上加自己的協定。"
+  },
+  {
+   "kind": "html",
+   "en": "Check it",
+   "zh": "考考自己"
+  },
+  {
+   "kind": "js",
+   "en": "'video call'",
+   "zh": "'視訊通話'"
+  },
+  {
+   "kind": "js",
+   "en": "'file download'",
+   "zh": "'檔案下載'"
+  },
+  {
+   "kind": "js",
+   "en": "`${gotT}/${N} delivered${sm.resends ? ` · ${sm.resends} resent` : ''}${done ? ` · finished at ${(sm.tcpDone / 1000).toFixed(1)} s${video ? ` · ${sm.tcpLate} frames too late` : ''}` : ''}`",
+   "zh": "`已送達 ${gotT}/${N}${sm.resends ? ` · 重送 ${sm.resends} 次` : ''}${done ? ` · 在 ${(sm.tcpDone / 1000).toFixed(1)} 秒完成${video ? ` · ${sm.tcpLate} 個畫面太晚` : ''}` : ''}`"
+  },
+  {
+   "kind": "js",
+   "en": "`${gotU}/${N} delivered${done ? ` · ${sm.udpMissing} never arrived${video ? ` · ${sm.udpLate} frames missing` : ''}` : ''}`",
+   "zh": "`已送達 ${gotU}/${N}${done ? ` · ${sm.udpMissing} 個從未到達${video ? ` · 缺少 ${sm.udpLate} 個畫面` : ''}` : ''}`"
+  },
+  {
+   "kind": "js",
+   "en": "'Press Play to send the packets.'",
+   "zh": "'按「播放」送出封包。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Sending…'",
+   "zh": "'傳送中…'"
+  },
+  {
+   "kind": "js",
+   "en": "'✓ No loss: both protocols deliver all 20 packets, on time and in order.'",
+   "zh": "'✓ 沒有遺失：兩種協定都準時、依序送達全部 20 個封包。'"
+  },
+  {
+   "kind": "js",
+   "en": "`Video call: TCP shows ${sm.tcpLate} frames too late (the picture freezes while it waits for resends). UDP is missing ${sm.udpLate}, but everything else is on time, so the call just glitches briefly. UDP wins.`",
+   "zh": "`視訊通話：TCP 有 ${sm.tcpLate} 個畫面太晚（畫面在等重送時凍結）。UDP 少了 ${sm.udpLate} 個，但其他都準時，所以通話只是短暫地閃一下。UDP 勝出。`"
+  },
+  {
+   "kind": "js",
+   "en": "`File download: TCP took ${(sm.tcpDone / 1000).toFixed(1)} s instead of 2.2 s, but the file is complete. UDP finished fast with ${sm.udpMissing} packets missing: a corrupted PDF. TCP wins.`",
+   "zh": "`檔案下載：TCP 花了 ${(sm.tcpDone / 1000).toFixed(1)} 秒而不是 2.2 秒，但檔案是完整的。UDP 很快就結束了，卻少了 ${sm.udpMissing} 個封包：一個損壞的 PDF。TCP 勝出。`"
+  },
+  {
+   "kind": "js",
+   "en": "`t = ${(t / 1000).toFixed(1)} s`",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'File download'",
+   "zh": "'檔案下載'"
+  },
+  {
+   "kind": "js",
+   "en": "'Video call'",
+   "zh": "'視訊通話'"
+  },
+  {
+   "kind": "js",
+   "en": "'Press <b>Play</b> with 0% loss.'",
+   "zh": "'在 0% 遺失率下按<b>播放</b>。'"
+  },
+  {
+   "kind": "js",
+   "en": "'With a perfect network, TCP and UDP look the same.'",
+   "zh": "'網路完美時，TCP 和 UDP 看起來一模一樣。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Set the loss to <b>15%</b> and play again.'",
+   "zh": "'把遺失率設成 <b>15%</b>，再播放一次。'"
+  },
+  {
+   "kind": "js",
+   "en": "'TCP resends lost packets and holds everything behind them. UDP just shows gaps.'",
+   "zh": "'TCP 會重送遺失的封包，並擋住它後面的一切。UDP 只會出現空缺。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Switch to <b>Video call</b> and play.'",
+   "zh": "'切換到<b>視訊通話</b>並播放。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Frames older than 0.5 s are useless. Which protocol shows more of the call on time?'",
+   "zh": "'超過 0.5 秒的畫面就沒用了。哪種協定能準時呈現更多通話內容？'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\">// TCP: a connection, then a reliable stream of bytes</span>'",
+   "zh": "'<span class=\"c\">// TCP：先建立連線，再傳送可靠的位元組串流</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">const</span> sock = net.createConnection({ host: <span class=\"s\">\"encore.example\"</span>, port: 443 });'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'sock.write(pdfBytes);   <span class=\"c\">// arrives complete and in order, or the connection fails</span>'",
+   "zh": "'sock.write(pdfBytes);   <span class=\"c\">// 會完整且依序到達，否則連線會失敗</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\">// UDP: no connection, independent packets</span>'",
+   "zh": "'<span class=\"c\">// UDP：沒有連線，各自獨立的封包</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">const</span> udp = dgram.createSocket(<span class=\"s\">\"udp4\"</span>);'",
+   "zh": "="
+  },
+  {
+   "kind": "js",
+   "en": "'udp.send(videoFrame, 5004, <span class=\"s\">\"stream.encore.example\"</span>);  <span class=\"c\">// may be lost, duplicated or reordered</span>'",
+   "zh": "'udp.send(videoFrame, 5004, <span class=\"s\">\"stream.encore.example\"</span>);  <span class=\"c\">// 可能遺失、重複或亂序</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"c\">// the receiving app handles gaps itself</span>'",
+   "zh": "'<span class=\"c\">// 接收端的 App 自己處理空缺</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'<span class=\"key\">if</span> (frame.seq &lt; lastShown) <span class=\"key\">return</span>;  <span class=\"c\">// too old: skip it, don\\'t wait</span>'",
+   "zh": "'<span class=\"key\">if</span> (frame.seq &lt; lastShown) <span class=\"key\">return</span>;  <span class=\"c\">// 太舊了：跳過，不要等</span>'"
+  },
+  {
+   "kind": "js",
+   "en": "'Connection'",
+   "zh": "'連線'"
+  },
+  {
+   "kind": "js",
+   "en": "'A three-way handshake first (one round trip), then the OS tracks every byte: acknowledgements, retransmissions and ordering are all built in.'",
+   "zh": "'先進行三向交握（一次來回），之後由作業系統追蹤每一個位元組：確認、重送和排序全部內建。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Reliable stream'",
+   "zh": "'可靠的串流'"
+  },
+  {
+   "kind": "js",
+   "en": "'Your app never sees a lost or reordered packet. It just sees data arriving later. That\\'s the TCP row stalling in the lab.'",
+   "zh": "'你的 App 永遠不會看到遺失或亂序的封包，只會看到資料晚一點到。這就是實驗室裡 TCP 那一列卡住的原因。'"
+  },
+  {
+   "kind": "js",
+   "en": "'No connection'",
+   "zh": "'沒有連線'"
+  },
+  {
+   "kind": "js",
+   "en": "'No handshake and no per-connection state. Each send is one independent packet (a datagram).'",
+   "zh": "'沒有交握，也沒有每條連線的狀態。每次傳送都是一個獨立的封包（datagram）。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Fire and forget'",
+   "zh": "'送出就不管'"
+  },
+  {
+   "kind": "js",
+   "en": "'The OS sends it once. If it\\'s lost, nothing happens. That\\'s the red squares in the UDP row.'",
+   "zh": "'作業系統只送一次。遺失了就什麼都不會發生。這就是 UDP 那一列的紅色方塊。'"
+  },
+  {
+   "kind": "js",
+   "en": "'App-level choices'",
+   "zh": "'App 層的選擇'"
+  },
+  {
+   "kind": "js",
+   "en": "'Video and game protocols number their packets and decide themselves: skip late frames, conceal a missing one, or ask again only for what matters.'",
+   "zh": "'視訊和遊戲協定會替封包編號，自己做決定：跳過晚到的畫面、掩飾遺失的那一個，或只針對重要的東西重新要求。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Encore\\'s live concert stream freezes for a second every time the network hiccups, then jumps ahead. It runs over TCP. Why?'",
+   "zh": "'Encore 的演唱會直播每次網路一抖，就會凍結一秒，然後跳到後面。它是跑在 TCP 上的。為什麼？'"
+  },
+  {
+   "kind": "js",
+   "en": "'The video encoder is too slow'",
+   "zh": "'視訊編碼器太慢'"
+  },
+  {
+   "kind": "js",
+   "en": "'The freeze lines up with network loss, not encoding.'",
+   "zh": "'凍結的時間點和網路遺失吻合，而不是和編碼有關。'"
+  },
+  {
+   "kind": "js",
+   "en": "'TCP holds later packets until the lost one is resent: head-of-line blocking'",
+   "zh": "'TCP 在遺失的封包重送之前，會擋住後面的封包：隊頭阻塞'"
+  },
+  {
+   "kind": "js",
+   "en": "'For live media a late frame is useless. UDP-based protocols (like WebRTC) skip it and keep playing.'",
+   "zh": "'對直播媒體來說，晚到的畫面毫無用處。以 UDP 為基礎的協定（例如 WebRTC）會跳過它，繼續播放。'"
+  },
+  {
+   "kind": "js",
+   "en": "'UDP would freeze even more'",
+   "zh": "'UDP 會凍結得更嚴重'"
+  },
+  {
+   "kind": "js",
+   "en": "'UDP delivers what arrives immediately, so it glitches instead of freezing.'",
+   "zh": "'UDP 會立刻交出已經到達的東西，所以是閃一下而不是凍結。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Which of these should use TCP (or a reliable protocol)?'",
+   "zh": "'下列哪一個應該使用 TCP（或可靠的協定）？'"
+  },
+  {
+   "kind": "js",
+   "en": "'Downloading a ticket PDF'",
+   "zh": "'下載票券 PDF'"
+  },
+  {
+   "kind": "js",
+   "en": "'Every byte matters and order matters. A missing packet means a broken file.'",
+   "zh": "'每個位元組都重要，順序也重要。少一個封包就代表檔案壞掉。'"
+  },
+  {
+   "kind": "js",
+   "en": "'A live voice chat between fans'",
+   "zh": "'歌迷之間的即時語音聊天'"
+  },
+  {
+   "kind": "js",
+   "en": "'Late audio is worse than a tiny gap. UDP-based real-time protocols are the norm.'",
+   "zh": "'晚到的聲音比小小的空缺更糟。以 UDP 為基礎的即時協定才是常態。'"
+  },
+  {
+   "kind": "js",
+   "en": "'A multiplayer game sending player positions 30 times a second'",
+   "zh": "'每秒傳送 30 次玩家位置的多人遊戲'"
+  },
+  {
+   "kind": "js",
+   "en": "'Only the newest position matters. Old ones are worthless by the time they\\'re resent.'",
+   "zh": "'只有最新的位置才重要。等舊的被重送回來時，早就沒有價值了。'"
+  },
+  {
+   "kind": "js",
+   "en": "'DNS usually runs over UDP. Why is that fine?'",
+   "zh": "'DNS 通常跑在 UDP 上。為什麼這樣沒問題？'"
+  },
+  {
+   "kind": "js",
+   "en": "'DNS answers are never lost'",
+   "zh": "'DNS 的答案從來不會遺失'"
+  },
+  {
+   "kind": "js",
+   "en": "'They can be lost. The client just asks again after a short timeout.'",
+   "zh": "'它們會遺失。客戶端只要在短暫逾時後再問一次就好。'"
+  },
+  {
+   "kind": "js",
+   "en": "'Queries are tiny and a lost one is simply retried, which is cheaper than a TCP handshake every time'",
+   "zh": "'查詢很小，遺失了就重試，比每次都做 TCP 交握便宜'"
+  },
+  {
+   "kind": "js",
+   "en": "'For one small question and one small answer, setting up a connection would cost more than the occasional retry.'",
+   "zh": "'一個小問題配一個小答案，建立連線的成本會比偶爾重試還高。'"
+  },
+  {
+   "kind": "js",
+   "en": "'UDP is encrypted'",
+   "zh": "'UDP 是加密的'"
+  },
+  {
+   "kind": "js",
+   "en": "'Neither TCP nor UDP is encrypted by itself. That\\'s TLS\\'s job (page 19).'",
+   "zh": "'TCP 和 UDP 本身都沒有加密。那是 TLS 的工作（第 19 頁）。'"
+  }
+ ]
+}

@@ -149,6 +149,11 @@ const FLOWS = {
     ['click', '#go', 300],
     ['fill', ['#ttl', '0'], 100], ['click', '#go', 300],
   ],
+  'tcp-vs-udp': [
+    ['click', '#player .btn.primary', 3000],
+    ['fill', ['#loss', '15'], 100], ['click', '#player .btn.primary', 5000],
+    ['click', seg('useSeg', 2), 100], ['click', '#player .btn.primary', 5000],
+  ],
 };
 
 (async () => {

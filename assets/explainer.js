@@ -264,7 +264,7 @@
     [19, 5, 'tls-secrets', 'TLS and secrets', [67, 71, 73], 'built'],
     [20, 5, 'incident-simulator', 'Final incident simulator', [83, 84, 109, 111], 'built'],
     [21, 6, 'dns', 'DNS', [97], 'built'],
-    [22, 6, 'tcp-vs-udp', 'TCP vs UDP', [98], 'planned'],
+    [22, 6, 'tcp-vs-udp', 'TCP vs UDP', [98], 'built'],
     [23, 6, 'http2-http3', 'HTTP/2 and HTTP/3', [99], 'planned'],
     [24, 6, 'realtime', 'WebSockets, long polling and SSE', [22, 23, 24], 'planned'],
     [25, 6, 'grpc', 'gRPC', [100], 'planned'],

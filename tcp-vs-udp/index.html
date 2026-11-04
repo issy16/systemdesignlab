@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Send the same packets over a lossy network with TCP and UDP side by side, then pick the right one for a file download and a video call.">
+<title>TCP vs UDP · System Design Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/explainer.css">
+</head>
+<body>
+<!-- Plan. Stuck point: "TCP reliable, UDP unreliable" makes UDP sound simply worse; people miss that TCP's reliability costs waiting.
+     Lab: 20 packets, adjustable loss, TCP and UDP side by side; file download vs video call. One difference: wait for every packet in order, or take what arrives now. -->
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="../">system<b>.design.lab</b></a>
+  <nav class="acts" aria-label="Sections"><a href="#lab">Lab</a><a href="#real">The code</a><a href="#recap">Recap</a></nav>
+</div></header>
+
+<main id="top">
+<section class="panel hero">
+  <div class="panel-label"><span>page 22 · stage 6 · talk to the world</span><span class="hot">98</span></div>
+  <div class="eyebrow">TCP vs UDP</div>
+  <h1>“Reliable” has a price. <em>Sometimes it's a frozen video call.</em></h1>
+  <div class="scenario"><b>Encore</b>Encore sends ticket PDFs that must arrive perfectly, and now streams live concerts where a frame that arrives late is useless. On a bad mobile connection some packets get lost. TCP and UDP handle that loss in opposite ways.</div>
+  <div class="row"><a class="btn primary" href="#lab" style="text-decoration:none">Open the lab ↓</a></div>
+</section>
+
+<section class="panel" id="lab">
+  <div class="panel-label"><span>lab · same network, two protocols</span><span class="hot" id="tag">file download</span></div>
+  <h2>20 packets over a lossy network</h2>
+  <p>Each square is a packet. One is sent every 0.1 s and takes 0.3 s to cross the network. When a TCP packet is lost, the sender notices after about 0.6 s and sends it again. Simulated numbers.</p>
+  <div class="lab">
+    <div class="controls">
+      <div class="ctl"><label for="loss">Packet loss: <b id="lossV">0%</b></label><input type="range" id="loss" min="0" max="30" step="5" value="0"></div>
+      <div class="ctl"><span class="lab-k">What's being sent</span><div id="useSeg"></div></div>
+      <div class="ctl"><span class="lab-k">Simulation</span><div id="player"></div></div>
+    </div>
+    <div>
+      <h3>TCP <span class="muted" style="font-family:var(--body);text-transform:none;font-size:13px">delivers every packet, in order</span></h3>
+      <div class="cells" id="tcp" style="--cols:20" aria-hidden="true"></div>
+      <p class="mono" id="tcpTxt" style="font-size:13px;margin:6px 0 0"></p>
+    </div>
+    <div>
+      <h3>UDP <span class="muted" style="font-family:var(--body);text-transform:none;font-size:13px">delivers whatever arrives, when it arrives</span></h3>
+      <div class="cells" id="udp" style="--cols:20" aria-hidden="true"></div>
+      <p class="mono" id="udpTxt" style="font-size:13px;margin:6px 0 0"></p>
+    </div>
+    <div class="legend"><span><i style="background:var(--wait)"></i>in flight / resent</span><span><i style="background:var(--accent-2)"></i>arrived, waiting for an earlier one</span><span><i style="background:var(--ok)"></i>given to the app</span><span><i style="background:var(--bad)"></i>lost or too late</span></div>
+    <div class="status" id="status" role="status">Press Play to send the packets.</div>
+  </div>
+  <h3>Try this</h3>
+  <ol class="missions" id="missions"></ol>
+  <div class="compare">
+    <div><h3>TCP</h3><p style="margin:0">A connection with a handshake, acknowledgements, retransmission and ordering. The app gets a perfect stream of bytes. When a packet is lost, everything after it <b>waits</b> (head-of-line blocking).</p></div>
+    <div><h3>UDP</h3><p style="margin:0">Fire-and-forget packets: no handshake, no retries, no ordering. Lost packets stay lost, and late ones aren't waited for. The app decides what to do, which is great when old data is worthless.</p></div>
+  </div>
+  <div class="takeaway"><div class="t">The one difference</div><p>TCP <b>waits</b> until it has every byte in order; UDP hands over <b>what arrived, right now</b>. For files, web pages and payments you want TCP. For live video, voice and games, a late packet is as bad as a lost one, so UDP (with the app filling the gaps) wins.</p></div>
+</section>
+
+<section class="panel" id="real">
+  <div class="panel-label"><span>act 2 · the real thing</span><span class="hot">node.js</span></div>
+  <h2>Same idea, two socket types</h2>
+  <p><b>Hover or tap a line.</b></p>
+  <div class="yaml-wrap">
+    <pre class="yaml" id="code" aria-label="Example TCP and UDP code"></pre>
+    <div class="explain" aria-live="polite"><div class="t" id="exT">👆 pick a line</div><p id="exP">Each highlighted line maps to the lab.</p></div>
+  </div>
+</section>
+
+<section class="panel" id="recap">
+  <div class="panel-label"><span>recap · keep this</span><span class="hot">♥</span></div>
+  <h2>The whole page on one screen</h2>
+  <div class="cards">
+    <div class="card"><div class="sub">Complete + ordered</div><div class="t">TCP</div><p>Handshake, acknowledgements, retransmission, ordering, congestion control. HTTP/1 and HTTP/2, databases, SSH and email all use it.</p></div>
+    <div class="card"><div class="sub">Fast + lossy</div><div class="t">UDP</div><p>Just packets. Used by DNS, video calls, games and live streaming, and by QUIC, which builds its own reliability on top (page 23).</p></div>
+    <div class="card"><div class="sub">The cost</div><div class="t">Head-of-line blocking</div><p>One lost TCP packet delays everything behind it, even data that already arrived.</p></div>
+  </div>
+  <div class="takeaway"><div class="t">The tradeoff</div><p>TCP gives you correctness for free and charges you in latency when the network is bad. UDP gives you low latency and makes you handle loss, ordering and congestion yourself. That's why most apps use TCP, and why the ones that need real-time behavior use UDP with their own protocol on top.</p></div>
+  <h3 style="margin-top:26px">Check it <span class="score" id="score"></span></h3>
+  <ol class="mcq" id="quiz"></ol>
+</section>
+
+<nav class="pager" id="pager" aria-label="Pages"></nav>
+</main>
+
+<script src="../assets/explainer.js"></script>
+<script>
+(() => {
+const { $, el } = X;
+const N = 20, SEND = 100, ONE_WAY = 300, RTO = 600, DEADLINE = 500;
+
+/* ---------- schedule (pure, deterministic): when each packet reaches the app ---------- */
+const lost = (i, attempt, pct) => { let h = Math.imul((i + 1) * 2654435761 ^ (attempt + 1) * 40503, 0x9e3779b1) >>> 0; return h % 100 < pct; };
+function plan(pct) {
+  const tcp = [], udp = [];
+  for (let i = 0; i < N; i++) {
+    const sent = i * SEND;
+    udp.push({ sent, arrive: lost(i, 0, pct) ? null : sent + ONE_WAY });
+    let a = 0, t = sent, resends = 0;
+    while (lost(i, a, pct) && a < 6) { a++; t += RTO; resends++; }
+    tcp.push({ sent, arrive: t + ONE_WAY, resends, firstLostAt: resends ? sent + ONE_WAY : null });
+  }
+  let prev = 0;
+  tcp.forEach(p => { p.app = Math.max(p.arrive, prev); prev = p.app; });
+  udp.forEach(p => { p.app = p.arrive; });
+  return { tcp, udp, end: Math.max(...tcp.map(p => p.app)) + 200 };
+}
+function summarize(P, video) {
+  const late = arr => arr.filter(p => p.app == null || p.app - p.sent > DEADLINE).length;
+  return { tcpDone: Math.max(...P.tcp.map(p => p.app)), tcpStall: Math.max(...P.tcp.map(p => p.app - p.sent)) - ONE_WAY,
+    udpMissing: P.udp.filter(p => p.app == null).length, tcpLate: late(P.tcp), udpLate: late(P.udp), resends: P.tcp.reduce((a, p) => a + p.resends, 0), video };
+}
+
+/* ---------- UI ---------- */
+let loss = 0, video = false, P = plan(0), t = 0;
+const runs = [];
+const mk = id => { const g = $('#' + id); for (let i = 0; i < N; i++) g.append(el('div', 'cell')); return [...g.children]; };
+const tcpCells = mk('tcp'), udpCells = mk('udp');
+function cellState(p, now, isUdp) {
+  if (now < p.sent) return '';
+  if (p.app != null && now >= p.app) return video && p.app - p.sent > DEADLINE ? 'bad' : 'hit';
+  if (isUdp && p.arrive == null) return now >= p.sent + ONE_WAY ? 'bad' : 'wait';
+  if (!isUdp && now >= p.arrive) return 'on';
+  return 'wait';
+}
+function render() {
+  $('#lossV').textContent = loss + '%';
+  $('#tag').textContent = video ? 'video call' : 'file download';
+  P.tcp.forEach((p, i) => (tcpCells[i].className = 'cell ' + cellState(p, t, false)));
+  P.udp.forEach((p, i) => (udpCells[i].className = 'cell ' + cellState(p, t, true)));
+  const done = t >= P.end;
+  const sm = summarize(P, video);
+  const gotT = P.tcp.filter(p => t >= p.app).length, gotU = P.udp.filter(p => p.app != null && t >= p.app).length;
+  $('#tcpTxt').textContent = `${gotT}/${N} delivered${sm.resends ? ` · ${sm.resends} resent` : ''}${done ? ` · finished at ${(sm.tcpDone / 1000).toFixed(1)} s${video ? ` · ${sm.tcpLate} frames too late` : ''}` : ''}`;
+  $('#udpTxt').textContent = `${gotU}/${N} delivered${done ? ` · ${sm.udpMissing} never arrived${video ? ` · ${sm.udpLate} frames missing` : ''}` : ''}`;
+  const st = $('#status');
+  if (!t) { st.className = 'status'; st.textContent = 'Press Play to send the packets.'; }
+  else if (!done) { st.className = 'status'; st.textContent = 'Sending…'; }
+  else if (!loss) { st.className = 'status ok'; st.textContent = '✓ No loss: both protocols deliver all 20 packets, on time and in order.'; }
+  else if (video) { st.className = 'status ' + (sm.tcpLate > sm.udpLate ? 'wait' : 'ok'); st.textContent = `Video call: TCP shows ${sm.tcpLate} frames too late (the picture freezes while it waits for resends). UDP is missing ${sm.udpLate}, but everything else is on time, so the call just glitches briefly. UDP wins.`; }
+  else { st.className = 'status ' + (sm.udpMissing ? 'wait' : 'ok'); st.textContent = `File download: TCP took ${(sm.tcpDone / 1000).toFixed(1)} s instead of 2.2 s, but the file is complete. UDP finished fast with ${sm.udpMissing} packets missing: a corrupted PDF. TCP wins.`; }
+  player.clock(`t = ${(t / 1000).toFixed(1)} s`);
+  if (done && !P.recorded) { P.recorded = true; runs.push({ loss, ...sm }); }
+  mis.update(runs);
+}
+const player = X.player($('#player'), {
+  step: () => { if (t >= P.end) { player.pause(); return; } t += 100; render(); }, stepTicks: 3,
+  reset: () => { P = plan(loss); t = 0; render(); },
+});
+$('#loss').addEventListener('input', e => { loss = +e.target.value; P = plan(loss); t = 0; player.pause(); render(); });
+X.seg($('#useSeg'), ['File download', 'Video call'], i => { video = i === 1; P = plan(loss); t = 0; player.pause(); render(); }, 0);
+const mis = X.missions($('#missions'), [
+  { text: 'Press <b>Play</b> with 0% loss.', hint: 'With a perfect network, TCP and UDP look the same.', check: r => r.some(x => x.loss === 0) },
+  { text: 'Set the loss to <b>15%</b> and play again.', hint: 'TCP resends lost packets and holds everything behind them. UDP just shows gaps.', check: r => r.some(x => x.loss >= 10 && !x.video) },
+  { text: 'Switch to <b>Video call</b> and play.', hint: 'Frames older than 0.5 s are useless. Which protocol shows more of the call on time?', check: r => r.some(x => x.loss >= 10 && x.video && x.tcpLate > x.udpLate) },
+]);
+render();
+
+/* ---------- code map ---------- */
+X.codeMap($('#code'), [
+  ['<span class="c">// TCP: a connection, then a reliable stream of bytes</span>', null],
+  ['<span class="key">const</span> sock = net.createConnection({ host: <span class="s">"encore.example"</span>, port: 443 });', 'tcpconn'],
+  ['sock.write(pdfBytes);   <span class="c">// arrives complete and in order, or the connection fails</span>', 'tcpwrite'],
+  ['', null],
+  ['<span class="c">// UDP: no connection, independent packets</span>', null],
+  ['<span class="key">const</span> udp = dgram.createSocket(<span class="s">"udp4"</span>);', 'udp'],
+  ['udp.send(videoFrame, 5004, <span class="s">"stream.encore.example"</span>);  <span class="c">// may be lost, duplicated or reordered</span>', 'udpsend'],
+  ['', null],
+  ['<span class="c">// the receiving app handles gaps itself</span>', null],
+  ['<span class="key">if</span> (frame.seq &lt; lastShown) <span class="key">return</span>;  <span class="c">// too old: skip it, don\'t wait</span>', 'skip'],
+], {
+  tcpconn: ['Connection', 'A three-way handshake first (one round trip), then the OS tracks every byte: acknowledgements, retransmissions and ordering are all built in.'],
+  tcpwrite: ['Reliable stream', 'Your app never sees a lost or reordered packet. It just sees data arriving later. That\'s the TCP row stalling in the lab.'],
+  udp: ['No connection', 'No handshake and no per-connection state. Each send is one independent packet (a datagram).'],
+  udpsend: ['Fire and forget', 'The OS sends it once. If it\'s lost, nothing happens. That\'s the red squares in the UDP row.'],
+  skip: ['App-level choices', 'Video and game protocols number their packets and decide themselves: skip late frames, conceal a missing one, or ask again only for what matters.'],
+}, $('#exT'), $('#exP'));
+
+/* ---------- quiz + pager ---------- */
+X.quiz($('#quiz'), [
+  { q: 'Encore\'s live concert stream freezes for a second every time the network hiccups, then jumps ahead. It runs over TCP. Why?', opts: [
+    ['The video encoder is too slow', false, 'The freeze lines up with network loss, not encoding.'],
+    ['TCP holds later packets until the lost one is resent: head-of-line blocking', true, 'For live media a late frame is useless. UDP-based protocols (like WebRTC) skip it and keep playing.'],
+    ['UDP would freeze even more', false, 'UDP delivers what arrives immediately, so it glitches instead of freezing.'],
+  ] },
+  { q: 'Which of these should use TCP (or a reliable protocol)?', opts: [
+    ['Downloading a ticket PDF', true, 'Every byte matters and order matters. A missing packet means a broken file.'],
+    ['A live voice chat between fans', false, 'Late audio is worse than a tiny gap. UDP-based real-time protocols are the norm.'],
+    ['A multiplayer game sending player positions 30 times a second', false, 'Only the newest position matters. Old ones are worthless by the time they\'re resent.'],
+  ] },
+  { q: 'DNS usually runs over UDP. Why is that fine?', opts: [
+    ['DNS answers are never lost', false, 'They can be lost. The client just asks again after a short timeout.'],
+    ['Queries are tiny and a lost one is simply retried, which is cheaper than a TCP handshake every time', true, 'For one small question and one small answer, setting up a connection would cost more than the occasional retry.'],
+    ['UDP is encrypted', false, 'Neither TCP nor UDP is encrypted by itself. That\'s TLS\'s job (page 19).'],
+  ] },
+], $('#score'));
+X.pager($('#pager'), 'tcp-vs-udp');
+})();
+</script>
+</body>
+</html>
